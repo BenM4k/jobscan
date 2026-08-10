@@ -1,67 +1,200 @@
-import Image from "next/image";
+import Link from "next/link";
+import { Suspense } from "react";
+import { requireSession } from "@/lib/auth-guard";
+import { Navbar } from "@/components/layout/Navbar";
 
-export default function Home() {
+async function LandingNavbar() {
+  const sessionResult = await requireSession();
+  const userEmail = sessionResult.ok ? sessionResult.value?.user?.email : null;
+  return <Navbar userEmail={userEmail} />;
+}
+
+async function LandingCTA() {
+  const sessionResult = await requireSession();
+  const isAuthenticated = sessionResult.ok && sessionResult.value !== null;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="flex flex-col sm:flex-row items-center gap-4">
+      {isAuthenticated ? (
+        <Link
+          href="/dashboard"
+          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm px-7 py-3.5 rounded-xl shadow-lg shadow-blue-500/25 transition transform hover:-translate-y-0.5"
+        >
+          Go to Dashboard →
+        </Link>
+      ) : (
+        <Link
+          href="/sign-up"
+          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm px-7 py-3.5 rounded-xl shadow-lg shadow-blue-500/25 transition transform hover:-translate-y-0.5"
+        >
+          Start automated job search
+        </Link>
+      )}
+    </div>
+  );
+}
+
+export default function LandingPage() {
+  return (
+    <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0A0A0C] text-gray-900 dark:text-zinc-100 font-sans flex flex-col selection:bg-blue-500 selection:text-white relative overflow-hidden transition-colors duration-300">
+      {/* Subtle Dot Grid Background Pattern */}
+      <div
+        className="absolute inset-0 pointer-events-none opacity-40 dark:opacity-20"
+        style={{
+          backgroundImage: `radial-gradient(#CBD5E1 1px, transparent 1px)`,
+          backgroundSize: `24px 24px`,
+        }}
+      />
+
+      <header>
+        <Suspense fallback={<Navbar userEmail={null} />}>
+          <LandingNavbar />
+        </Suspense>
+      </header>
+
+      {/* Floating Tactical Widgets */}
+      <main className="relative flex-1 flex flex-col items-center justify-center text-center px-6 py-20 max-w-5xl mx-auto">
+        {/* Floating Top-Left Sticky Note Widget */}
+        <div aria-hidden="true" className="hidden lg:block absolute top-12 left-0 -rotate-3 bg-[#FEF08A] dark:bg-yellow-400 text-gray-900 p-4 rounded-xl shadow-lg border border-yellow-300 max-w-[200px] text-left transform hover:rotate-0 transition duration-300">
+          <div className="w-2.5 h-2.5 rounded-full bg-rose-500 mx-auto -mt-2 mb-2 shadow-sm" />
+          <p className="text-xs font-handwriting font-bold leading-snug">
+            Auto-score jobs against my resume with Claude, Gemini & OpenAI!
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* Floating Top-Right Reminders Widget */}
+        <div aria-hidden="true" className="hidden lg:block absolute top-12 right-0 rotate-3 bg-white dark:bg-slate-900 text-gray-800 dark:text-slate-200 p-4 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-800 max-w-[220px] text-left transform hover:rotate-0 transition duration-300">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-sm">⏱️</span>
+            <span className="text-xs font-bold text-gray-900 dark:text-slate-100">
+              Scheduled Ingest
+            </span>
+          </div>
+          <p className="text-[11px] text-gray-500 dark:text-slate-400">
+            Greenhouse & RemoteOK
+          </p>
+          <div className="mt-2 text-[10px] font-mono bg-blue-50 dark:bg-indigo-950 text-blue-600 dark:text-indigo-300 px-2 py-1 rounded-md font-semibold inline-block">
+            Every day @ 09:00 AM
+          </div>
+        </div>
+
+        {/* Central Logo Badge */}
+        <div aria-hidden="true" className="w-16 h-16 rounded-2xl bg-white dark:bg-slate-900 border border-gray-200/80 dark:border-slate-800 shadow-xl flex items-center justify-center mb-6 relative group">
+          <div className="grid grid-cols-2 gap-1.5">
+            <span className="w-3.5 h-3.5 rounded-full bg-blue-500" />
+            <span className="w-3.5 h-3.5 rounded-full bg-gray-900 dark:bg-slate-100" />
+            <span className="w-3.5 h-3.5 rounded-full bg-gray-900 dark:bg-slate-100" />
+            <span className="w-3.5 h-3.5 rounded-full bg-gray-900 dark:bg-slate-100" />
+          </div>
+        </div>
+
+        {/* Hero Title & Subtitle */}
+        <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-gray-900 dark:text-slate-100 leading-tight mb-4">
+          Discover, score, and apply <br />
+          <span className="text-gray-400 dark:text-slate-500 font-normal">
+            all in one place
+          </span>
+        </h1>
+
+        <p className="text-gray-600 dark:text-slate-400 text-base sm:text-lg max-w-xl mb-8 leading-relaxed font-normal">
+          Efficiently automate your job search pipeline, score matches against
+          your resume with AI, and draft custom cover letters.
+        </p>
+
+        {/* CTA Button */}
+        <Suspense
+          fallback={
+            <Link
+              href="/sign-up"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm px-7 py-3.5 rounded-xl shadow-lg shadow-blue-500/25 transition transform hover:-translate-y-0.5"
+            >
+              Start automated job search
+            </Link>
+          }
+        >
+          <LandingCTA />
+        </Suspense>
+
+        {/* Bottom Floating Cards Preview */}
+        <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-6 mt-16 text-left">
+          {/* Today's Applications Widget */}
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-800 space-y-3">
+            <div className="flex justify-between items-center">
+              <h3 className="text-xs font-bold text-gray-900 dark:text-slate-100 uppercase tracking-wider">
+                Today&apos;s Pipeline
+              </h3>
+              <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded-full">
+                Active Ingest
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <div className="p-3 rounded-xl bg-gray-50 dark:bg-slate-950 flex items-center justify-between border border-gray-100 dark:border-slate-800">
+                <div>
+                  <p className="text-xs font-bold text-gray-900 dark:text-slate-200">
+                    Senior Staff Frontend Engineer
+                  </p>
+                  <p className="text-[11px] text-gray-500 dark:text-slate-400">
+                    Greenhouse • Airbnb
+                  </p>
+                </div>
+                <span className="text-xs font-bold text-blue-600 dark:text-indigo-400 bg-blue-50 dark:bg-indigo-950 px-2 py-1 rounded-md">
+                  96% Match
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-gray-50 dark:bg-slate-950 flex items-center justify-between border border-gray-100 dark:border-slate-800">
+                <div>
+                  <p className="text-xs font-bold text-gray-900 dark:text-slate-200">
+                    Tech Lead Architect
+                  </p>
+                  <p className="text-[11px] text-gray-500 dark:text-slate-400">
+                    Lever • Stripe
+                  </p>
+                </div>
+                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 px-2 py-1 rounded-md">
+                  92% Match
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Job Sources & Integrations Widget */}
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-800 space-y-3">
+            <div className="flex justify-between items-center">
+              <h3 className="text-xs font-bold text-gray-900 dark:text-slate-100 uppercase tracking-wider">
+                Supported Boards & AI
+              </h3>
+              <span className="text-xs text-gray-400">Integrated</span>
+            </div>
+
+            <div className="grid grid-cols-4 gap-2 pt-2">
+              <div className="p-3 bg-gray-50 dark:bg-slate-950 rounded-xl text-center border border-gray-100 dark:border-slate-800">
+                <span className="text-base block mb-1">🌿</span>
+                <span className="text-[10px] font-bold text-gray-700 dark:text-slate-300">
+                  Greenhouse
+                </span>
+              </div>
+              <div className="p-3 bg-gray-50 dark:bg-slate-950 rounded-xl text-center border border-gray-100 dark:border-slate-800">
+                <span className="text-base block mb-1">🌐</span>
+                <span className="text-[10px] font-bold text-gray-700 dark:text-slate-300">
+                  RemoteOK
+                </span>
+              </div>
+              <div className="p-3 bg-gray-50 dark:bg-slate-950 rounded-xl text-center border border-gray-100 dark:border-slate-800">
+                <span className="text-base block mb-1">⚡</span>
+                <span className="text-[10px] font-bold text-gray-700 dark:text-slate-300">
+                  Lever
+                </span>
+              </div>
+              <div className="p-3 bg-gray-50 dark:bg-slate-950 rounded-xl text-center border border-gray-100 dark:border-slate-800">
+                <span className="text-base block mb-1">🤖</span>
+                <span className="text-[10px] font-bold text-gray-700 dark:text-slate-300">
+                  Claude AI
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </main>
     </div>

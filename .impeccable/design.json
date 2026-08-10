@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-10T05:19:25Z",
+  "title": "Design System: JobPilot",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Tactical Blue", "canonical": "#2563EB" },
+      "neutral-bg-dark": { "role": "neutral", "displayName": "Obsidian Dark", "canonical": "#0A0A0C" },
+      "neutral-bg-light": { "role": "neutral", "displayName": "Off-White Canvas", "canonical": "#FAFAFA" }
+    },
+    "shadows": [
+      { "name": "glow-blue", "value": "0 10px 25px -5px rgba(37, 99, 235, 0.25)", "purpose": "Primary CTA button glow" }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary CTA Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main action button used across hero section and primary form submits.",
+      "html": "<button class=\"ds-btn-primary\">Start automated job search →</button>",
+      "css": ".ds-btn-primary { background-color: #2563eb; color: #ffffff; font-weight: 600; font-size: 0.875rem; padding: 14px 28px; border-radius: 12px; border: none; box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.25); cursor: pointer; transition: all 0.2s ease; } .ds-btn-primary:hover { background-color: #1d4ed8; transform: translateY(-1px); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Tactical Flight Deck",
+    "overview": "JobPilot combines the precision of an aviator's flight deck with high-density modern SaaS design, featuring subtle background dot grid patterns, glassmorphism containers, and vibrant status pills.",
+    "keyCharacteristics": [
+      "High Contrast Dark/Light Dual Mode",
+      "Tactical Dot Grid Canvas",
+      "Color-Coded Status & Fit Scoring",
+      "Instant Shell Rendering"
+    ],
+    "rules": [
+      { "name": "The Single Accent Focus Rule", "body": "Vibrant blue (#2563EB) is reserved strictly for primary interactive triggers, active filters, and key score highlights.", "section": "colors" },
+      { "name": "The Flat-With-Border Rule", "body": "Containers rest flat on the dot grid canvas with precision 1px border strokes; elevation shadows appear only on hover.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do maintain the subtle dot-grid canvas pattern across all page layouts.",
+      "Do preserve high contrast between text labels and score badge backgrounds.",
+      "Do keep skeleton loading states structured to match exact resolved components."
+    ],
+    "donts": [
+      "Don't use heavy drop shadows or solid dark borders in light mode.",
+      "Don't mix plain browser default fonts with custom Tailwind typography."
+    ]
+  }
+}
