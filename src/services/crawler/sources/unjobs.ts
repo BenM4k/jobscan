@@ -94,7 +94,7 @@ export async function fetchUnJobsJobs(): Promise<{ jobs: CrawledJob[]; result: C
         upserted: 0,
       },
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       jobs: [],
       result: {
@@ -102,7 +102,7 @@ export async function fetchUnJobsJobs(): Promise<{ jobs: CrawledJob[]; result: C
         fetched: 0,
         matched: 0,
         upserted: 0,
-        error: error.message || String(error),
+        error: error instanceof Error ? error.message : String(error),
       },
     };
   }

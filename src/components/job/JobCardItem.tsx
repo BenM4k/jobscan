@@ -5,8 +5,9 @@ import { JobSelect } from "@/dal/jobs.dal";
 import { JobStatus } from "@/services/db/schema";
 import { getScoreBadgeStyle } from "@/lib/score-style";
 import { CardGridSelect } from "@/components/ui/card-grid-select";
+import { useTranslations } from "next-intl";
 
-type AIProvider = "claude" | "gemini" | "openai";
+type AIProvider = "claude" | "gemini" | "openai" | "gateway";
 
 interface JobCardItemProps {
   job: JobSelect;
@@ -39,6 +40,7 @@ export function JobCardItem({
   onDeleteJob,
 }: JobCardItemProps) {
   const [isBookmarked, setIsBookmarked] = useState(false);
+  const t = useTranslations("dashboard");
 
   const descriptionSnippet = job.description
     ? job.description
@@ -63,7 +65,7 @@ export function JobCardItem({
         {/* Company Initial Logo Box */}
         <div
           aria-hidden="true"
-          className="w-11 h-11 sm:w-13 sm:h-13 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-[#1C1C22] dark:to-[#16161B] border border-slate-300 dark:border-zinc-700/60 text-gray-900 dark:text-slate-100 font-extrabold flex items-center justify-center text-xs sm:text-sm shrink-0 font-sans tracking-wider shadow-xs"
+          className="w-11 h-11 sm:w-13 sm:h-13 rounded-2xl bg-linear-to-br from-slate-100 to-slate-200 dark:from-[#1C1C22] dark:to-[#16161B] border border-slate-300 dark:border-zinc-700/60 text-gray-900 dark:text-slate-100 font-extrabold flex items-center justify-center text-xs sm:text-sm shrink-0 font-sans tracking-wider shadow-xs"
         >
           {companyInitials}
         </div>
@@ -91,47 +93,54 @@ export function JobCardItem({
               <button
                 onClick={() => setIsBookmarked(!isBookmarked)}
                 className="text-gray-400 hover:text-amber-500 transition p-1.5 text-sm sm:text-base focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 rounded-lg cursor-pointer"
-                title={isBookmarked ? "Remove bookmark" : "Bookmark opportunity"}
-                aria-label={isBookmarked ? "Remove bookmark" : "Bookmark opportunity"}
+                title={
+                  isBookmarked ? "Remove bookmark" : "Bookmark opportunity"
+                }
+                aria-label={
+                  isBookmarked ? "Remove bookmark" : "Bookmark opportunity"
+                }
               >
-                {isBookmarked ? "🔖" : "📑"}
+                <span className={isBookmarked ? "text-amber-500" : ""}>
+                  {isBookmarked ? "★" : "☆"}
+                </span>
               </button>
+
               <button
                 onClick={() => onDeleteJob(job.id)}
-                title="Delete job posting"
-                aria-label="Delete job posting"
-                className="text-gray-400 hover:text-rose-500 transition p-1.5 text-xs sm:text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 rounded-lg cursor-pointer"
+                className="text-gray-400 hover:text-rose-600 transition p-1.5 text-sm sm:text-base focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 rounded-lg cursor-pointer"
+                title="Delete opportunity"
+                aria-label={`Delete ${job.title}`}
               >
-                🗑️
+                ✕
               </button>
             </div>
           </div>
 
-          {/* Description Snippet */}
-          <p className="text-xs sm:text-sm text-gray-600 dark:text-zinc-400 leading-relaxed line-clamp-2 pt-0.5">
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-zinc-400 leading-relaxed font-sans line-clamp-2">
             {descriptionSnippet}
           </p>
 
-          {/* Metadata Footer Row */}
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2.5 pt-2 text-[11px] sm:text-xs text-gray-500 dark:text-zinc-400 font-medium">
-            <span className="truncate max-w-[140px] sm:max-w-none">📍 {locationText}</span>
+            <span className="truncate max-w-35 sm:max-w-none">
+              📍 {locationText}
+            </span>
 
             {job.workplaceType && (
               <span className="bg-gray-100 dark:bg-[#1E1E24] text-gray-700 dark:text-zinc-300 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg font-semibold text-[10px] sm:text-[11px]">
                 {job.workplaceType === "remote"
-                  ? "Remote"
+                  ? t("remote")
                   : job.workplaceType === "hybrid"
-                  ? "Hybrid"
-                  : "On-site"}
+                    ? t("hybrid")
+                    : t("onSite")}
               </span>
             )}
 
-            <span>• via {job.source}</span>
+            <span>• {t("via")} {job.source}</span>
 
             {job.postedAt && (
               <span>
                 •{" "}
-                {new Date(job.postedAt).toLocaleDateString("en-US", {
+                {new Date(job.postedAt).toLocaleDateString(undefined, {
                   month: "short",
                   day: "numeric",
                 })}
@@ -151,12 +160,12 @@ export function JobCardItem({
             title="Status"
             value={job.status}
             options={[
-              { id: "new", label: "NEW" },
-              { id: "scored", label: "SCORED" },
-              { id: "applied", label: "APPLIED" },
-              { id: "interviewing", label: "INT" },
-              { id: "rejected", label: "REJ" },
-              { id: "offer", label: "OFFER" },
+              { id: "new", label: t("statusNew") },
+              { id: "scored", label: t("statusScored") },
+              { id: "applied", label: t("statusApplied") },
+              { id: "interviewing", label: t("statusInterviewing") },
+              { id: "rejected", label: t("statusRejected") },
+              { id: "offer", label: t("statusOffer") },
             ]}
             onChange={(val) => onStatusChange(job.id, val as JobStatus)}
             accentColor="blue"
@@ -166,9 +175,10 @@ export function JobCardItem({
             title="AI Engine"
             value={aiProvider}
             options={[
-              { id: "claude", label: "Claude" },
+              { id: "gateway", label: "Gateway" },
               { id: "gemini", label: "Gemini" },
               { id: "openai", label: "OpenAI" },
+              { id: "claude", label: "Claude" },
             ]}
             onChange={(val) => onAiProviderChange(val as AIProvider)}
             accentColor="indigo"
@@ -176,23 +186,25 @@ export function JobCardItem({
         </div>
 
         <div className="flex items-center justify-between sm:justify-end gap-2.5 sm:gap-3 w-full sm:w-auto pt-1 sm:pt-0">
-          {job.fitScore !== null && job.fitScore !== undefined && (() => {
-            const scoreStyle = getScoreBadgeStyle(job.fitScore);
-            return (
-              <span
-                className={`text-xs sm:text-sm font-extrabold px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border shrink-0 ${scoreStyle.bgColor} ${scoreStyle.borderColor} ${scoreStyle.textColor}`}
-              >
-                Score: {job.fitScore}/100
-              </span>
-            );
-          })()}
+          {job.fitScore !== null &&
+            job.fitScore !== undefined &&
+            (() => {
+              const scoreStyle = getScoreBadgeStyle(job.fitScore);
+              return (
+                <span
+                  className={`text-xs sm:text-sm font-extrabold px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border shrink-0 ${scoreStyle.bgColor} ${scoreStyle.borderColor} ${scoreStyle.textColor}`}
+                >
+                  {t("score")}: {job.fitScore}/100
+                </span>
+              );
+            })()}
 
           <button
             onClick={() => onScoreJob(job.id)}
             disabled={isScoring}
             className="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold px-3.5 sm:px-4 py-2 rounded-xl transition disabled:opacity-50 shadow-xs text-center cursor-pointer"
           >
-            {isScoring ? "Scoring..." : "Score AI"}
+            {isScoring ? t("scoring") : t("scoreJob")}
           </button>
         </div>
       </div>

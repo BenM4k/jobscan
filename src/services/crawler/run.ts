@@ -84,13 +84,13 @@ export async function runDrcCrawler(keyword?: string): Promise<CrawlResult> {
       result.upserted = sourceUpserted;
       totalUpserted += sourceUpserted;
       sourceResults.push(result);
-    } catch (err: any) {
+    } catch (err: unknown) {
       sourceResults.push({
         source: name,
         fetched: 0,
         matched: 0,
         upserted: 0,
-        error: err.message || String(err),
+        error: err instanceof Error ? err.message : String(err),
       });
     }
   }

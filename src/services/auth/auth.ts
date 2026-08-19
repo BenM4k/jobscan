@@ -20,9 +20,17 @@ export const auth = betterAuth({
   advanced: {
     database: { generateId: "uuid" },
   },
-
+  trustedOrigins: [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:3002",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
+    "http://127.0.0.1:3002",
+  ],
   emailAndPassword: {
     enabled: true,
+    requireEmailVerification: false,
     async sendResetPassword({
       user,
       url,

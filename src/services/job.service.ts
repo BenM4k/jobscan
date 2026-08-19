@@ -8,13 +8,14 @@ import { getScoringProvider } from "./scoring/factory";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 
-// Enforce State Machine Transitions
 const VALID_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
-  new: ["scored"],
-  scored: ["applied", "rejected"],
-  applied: ["interviewing", "rejected"],
+  new: ["saved", "scored", "tailored", "applied", "rejected"],
+  saved: ["scored", "tailored", "applied", "rejected"],
+  scored: ["tailored", "applied", "interviewing", "rejected"],
+  tailored: ["applied", "interviewing", "rejected"],
+  applied: ["interviewing", "rejected", "offer"],
   interviewing: ["offer", "rejected"],
-  rejected: [],
+  rejected: ["saved", "new", "applied"],
   offer: [],
 };
 
@@ -90,11 +91,11 @@ export async function scoreJobWithAI(
   if (!profileResult.ok) return profileResult;
   const userProfile = profileResult.value;
 
-  if (!userProfile || !userProfile.resumeText) {
+  if (!userProfile || !userProfile.resumeText || !userProfile.resumeText.trim()) {
     return err(
       new AppError(
-        "VALIDATION_ERROR",
-        "User profile and resume must be configured before scoring jobs"
+        "NO_MASTER_RESUME",
+        "User master resume is not configured. Please set up your master resume in Profile before scoring jobs."
       )
     );
   }

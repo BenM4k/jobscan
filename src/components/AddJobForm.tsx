@@ -2,10 +2,13 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { addManualJobAction } from "@/actions/job.actions";
 
 export function AddJobForm() {
   const router = useRouter();
+  const t = useTranslations("addJob");
+
   const [title, setTitle] = useState("");
   const [company, setCompany] = useState("");
   const [url, setUrl] = useState("");
@@ -45,10 +48,10 @@ export function AddJobForm() {
           </span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-serif text-gray-900 dark:text-slate-100 font-medium">
-          Save Custom Job Posting
+          {t("title")}
         </h1>
         <p className="text-xs sm:text-sm text-gray-500 dark:text-zinc-400 max-w-xl">
-          Save any custom job link and full job description. Saved jobs can be scored with AI to generate fit analysis, cover letters, and tailored resumes.
+          {t("subtitle")}
         </p>
       </div>
 
@@ -68,7 +71,7 @@ export function AddJobForm() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <div>
             <label htmlFor="job-title-input" className="block text-xs font-bold text-gray-700 dark:text-zinc-300 mb-1.5">
-              Job Title *
+              {t("jobTitleLabel")} *
             </label>
             <input
               id="job-title-input"
@@ -76,14 +79,14 @@ export function AddJobForm() {
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Senior Frontend Engineer"
+              placeholder={t("jobTitlePlaceholder")}
               className="w-full bg-white dark:bg-[#121215] border border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 text-xs sm:text-sm font-medium rounded-2xl p-4 focus:outline-none focus:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/20 transition shadow-xs"
             />
           </div>
 
           <div>
             <label htmlFor="company-name-input" className="block text-xs font-bold text-gray-700 dark:text-zinc-300 mb-1.5">
-              Company Name *
+              {t("companyLabel")} *
             </label>
             <input
               id="company-name-input"
@@ -91,7 +94,7 @@ export function AddJobForm() {
               required
               value={company}
               onChange={(e) => setCompany(e.target.value)}
-              placeholder="e.g. Stripe, Acme Corp"
+              placeholder={t("companyPlaceholder")}
               className="w-full bg-white dark:bg-[#121215] border border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 text-xs sm:text-sm font-medium rounded-2xl p-4 focus:outline-none focus:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/20 transition shadow-xs"
             />
           </div>
@@ -99,7 +102,7 @@ export function AddJobForm() {
 
         <div>
           <label htmlFor="job-url-input" className="block text-xs font-bold text-gray-700 dark:text-zinc-300 mb-1.5">
-            Job Posting Link / URL *
+            {t("urlLabel")} *
           </label>
           <input
             id="job-url-input"
@@ -107,14 +110,14 @@ export function AddJobForm() {
             required
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://linkedin.com/jobs/view/... or https://company.com/careers/role"
+            placeholder={t("urlPlaceholder")}
             className="w-full bg-white dark:bg-[#121215] border border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 text-xs sm:text-sm font-medium rounded-2xl p-4 focus:outline-none focus:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/20 transition shadow-xs"
           />
         </div>
 
         <div>
           <label htmlFor="job-description-input" className="block text-xs font-bold text-gray-700 dark:text-zinc-300 mb-1.5">
-            Full Job Description *
+            {t("descriptionLabel")} *
           </label>
           <textarea
             id="job-description-input"
@@ -122,7 +125,7 @@ export function AddJobForm() {
             required
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Paste the full job description text or HTML content here..."
+            placeholder={t("descriptionPlaceholder")}
             className="w-full bg-white dark:bg-[#121215] border border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 text-xs sm:text-sm font-sans rounded-2xl p-4 focus:outline-none focus:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/20 leading-relaxed transition shadow-xs"
           />
         </div>
@@ -130,9 +133,9 @@ export function AddJobForm() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm py-4 rounded-2xl transition disabled:opacity-50 shadow-md shadow-blue-500/20"
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm py-4 rounded-2xl transition disabled:opacity-50 shadow-md shadow-blue-500/20 cursor-pointer"
         >
-          {isSubmitting ? "Saving Job Posting..." : "Save Job to Pipeline"}
+          {isSubmitting ? t("submitting") : t("submitButton")}
         </button>
       </form>
     </div>

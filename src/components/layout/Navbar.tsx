@@ -3,8 +3,9 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { signOut } from "@/services/auth/auth-client";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { PreferencesWidget } from "@/components/PreferencesWidget";
 
 interface NavbarProps {
   userEmail?: string | null;
@@ -14,6 +15,7 @@ export function Navbar({ userEmail }: NavbarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  const t = useTranslations("nav");
 
   const handleSignOut = async () => {
     await signOut();
@@ -22,9 +24,9 @@ export function Navbar({ userEmail }: NavbarProps) {
   };
 
   const navLinks = [
-    { href: "/dashboard", label: "Pipeline", icon: "📊" },
-    { href: "/dashboard/add-job", label: "Add Job", icon: "➕" },
-    { href: "/dashboard/profile", label: "Profile & Resume", icon: "👤" },
+    { href: "/dashboard", label: t("pipeline"), icon: "📊" },
+    { href: "/dashboard/add-job", label: t("addJob"), icon: "➕" },
+    { href: "/dashboard/profile", label: t("profile"), icon: "👤" },
   ];
 
   return (
@@ -36,7 +38,7 @@ export function Navbar({ userEmail }: NavbarProps) {
         <Link href="/" aria-label="JobPilot Home" className="flex items-center gap-3 group">
           <div
             aria-hidden="true"
-            className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-blue-500/25 text-white font-black text-lg group-hover:scale-105 transition-transform duration-300"
+            className="w-9 h-9 rounded-xl bg-linear-to-tr from-blue-600 via-indigo-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-blue-500/25 text-white font-black text-lg group-hover:scale-105 transition-transform duration-300"
           >
             ✦
           </div>
@@ -79,23 +81,24 @@ export function Navbar({ userEmail }: NavbarProps) {
             </div>
           )}
 
-          <ThemeToggle />
+          {/* Unified Preferences Widget (Language + Light/Dark Mode) */}
+          <PreferencesWidget />
 
           {userEmail ? (
             <div className="flex items-center gap-3 pl-2 border-l border-slate-300 dark:border-slate-800">
               <div
                 aria-label={`Signed in as ${userEmail}`}
                 title={userEmail}
-                className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold text-xs flex items-center justify-center uppercase shadow-xs"
+                className="w-8 h-8 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 text-white font-bold text-xs flex items-center justify-center uppercase shadow-xs"
               >
                 {userEmail.slice(0, 2)}
               </div>
               <button
                 onClick={handleSignOut}
-                aria-label="Sign Out"
+                aria-label={t("signOut")}
                 className="bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/60 hover:text-rose-600 dark:hover:text-rose-300 text-gray-800 dark:text-slate-300 px-3.5 py-1.5 rounded-xl text-xs font-bold transition border border-slate-300 dark:border-slate-700/80 cursor-pointer shadow-xs"
               >
-                Sign Out
+                {t("signOut")}
               </button>
             </div>
           ) : (
@@ -104,28 +107,28 @@ export function Navbar({ userEmail }: NavbarProps) {
                 href="/sign-in"
                 className="text-xs font-bold text-gray-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-indigo-400 transition"
               >
-                Sign in
+                {t("signIn")}
               </Link>
               <Link
                 href="/sign-up"
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl transition text-xs font-bold shadow-md shadow-blue-500/20"
               >
-                Get started free
+                {t("signUp")}
               </Link>
             </div>
           )}
         </div>
 
-        {/* Mobile Menu Right Actions & Toggle */}
+        {/* Mobile Header Right: Unified Widget + Hamburger */}
         <div className="flex items-center gap-2 md:hidden">
-          <ThemeToggle />
+          <PreferencesWidget />
 
           <button
             type="button"
             onClick={() => setMobileMenuOpen((prev) => !prev)}
             aria-expanded={mobileMenuOpen}
             aria-label="Toggle mobile menu"
-            className="p-2 rounded-xl text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+            className="p-2 rounded-xl text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer"
           >
             <span className="text-xl font-bold">{mobileMenuOpen ? "✕" : "☰"}</span>
           </button>
@@ -138,7 +141,7 @@ export function Navbar({ userEmail }: NavbarProps) {
           {userEmail ? (
             <>
               <div className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-zinc-900 rounded-xl border border-gray-200/60 dark:border-zinc-800">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold text-xs flex items-center justify-center uppercase">
+                <div className="w-8 h-8 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 text-white font-bold text-xs flex items-center justify-center uppercase">
                   {userEmail.slice(0, 2)}
                 </div>
                 <div className="truncate text-xs font-semibold text-gray-800 dark:text-zinc-200">
@@ -173,9 +176,9 @@ export function Navbar({ userEmail }: NavbarProps) {
                   setMobileMenuOpen(false);
                   handleSignOut();
                 }}
-                className="w-full text-center bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60 px-4 py-2.5 rounded-xl text-xs font-bold transition"
+                className="w-full text-center bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer"
               >
-                Sign Out
+                {t("signOut")}
               </button>
             </>
           ) : (
@@ -185,14 +188,14 @@ export function Navbar({ userEmail }: NavbarProps) {
                 onClick={() => setMobileMenuOpen(false)}
                 className="w-full text-center border border-gray-200 dark:border-zinc-800 text-gray-800 dark:text-zinc-200 font-bold text-xs px-4 py-2.5 rounded-xl transition hover:bg-gray-50 dark:hover:bg-zinc-900"
               >
-                Sign in
+                {t("signIn")}
               </Link>
               <Link
                 href="/sign-up"
                 onClick={() => setMobileMenuOpen(false)}
                 className="w-full text-center bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-md shadow-blue-500/20"
               >
-                Get started free
+                {t("signUp")}
               </Link>
             </div>
           )}

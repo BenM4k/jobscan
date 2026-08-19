@@ -132,7 +132,7 @@ export async function fetchCongoJobJobs(): Promise<{ jobs: CrawledJob[]; result:
           workplaceType: "on-site",
         });
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (page === 1) {
         throw err;
       }

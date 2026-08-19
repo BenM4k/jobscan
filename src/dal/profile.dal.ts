@@ -18,7 +18,7 @@ export async function getProfile(): Promise<Result<ProfileSelect | null, AppErro
 }
 
 export async function upsertProfile(
-  data: { resumeText: string; skills?: string[]; aiProvider?: string }
+  data: Partial<ProfileInsert> & { resumeText: string }
 ): Promise<Result<ProfileSelect, AppError>> {
   try {
     const existingResult = await getProfile();
@@ -27,15 +27,20 @@ export async function upsertProfile(
     }
 
     if (existingResult.value) {
+      const { eq } = await import("drizzle-orm");
       const [updated] = await db
         .update(profile)
         .set({
           resumeText: data.resumeText,
+          rawText: data.rawText ?? existingResult.value.rawText,
+          summary: data.summary ?? existingResult.value.summary,
           skills: data.skills ?? existingResult.value.skills,
+          education: data.education ?? existingResult.value.education,
+          experience: data.experience ?? existingResult.value.experience,
           aiProvider: data.aiProvider ?? existingResult.value.aiProvider,
           updatedAt: new Date(),
         })
-        .where(db.query ? undefined : undefined) // update single profile
+        .where(eq(profile.id, existingResult.value.id))
         .returning();
 
       return ok(updated);
@@ -44,7 +49,11 @@ export async function upsertProfile(
         .insert(profile)
         .values({
           resumeText: data.resumeText,
+          rawText: data.rawText,
+          summary: data.summary,
           skills: data.skills ?? [],
+          education: data.education ?? [],
+          experience: data.experience ?? [],
           aiProvider: data.aiProvider ?? "gemini",
         })
         .returning();

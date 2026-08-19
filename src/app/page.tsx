@@ -2,6 +2,9 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { requireSession } from "@/lib/auth-guard";
 import { Navbar } from "@/components/layout/Navbar";
+import { getTranslations } from "next-intl/server";
+
+export const instant = false;
 
 async function LandingNavbar() {
   const sessionResult = await requireSession();
@@ -10,7 +13,10 @@ async function LandingNavbar() {
 }
 
 async function LandingCTA() {
-  const sessionResult = await requireSession();
+  const [sessionResult, t] = await Promise.all([
+    requireSession(),
+    getTranslations("landing"),
+  ]);
   const isAuthenticated = sessionResult.ok && sessionResult.value !== null;
 
   return (
@@ -20,21 +26,23 @@ async function LandingCTA() {
           href="/dashboard"
           className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm px-7 py-3.5 rounded-xl shadow-lg shadow-blue-500/25 transition transform hover:-translate-y-0.5"
         >
-          Go to Dashboard →
+          {t("ctaLoggedIn")}
         </Link>
       ) : (
         <Link
           href="/sign-up"
           className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm px-7 py-3.5 rounded-xl shadow-lg shadow-blue-500/25 transition transform hover:-translate-y-0.5"
         >
-          Start automated job search
+          {t("ctaLoggedOut")}
         </Link>
       )}
     </div>
   );
 }
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const t = await getTranslations("landing");
+
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0A0A0C] text-gray-900 dark:text-zinc-100 font-sans flex flex-col selection:bg-blue-500 selection:text-white relative overflow-hidden transition-colors duration-300">
       {/* Subtle Dot Grid Background Pattern */}
@@ -47,7 +55,11 @@ export default function LandingPage() {
       />
 
       <header>
-        <Suspense fallback={<Navbar userEmail={null} />}>
+        <Suspense
+          fallback={
+            <div className="h-16 border-b border-slate-300 dark:border-zinc-800 bg-white/80 dark:bg-[#0A0A0C]/90" />
+          }
+        >
           <LandingNavbar />
         </Suspense>
       </header>
@@ -55,31 +67,40 @@ export default function LandingPage() {
       {/* Floating Tactical Widgets */}
       <main className="relative flex-1 flex flex-col items-center justify-center text-center px-6 py-20 max-w-5xl mx-auto">
         {/* Floating Top-Left Sticky Note Widget */}
-        <div aria-hidden="true" className="hidden lg:block absolute top-12 left-0 -rotate-3 bg-[#FEF08A] dark:bg-yellow-400 text-gray-900 p-4 rounded-xl shadow-lg border border-yellow-300 max-w-[200px] text-left transform hover:rotate-0 transition duration-300">
-          <div className="w-2.5 h-2.5 rounded-full bg-rose-500 mx-auto -mt-2 mb-2 shadow-sm" />
+        <div
+          aria-hidden="true"
+          className="hidden lg:block absolute top-12 left-0 -rotate-3 bg-[#FEF08A] dark:bg-yellow-400 text-gray-900 p-4 rounded-xl shadow-lg border border-yellow-300 max-w-50 text-left transform hover:rotate-0 transition duration-300"
+        >
+          <div className="w-2.5 h-2.5 rounded-full bg-rose-500 mx-auto -mt-2 mb-2 shadow-xs" />
           <p className="text-xs font-handwriting font-bold leading-snug">
-            Auto-score jobs against my resume with Claude, Gemini & OpenAI!
+            {t("stickyNote")}
           </p>
         </div>
 
         {/* Floating Top-Right Reminders Widget */}
-        <div aria-hidden="true" className="hidden lg:block absolute top-12 right-0 rotate-3 bg-white dark:bg-slate-900 text-gray-800 dark:text-slate-200 p-4 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-800 max-w-[220px] text-left transform hover:rotate-0 transition duration-300">
+        <div
+          aria-hidden="true"
+          className="hidden lg:block absolute top-12 right-0 rotate-3 bg-white dark:bg-slate-900 text-gray-800 dark:text-slate-200 p-4 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-800 max-w-55 text-left transform hover:rotate-0 transition duration-300"
+        >
           <div className="flex items-center gap-2 mb-2">
             <span className="text-sm">⏱️</span>
             <span className="text-xs font-bold text-gray-900 dark:text-slate-100">
-              Scheduled Ingest
+              {t("scheduledIngest")}
             </span>
           </div>
           <p className="text-[11px] text-gray-500 dark:text-slate-400">
-            Greenhouse & RemoteOK
+            {t("scheduledSources")}
           </p>
           <div className="mt-2 text-[10px] font-mono bg-blue-50 dark:bg-indigo-950 text-blue-600 dark:text-indigo-300 px-2 py-1 rounded-md font-semibold inline-block">
-            Every day @ 09:00 AM
+            {t("scheduledTime")}
           </div>
         </div>
 
         {/* Central Logo Badge */}
-        <div aria-hidden="true" className="w-16 h-16 rounded-2xl bg-white dark:bg-slate-900 border border-gray-200/80 dark:border-slate-800 shadow-xl flex items-center justify-center mb-6 relative group">
+        <div
+          aria-hidden="true"
+          className="w-16 h-16 rounded-2xl bg-white dark:bg-slate-900 border border-gray-200/80 dark:border-slate-800 shadow-xl flex items-center justify-center mb-6 relative group"
+        >
           <div className="grid grid-cols-2 gap-1.5">
             <span className="w-3.5 h-3.5 rounded-full bg-blue-500" />
             <span className="w-3.5 h-3.5 rounded-full bg-gray-900 dark:bg-slate-100" />
@@ -90,15 +111,14 @@ export default function LandingPage() {
 
         {/* Hero Title & Subtitle */}
         <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-gray-900 dark:text-slate-100 leading-tight mb-4">
-          Discover, score, and apply <br />
+          {t("heroTitle1")} <br />
           <span className="text-gray-400 dark:text-slate-500 font-normal">
-            all in one place
+            {t("heroTitle2")}
           </span>
         </h1>
 
         <p className="text-gray-600 dark:text-slate-400 text-base sm:text-lg max-w-xl mb-8 leading-relaxed font-normal">
-          Efficiently automate your job search pipeline, score matches against
-          your resume with AI, and draft custom cover letters.
+          {t("heroSubtitle")}
         </p>
 
         {/* CTA Button */}
@@ -108,7 +128,7 @@ export default function LandingPage() {
               href="/sign-up"
               className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm px-7 py-3.5 rounded-xl shadow-lg shadow-blue-500/25 transition transform hover:-translate-y-0.5"
             >
-              Start automated job search
+              {t("ctaLoggedOut")}
             </Link>
           }
         >
@@ -121,10 +141,10 @@ export default function LandingPage() {
           <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-800 space-y-3">
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-bold text-gray-900 dark:text-slate-100 uppercase tracking-wider">
-                Today&apos;s Pipeline
+                {t("pipelinePreviewTitle")}
               </h3>
               <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded-full">
-                Active Ingest
+                {t("activeIngest")}
               </span>
             </div>
 
@@ -139,7 +159,7 @@ export default function LandingPage() {
                   </p>
                 </div>
                 <span className="text-xs font-bold text-blue-600 dark:text-indigo-400 bg-blue-50 dark:bg-indigo-950 px-2 py-1 rounded-md">
-                  96% Match
+                  {t("match96")}
                 </span>
               </div>
 
@@ -153,7 +173,7 @@ export default function LandingPage() {
                   </p>
                 </div>
                 <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 px-2 py-1 rounded-md">
-                  92% Match
+                  {t("match92")}
                 </span>
               </div>
             </div>
@@ -163,9 +183,9 @@ export default function LandingPage() {
           <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-800 space-y-3">
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-bold text-gray-900 dark:text-slate-100 uppercase tracking-wider">
-                Supported Boards & AI
+                {t("boardsTitle")}
               </h3>
-              <span className="text-xs text-gray-400">Integrated</span>
+              <span className="text-xs text-gray-400">{t("integrated")}</span>
             </div>
 
             <div className="grid grid-cols-4 gap-2 pt-2">
@@ -190,7 +210,7 @@ export default function LandingPage() {
               <div className="p-3 bg-gray-50 dark:bg-slate-950 rounded-xl text-center border border-gray-100 dark:border-slate-800">
                 <span className="text-base block mb-1">🤖</span>
                 <span className="text-[10px] font-bold text-gray-700 dark:text-slate-300">
-                  Claude AI
+                  Gemini Flash
                 </span>
               </div>
             </div>

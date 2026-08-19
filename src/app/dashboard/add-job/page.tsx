@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { Navbar } from "@/components/layout/Navbar";
 import { AddJobForm } from "@/components/AddJobForm";
 
+export const instant = false;
+
 async function AddJobNavbar() {
   const sessionResult = await requireSession();
 
@@ -61,7 +63,7 @@ export default function AddJobPage() {
         }}
       />
 
-      <Suspense fallback={<Navbar userEmail="" />}>
+      <Suspense fallback={<div className="h-16 border-b border-slate-300 dark:border-zinc-800 bg-white/80 dark:bg-[#0A0A0C]/90" />}>
         <AddJobNavbar />
       </Suspense>
 

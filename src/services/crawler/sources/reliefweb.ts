@@ -79,7 +79,7 @@ export async function fetchReliefWebJobs(): Promise<{ jobs: CrawledJob[]; result
         upserted: 0,
       },
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       jobs: [],
       result: {
@@ -87,7 +87,7 @@ export async function fetchReliefWebJobs(): Promise<{ jobs: CrawledJob[]; result
         fetched: 0,
         matched: 0,
         upserted: 0,
-        error: error.message || String(error),
+        error: error instanceof Error ? error.message : String(error),
       },
     };
   }

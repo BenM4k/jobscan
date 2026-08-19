@@ -1,21 +1,30 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 
 interface ProfileSidebarProps {
   aiProvider: string;
   skillsCount: number;
   resumeLength: number;
+  experienceCount?: number;
+  educationCount?: number;
 }
 
 export function ProfileSidebar({
-  aiProvider,
   skillsCount,
   resumeLength,
+  experienceCount = 0,
+  educationCount = 0,
 }: ProfileSidebarProps) {
+  const t = useTranslations("profile");
+
   const strengthPercentage = Math.min(
     100,
-    (resumeLength > 100 ? 50 : 20) + (skillsCount > 0 ? 30 : 0) + 20
+    (resumeLength > 100 ? 40 : 10) +
+      (skillsCount > 0 ? 25 : 0) +
+      (experienceCount > 0 ? 20 : 0) +
+      (educationCount > 0 ? 15 : 0)
   );
 
   return (
@@ -23,7 +32,7 @@ export function ProfileSidebar({
       {/* AT A GLANCE Section */}
       <div className="space-y-4 pt-1 border-t lg:border-t-0 border-slate-300 dark:border-zinc-800/80">
         <h3 className="text-[11px] font-mono font-semibold uppercase tracking-wider text-gray-500 dark:text-zinc-500">
-          AT A GLANCE
+          {t("atAGlance")}
         </h3>
 
         <div className="space-y-4 text-xs">
@@ -31,10 +40,34 @@ export function ProfileSidebar({
             <span aria-hidden="true" className="text-base">📄</span>
             <div>
               <p className="font-semibold text-gray-900 dark:text-slate-200">
-                Resume Document
+                {t("editResume")}
               </p>
               <p className="text-[11px] text-gray-500 dark:text-zinc-400 font-mono">
-                {resumeLength} characters uploaded
+                {resumeLength > 0 ? `${resumeLength} ${t("charsSaved")}` : "0"}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3">
+            <span aria-hidden="true" className="text-base">💼</span>
+            <div>
+              <p className="font-semibold text-gray-900 dark:text-slate-200">
+                {t("experienceHeading")}
+              </p>
+              <p className="text-[11px] text-gray-500 dark:text-zinc-400 font-mono">
+                {experienceCount} {t("positionsRecorded")}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3">
+            <span aria-hidden="true" className="text-base">🎓</span>
+            <div>
+              <p className="font-semibold text-gray-900 dark:text-slate-200">
+                {t("educationHeading")}
+              </p>
+              <p className="text-[11px] text-gray-500 dark:text-zinc-400 font-mono">
+                {educationCount} {t("degreesRecorded")}
               </p>
             </div>
           </div>
@@ -43,10 +76,10 @@ export function ProfileSidebar({
             <span aria-hidden="true" className="text-base">⚡</span>
             <div>
               <p className="font-semibold text-gray-900 dark:text-slate-200">
-                Technical Skills
+                {t("skillsHeading")}
               </p>
               <p className="text-[11px] text-gray-500 dark:text-zinc-400 font-mono">
-                {skillsCount} skill keywords tracked
+                {skillsCount} {t("skillsTracked")}
               </p>
             </div>
           </div>
@@ -55,10 +88,10 @@ export function ProfileSidebar({
             <span aria-hidden="true" className="text-base">🤖</span>
             <div>
               <p className="font-semibold text-gray-900 dark:text-slate-200">
-                Active AI Engine
+                {t("activeAiEngine")}
               </p>
               <p className="text-[11px] text-indigo-600 dark:text-indigo-400 font-mono capitalize">
-                {aiProvider} Model Engine
+                Gemini 3.6 Flash
               </p>
             </div>
           </div>
@@ -69,7 +102,7 @@ export function ProfileSidebar({
       <div className="space-y-3 pt-4 border-t border-slate-300 dark:border-zinc-800/80">
         <div className="flex justify-between items-center text-xs font-semibold">
           <span className="font-mono uppercase text-[11px] text-gray-400 dark:text-zinc-500">
-            PROFILE STRENGTH
+            {t("profileStrength")}
           </span>
           <span className="text-gray-900 dark:text-slate-200 font-bold">
             {strengthPercentage > 75 ? "Strong" : strengthPercentage > 40 ? "Medium" : "Basic"}
@@ -89,10 +122,6 @@ export function ProfileSidebar({
             style={{ width: `${strengthPercentage}%` }}
           />
         </div>
-
-        <p className="text-[11px] text-gray-500 dark:text-zinc-400 leading-relaxed pt-1">
-          Add a portfolio link and references to reach 100% and appear higher in recruiter searches.
-        </p>
       </div>
     </aside>
   );

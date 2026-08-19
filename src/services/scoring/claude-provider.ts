@@ -1,8 +1,15 @@
 import "server-only";
-import { ScoringProvider, ScoreResult, AIProviderName } from "./types";
+import {
+  ScoringProvider,
+  ScoreResult,
+  AIProviderName,
+  scoreResultSchema,
+  buildScoringPrompt,
+} from "./types";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
-import Anthropic from "@anthropic-ai/sdk";
+import { generateObject } from "ai";
+import { createAnthropic } from "@ai-sdk/anthropic";
 
 export class ClaudeProvider implements ScoringProvider {
   name: AIProviderName = "claude";
@@ -24,54 +31,21 @@ export class ClaudeProvider implements ScoringProvider {
         );
       }
 
-      const client = new Anthropic({ apiKey });
+      const anthropic = createAnthropic({ apiKey });
+      const prompt = buildScoringPrompt(
+        jobTitle,
+        jobDescription,
+        resumeText,
+        skills
+      );
 
-      const prompt = `You are an elite executive career strategist, technical recruiter, and professional resume builder.
-Your task is to analyze the candidate's background and create a custom tailored resume and cover letter engineered specifically for this target job position.
-
-IMPORTANT CREATIVE TAILORING DIRECTIVES:
-1. DO NOT simply copy-paste verbatim text from the candidate's base resume.
-2. TAILORED RESUME: Synthesize the candidate's core domain experience and skills. Transform and generate new, realistic, highly-tailored experience bullet points, accomplishments, technical skills, and quantifiable metrics that directly match the specific key requirements, responsibilities, and technologies requested in the target job description.
-3. COVER LETTER: Write a compelling, highly realistic, position-specific cover letter draft. Connect the candidate's background to the target company's mission and role requirements without repeating verbatim resume text. Generate realistic value propositions and enthusiasm for the position.
-4. Keep all generated details professional, realistic, and authentic for a candidate with this profile.
-
-Candidate Base Resume:
-${resumeText}
-
-Candidate Skills:
-${skills.join(", ")}
-
-Job Title:
-${jobTitle}
-
-Job Description:
-${jobDescription}
-
-Respond strictly in valid JSON format with no markdown block code wrappers and no additional commentary:
-{
-  "fitScore": <number between 0 and 100>,
-  "scoreReasoning": "<detailed 2-3 sentence explanation of match alignment and key strengths>",
-  "coverLetterDraft": "<a compelling, highly customized multi-paragraph cover letter tailored specifically to this role and company with realistic value propositions>",
-  "tailoredResume": "<a complete, professionally formatted tailored resume with summary, skills, and newly generated realistic bullet points tailored directly to the job description requirements>"
-}`;
-
-
-      const response = await client.messages.create({
-        model: "claude-3-5-sonnet-20241022",
-        max_tokens: 1500,
-        messages: [{ role: "user", content: prompt }],
+      const { object } = await generateObject({
+        model: anthropic("claude-3-5-sonnet-latest"),
+        schema: scoreResultSchema,
+        prompt,
       });
 
-      const content = response.content[0];
-      if (content.type !== "text") {
-        return err(
-          new AppError("EXTERNAL_API_ERROR", "Unexpected non-text response received from Anthropic Claude API.")
-        );
-      }
-
-      const cleanedText = content.text.replace(/```json/g, "").replace(/```/g, "").trim();
-      const parsed = JSON.parse(cleanedText) as ScoreResult;
-      return ok(parsed);
+      return ok(object);
     } catch (E) {
       console.error(E);
       const message = E instanceof Error ? E.message : "Unknown error";

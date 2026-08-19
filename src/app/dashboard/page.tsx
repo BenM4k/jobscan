@@ -9,6 +9,8 @@ import { searchParamsCache } from "@/lib/search-params";
 import { JobStatus } from "@/services/db/schema";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 
+export const instant = false;
+
 interface DashboardPageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
@@ -116,7 +118,7 @@ export default function DashboardPage({ searchParams }: DashboardPageProps) {
           }}
         />
 
-        <Suspense fallback={<Navbar userEmail="" />}>
+        <Suspense fallback={<div className="h-16 border-b border-slate-300 dark:border-zinc-800 bg-white/80 dark:bg-[#0A0A0C]/90" />}>
           <DashboardNavbar />
         </Suspense>
 

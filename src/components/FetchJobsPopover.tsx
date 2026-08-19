@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { triggerJobFetchAction, triggerDrcCrawlAction } from "@/actions/job.actions";
+import { useTranslations } from "next-intl";
 
 type FetchSource = "remoteok" | "drc" | "greenhouse" | "lever" | "ashby";
 
@@ -16,6 +17,7 @@ export function FetchJobsPopover({ onSuccess, onError }: FetchJobsPopoverProps) 
   const [queryInput, setQueryInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const t = useTranslations("dashboard");
 
   const isKeywordSource = selectedSource === "remoteok" || selectedSource === "drc";
 
@@ -54,9 +56,10 @@ export function FetchJobsPopover({ onSuccess, onError }: FetchJobsPopoverProps) 
           setTimeout(() => window.location.reload(), 1200);
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setIsLoading(false);
-      onError(err.message || "Failed to fetch jobs.");
+      const msg = err instanceof Error ? err.message : "Failed to fetch jobs.";
+      onError(msg);
     }
   };
 
@@ -64,18 +67,18 @@ export function FetchJobsPopover({ onSuccess, onError }: FetchJobsPopoverProps) 
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger
         disabled={isLoading}
-        aria-label="Fetch or Crawl New Job Postings"
+        aria-label={t("fetchJobs")}
         className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl transition shadow-md shadow-emerald-600/20 inline-flex items-center gap-1.5 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 cursor-pointer"
       >
         {isLoading ? (
           <>
             <span aria-hidden="true" className="w-2 h-2 rounded-full bg-white animate-ping" />
-            <span>Fetching Opportunities...</span>
+            <span>{t("fetchingJobs")}</span>
           </>
         ) : (
           <>
             <span aria-hidden="true">🌐</span>
-            <span>Fetch Jobs</span>
+            <span>{t("fetchJobs")}</span>
             <span className="text-[10px] opacity-75" aria-hidden="true">▾</span>
           </>
         )}
@@ -88,10 +91,10 @@ export function FetchJobsPopover({ onSuccess, onError }: FetchJobsPopoverProps) 
         <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-zinc-800/80">
           <div>
             <h4 className="text-xs font-bold text-gray-900 dark:text-slate-100 uppercase tracking-wider">
-              Fetch New Job Listings
+              {t("fetchPopoverTitle")}
             </h4>
             <p className="text-[11px] text-gray-500 dark:text-zinc-400">
-              Select platform source and search parameter.
+              {t("fetchPopoverSubtitle")}
             </p>
           </div>
         </div>
@@ -126,7 +129,7 @@ export function FetchJobsPopover({ onSuccess, onError }: FetchJobsPopoverProps) 
                 : "border-slate-300 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800/60 text-gray-800 dark:text-zinc-300"
             }`}
           >
-            <span>🇨🇩 DRC Local</span>
+            <span>🇨🇩 {t("drcSources")}</span>
             <span className="text-[9px] opacity-70 font-normal">Keyword Filter</span>
           </button>
 
@@ -186,7 +189,7 @@ export function FetchJobsPopover({ onSuccess, onError }: FetchJobsPopoverProps) 
               htmlFor="fetch-query-input"
               className="block text-xs font-semibold text-gray-800 dark:text-zinc-200 mb-1"
             >
-              {isKeywordSource ? "Job Field / Skill Keyword" : "Company Board Slug / ID"}
+              {isKeywordSource ? t("targetKeyword") : t("companyBoardToken")}
             </label>
             <input
               id="fetch-query-input"
@@ -202,35 +205,12 @@ export function FetchJobsPopover({ onSuccess, onError }: FetchJobsPopoverProps) 
             />
           </div>
 
-          {/* Hint / Warning Info Block */}
-          {isKeywordSource ? (
-            <div className="p-3 bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/60 rounded-xl text-[11px] text-blue-700 dark:text-blue-300 space-y-1">
-              <span className="font-bold flex items-center gap-1">
-                💡 Keyword Search Allowed
-              </span>
-              <p className="leading-normal">
-                {selectedSource === "remoteok"
-                  ? "RemoteOK supports filtering listings by specific field or skill tags (e.g., 'software developer', 'dev', 'python')."
-                  : "DRC local sources match postings matching your skill or field search query."}
-              </p>
-            </div>
-          ) : (
-            <div className="p-3 bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/60 rounded-xl text-[11px] text-amber-800 dark:text-amber-300 space-y-1">
-              <span className="font-bold flex items-center gap-1">
-                ⚠️ Company Board Slug Required
-              </span>
-              <p className="leading-normal">
-                ATS platforms ({selectedSource.toUpperCase()}) do not support generic role searches. Enter the exact company board ID from their portal URL (e.g. greenhouse.io/<strong>vercel</strong> -&gt; vercel).
-              </p>
-            </div>
-          )}
-
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs py-2.5 rounded-xl transition shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs py-2.5 rounded-xl transition shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
           >
-            {isLoading ? "Fetching Jobs..." : `Fetch ${selectedSource.toUpperCase()} Jobs`}
+            {isLoading ? t("fetching") : `${t("fetchButton")} (${selectedSource.toUpperCase()})`}
           </button>
         </form>
       </PopoverContent>

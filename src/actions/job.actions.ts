@@ -14,7 +14,9 @@ const transitionStatusSchema = z.object({
   jobId: z.string().uuid(),
   status: z.enum([
     "new",
+    "saved",
     "scored",
+    "tailored",
     "applied",
     "interviewing",
     "rejected",
@@ -24,7 +26,7 @@ const transitionStatusSchema = z.object({
 
 const scoreJobSchema = z.object({
   jobId: z.string().uuid(),
-  provider: z.enum(["claude", "gemini", "openai"]).optional(),
+  provider: z.enum(["claude", "gemini", "openai", "gateway"]).optional(),
 });
 
 export async function triggerJobFetchAction(formData: FormData) {
@@ -77,7 +79,7 @@ export async function transitionJobStatusAction(
 
 export async function scoreJobAction(
   jobId: string,
-  provider?: "claude" | "gemini" | "openai",
+  provider?: "claude" | "gemini" | "openai" | "gateway",
 ) {
   const sessionResult = await requireSession();
   if (!sessionResult.ok)

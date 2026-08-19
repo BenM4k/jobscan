@@ -1,5 +1,6 @@
 export type AppErrorCode =
   | "VALIDATION_ERROR"
+  | "NO_MASTER_RESUME"
   | "NOT_FOUND"
   | "UNAUTHORIZED"
   | "EXTERNAL_API_ERROR"

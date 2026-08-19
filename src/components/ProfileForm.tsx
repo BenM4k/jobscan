@@ -1,15 +1,24 @@
 "use client";
 
 import React, { useState } from "react";
-import {
-  saveProfileTextAction,
-  uploadResumeFileAction,
-  reformatProfileWithGeminiAction,
-  deleteResumeAction,
-} from "@/actions/profile.actions";
+import { saveMasterResumeAction, deleteResumeAction } from "@/actions/profile.actions";
 import { CardGridSelect } from "@/components/ui/card-grid-select";
 import { ProfileOverview } from "@/components/profile/ProfileOverview";
 import { ProfileSidebar } from "@/components/profile/ProfileSidebar";
+import { MasterResumeUpload } from "@/components/profile/MasterResumeUpload";
+import { MasterResumeEditor } from "@/components/profile/MasterResumeEditor";
+import { EducationItem, ExperienceItem, ResumeProfileData } from "@/lib/ai";
+import { toast } from "sonner";
+import { useTranslations } from "next-intl";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 interface ProfileFormProps {
   userEmail?: string;
@@ -17,6 +26,9 @@ interface ProfileFormProps {
   initialResumeText?: string;
   initialSkills?: string[];
   initialAiProvider?: string;
+  initialSummary?: string;
+  initialEducation?: EducationItem[];
+  initialExperience?: ExperienceItem[];
 }
 
 export function ProfileForm({
@@ -25,348 +37,224 @@ export function ProfileForm({
   initialResumeText = "",
   initialSkills = [],
   initialAiProvider = "gemini",
+  initialSummary = "",
+  initialEducation = [],
+  initialExperience = [],
 }: ProfileFormProps) {
   const [resumeText, setResumeText] = useState(initialResumeText);
+  const [summary, setSummary] = useState(initialSummary);
   const [skills, setSkills] = useState(initialSkills.join(", "));
+  const [education, setEducation] = useState<EducationItem[]>(initialEducation);
+  const [experience, setExperience] = useState<ExperienceItem[]>(initialExperience);
+  const [rawText, setRawText] = useState(initialResumeText);
   const [aiProvider, setAiProvider] = useState(initialAiProvider);
   const [isEditing, setIsEditing] = useState(!initialResumeText.trim());
-  const [isReformatting, setIsReformatting] = useState(false);
-  const [statusMsg, setStatusMsg] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
+  const t = useTranslations("profile");
+  const tCommon = useTranslations("common");
 
   const parsedSkillsList = skills
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const handleSaveText = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setStatusMsg(null);
-
-    const formData = new FormData();
-    formData.append("resumeText", resumeText);
-    formData.append("skills", skills);
-    formData.append("aiProvider", aiProvider);
-
-    const res = await saveProfileTextAction(formData);
-    setIsSubmitting(false);
-
-    if (res.success) {
-      setIsEditing(false);
-      setStatusMsg({
-        type: "success",
-        text: "Candidate profile settings saved!",
-      });
-    } else {
-      setStatusMsg({
-        type: "error",
-        text: res.error || "Failed to update profile.",
-      });
-    }
+  const handleExtracted = (data: ResumeProfileData, fileRawText: string) => {
+    setSummary(data.summary || "");
+    setSkills(data.skills?.join(", ") || "");
+    setEducation(data.education || []);
+    setExperience(data.experience || []);
+    setRawText(fileRawText);
+    setIsEditing(true);
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsSubmitting(true);
-    setStatusMsg(null);
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    const res = await uploadResumeFileAction(formData);
-    setIsSubmitting(false);
+  const handleSave = async () => {
+    setIsSaving(true);
+    const res = await saveMasterResumeAction({
+      summary,
+      skills: parsedSkillsList,
+      education,
+      experience,
+      rawText,
+      resumeText,
+      aiProvider,
+    });
+    setIsSaving(false);
 
     if (res.success && res.data) {
       setResumeText(res.data.resumeText);
-      if (Array.isArray(res.data.skills) && res.data.skills.length > 0) {
-        setSkills(res.data.skills.join(", "));
-      }
       setIsEditing(false);
-      setStatusMsg({
-        type: "success",
-        text: `Successfully uploaded & formatted resume text with Gemini AI!`,
-      });
+      toast.success("Master resume saved successfully!");
     } else {
-      setStatusMsg({
-        type: "error",
-        text: res.error || "Failed to upload or parse resume document.",
-      });
+      toast.error(res.error || "Failed to save master resume");
     }
   };
 
-  const handleReformatWithGemini = async () => {
-    setIsReformatting(true);
-    setStatusMsg(null);
-
-    const res = await reformatProfileWithGeminiAction();
-    setIsReformatting(false);
-
-    if (res.success && res.data) {
-      setResumeText(res.data.resumeText);
-      if (Array.isArray(res.data.skills) && res.data.skills.length > 0) {
-        setSkills(res.data.skills.join(", "));
-      }
-      setAiProvider("gemini");
-      setStatusMsg({
-        type: "success",
-        text: "Profile successfully reformatted & updated using Google Gemini AI!",
-      });
-    } else {
-      setStatusMsg({
-        type: "error",
-        text: res.error || "Failed to reformat profile with Gemini AI.",
-      });
-    }
-  };
-
-  const handleDeleteResume = async () => {
-    if (
-      !confirm(
-        "Are you sure you want to delete your resume from your candidate profile? You can upload a new one immediately.",
-      )
-    ) {
-      return;
-    }
-
-    setIsSubmitting(true);
-    setStatusMsg(null);
-
+  const confirmDeleteResume = async () => {
+    setDeleteConfirmOpen(false);
     const res = await deleteResumeAction();
-    setIsSubmitting(false);
-
     if (res.success) {
       setResumeText("");
+      setSummary("");
       setSkills("");
+      setEducation([]);
+      setExperience([]);
       setIsEditing(true);
-      setStatusMsg({
-        type: "success",
-        text: "Resume deleted. Please upload a new resume below.",
-      });
-    } else {
-      setStatusMsg({
-        type: "error",
-        text: res.error || "Failed to delete resume.",
-      });
+      toast.info("Master resume deleted.");
     }
   };
 
-  // If user has provided resume & not currently editing -> render profile view!
+  const deleteResumeModal = (
+    <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+      <DialogContent className="sm:max-w-md bg-white dark:bg-[#121215] border border-slate-300 dark:border-zinc-800 rounded-3xl p-6 space-y-4">
+        <DialogHeader>
+          <div className="w-10 h-10 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center text-lg mb-1">
+            🗑️
+          </div>
+          <DialogTitle className="text-base font-bold text-gray-900 dark:text-slate-100">
+            {t("deleteResumeModalTitle")}
+          </DialogTitle>
+          <DialogDescription className="text-xs text-gray-500 dark:text-zinc-400 leading-relaxed">
+            {t("deleteResumeModalDescription")}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="flex flex-row justify-end gap-2 pt-2">
+          <Button
+            variant="outline"
+            onClick={() => setDeleteConfirmOpen(false)}
+            className="text-xs font-bold rounded-xl cursor-pointer"
+          >
+            {tCommon("cancel")}
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={confirmDeleteResume}
+            className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl cursor-pointer"
+          >
+            {t("deleteResumeConfirm")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (!isEditing && resumeText.trim()) {
     return (
       <div className="space-y-6 max-w-5xl mx-auto">
-        {statusMsg && (
-          <div
-            className={`p-4 rounded-2xl text-xs font-semibold flex justify-between items-center ${
-              statusMsg.type === "success"
-                ? "bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
-                : "bg-rose-50 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
-            }`}
-          >
-            <span>
-              {statusMsg.type === "success" ? "✅ " : "⚠️ "}
-              {statusMsg.text}
-            </span>
-            <button
-              onClick={() => setStatusMsg(null)}
-              className="text-xs font-bold opacity-75 hover:opacity-100"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
-
         <div className="flex flex-col lg:flex-row items-start gap-12 pt-4">
           <ProfileOverview
-            name={
-              userName || (userEmail ? userEmail.split("@")[0] : "Candidate")
-            }
+            name={userName || (userEmail ? userEmail.split("@")[0] : "Candidate")}
             headline={
-              parsedSkillsList.length > 0
-                ? `${parsedSkillsList.slice(0, 3).join(" • ")}`
+              experience.length > 0 && experience[0]?.title
+                ? `${experience[0].title}${experience[0].company ? ` at ${experience[0].company}` : ""}`
+                : parsedSkillsList.length > 0
+                ? parsedSkillsList.slice(0, 3).join(" • ")
                 : "Candidate Profile"
             }
-            location="Kinshasa, Democratic Republic of Congo"
+            location="Democratic Republic of Congo"
+            summary={summary}
+            education={education}
+            experience={experience}
             about={resumeText}
             skills={parsedSkillsList}
             onEditClick={() => setIsEditing(true)}
-            onReformatClick={handleReformatWithGemini}
-            onDeleteClick={handleDeleteResume}
-            isReformatting={isReformatting}
+            onReformatClick={() => setIsEditing(true)}
+            onDeleteClick={() => setDeleteConfirmOpen(true)}
+            isReformatting={false}
           />
 
           <ProfileSidebar
             aiProvider={aiProvider}
             skillsCount={parsedSkillsList.length}
             resumeLength={resumeText.length}
+            experienceCount={experience.length}
+            educationCount={education.length}
           />
         </div>
+        {deleteResumeModal}
       </div>
     );
   }
 
-  // If user has NOT provided resume or clicked Edit profile -> render dark setup form!
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5 bg-white dark:bg-[#121215] border border-slate-300 dark:border-zinc-800 p-6 rounded-3xl transition-all duration-300 shadow-xs">
+      {/* Header bar */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5 bg-white dark:bg-[#121215] border border-slate-300 dark:border-zinc-800 p-6 rounded-3xl shadow-xs">
         <div>
-          <h2 className="text-2xl font-serif text-gray-900 dark:text-slate-100 font-medium">
-            Edit Candidate Profile & AI Setup
+          <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-slate-100">
+            {t("title")}
           </h2>
           <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
-            Upload your resume, set technical skill keywords, and choose your AI
-            scoring engine.
+            {t("subtitle")}
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-3">
           {resumeText.trim() && (
-            <>
-              <button
-                type="button"
-                onClick={handleReformatWithGemini}
-                disabled={isReformatting}
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition disabled:opacity-50 shadow-md shadow-indigo-600/20 flex items-center gap-1.5 cursor-pointer"
-              >
-                {isReformatting ? (
-                  <>
-                    <span className="w-2 h-2 rounded-full bg-white animate-ping" />
-                    <span>Gemini Reformatting...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>✨ Reformat with Gemini</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsEditing(false)}
-                className="bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-800 text-gray-800 dark:text-zinc-300 font-medium text-xs px-4 py-2.5 rounded-xl transition hover:border-slate-400 dark:hover:border-zinc-700 cursor-pointer shadow-xs"
-              >
-                Cancel & View Profile
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={() => setIsEditing(false)}
+              className="bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-800 text-gray-800 dark:text-zinc-300 font-bold text-xs px-4 py-2.5 rounded-xl hover:border-slate-400 dark:hover:border-zinc-700 cursor-pointer"
+            >
+              {t("cancel")}
+            </button>
           )}
 
           <button
             type="button"
-            onClick={handleSaveText}
-            disabled={isSubmitting}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition disabled:opacity-50 shadow-md shadow-blue-500/20 cursor-pointer"
+            onClick={handleSave}
+            disabled={isSaving}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition shadow-md shadow-blue-500/20 disabled:opacity-50 cursor-pointer"
           >
-            {isSubmitting ? "Saving..." : "Save Profile"}
+            {isSaving ? t("saving") : t("saveAsMaster")}
           </button>
         </div>
       </div>
 
-      {statusMsg && (
-        <div
-          className={`p-4 rounded-2xl text-xs font-semibold flex justify-between items-center ${
-            statusMsg.type === "success"
-              ? "bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
-              : "bg-rose-50 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
-          }`}
-        >
-          <span>
-            {statusMsg.type === "success" ? "✅ " : "⚠️ "}
-            {statusMsg.text}
-          </span>
-          <button
-            onClick={() => setStatusMsg(null)}
-            className="text-xs font-bold opacity-75 hover:opacity-100"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
+      {/* Upload Dropzone */}
+      <MasterResumeUpload onExtracted={handleExtracted} disabled={isSaving} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-        {/* Left Column: AI & Skills */}
-        <div className="lg:col-span-2 bg-white dark:bg-[#121215] border border-slate-300 dark:border-zinc-800 p-6 rounded-3xl space-y-6 shadow-xs">
-          <div>
-            <h3 className="text-sm font-bold text-gray-900 dark:text-slate-100">
-              1. AI Engine Provider
-            </h3>
-            <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
-              Select model for scoring match confidence.
-            </p>
-          </div>
-
-          <CardGridSelect
-            title="AI Engine"
-            value={aiProvider}
-            options={[
-              { id: "claude", label: "Claude" },
-              { id: "gemini", label: "Gemini" },
-              { id: "openai", label: "OpenAI" },
-            ]}
-            onChange={(val) => setAiProvider(val)}
-            accentColor="indigo"
-          />
-
-          <div className="pt-2">
-            <label className="block text-xs font-bold text-gray-700 dark:text-zinc-300 mb-1">
-              Technical Skills (Comma Separated)
-            </label>
-            <textarea
-              rows={4}
-              value={skills}
-              onChange={(e) => setSkills(e.target.value)}
-              placeholder="TypeScript, React, Next.js, Node.js, PostgreSQL"
-              className="w-full bg-slate-50 dark:bg-[#18181B] border border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 text-xs font-medium rounded-xl p-3 focus:outline-none focus:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/20 shadow-xs"
-            />
-          </div>
+      {/* AI Provider Select */}
+      <div className="bg-white dark:bg-[#121215] border border-slate-300 dark:border-zinc-800 p-6 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+        <div>
+          <h3 className="text-sm font-bold text-gray-900 dark:text-slate-100">
+            {t("defaultAiEngine")}
+          </h3>
+          <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
+            {t("defaultAiSubtitle")}
+          </p>
         </div>
 
-        {/* Right Column: Resume Upload & Plain Text */}
-        <div className="lg:col-span-3 bg-white dark:bg-[#121215] border border-slate-300 dark:border-zinc-800 p-6 rounded-3xl space-y-5 shadow-xs">
-          <div>
-            <h3 className="text-sm font-bold text-gray-900 dark:text-slate-100">
-              2. Upload or Paste Resume
-            </h3>
-            <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
-              Upload PDF / DOCX file or edit text directly to generate profile.
-            </p>
-          </div>
-
-          <div className="border-2 border-dashed border-slate-300 dark:border-zinc-800/80 p-6 rounded-2xl bg-slate-50/50 dark:bg-[#18181B]/50 flex flex-col items-center justify-center gap-2 hover:border-blue-500 transition cursor-pointer">
-            <label className="text-xs font-bold text-gray-700 dark:text-zinc-300 cursor-pointer hover:text-blue-500 transition flex items-center gap-2">
-              <span className="text-base">📄</span>
-              <span>Upload PDF or DOCX Resume</span>
-              <input
-                type="file"
-                accept=".pdf,.docx,.doc,.txt"
-                onChange={handleFileUpload}
-                disabled={isSubmitting}
-                className="hidden"
-              />
-            </label>
-            <span className="text-[10px] text-gray-500 dark:text-zinc-500 font-mono">
-              Auto text parsing enabled
-            </span>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-gray-700 dark:text-zinc-300 mb-1">
-              Resume Text Content
-            </label>
-            <textarea
-              rows={12}
-              value={resumeText}
-              onChange={(e) => setResumeText(e.target.value)}
-              placeholder="Paste plain text resume or work experience here..."
-              className="w-full bg-slate-50 dark:bg-[#18181B] border border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 text-xs font-mono rounded-xl p-3.5 focus:outline-none focus:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/20 leading-relaxed shadow-xs"
-            />
-          </div>
-        </div>
+        <CardGridSelect
+          title="AI Engine"
+          value={aiProvider}
+          options={[
+            { id: "gemini", label: "Gemini 3.6 Flash" },
+            { id: "gateway", label: "Gateway" },
+            { id: "openai", label: "OpenAI" },
+            { id: "claude", label: "Claude" },
+          ]}
+          onChange={(val) => setAiProvider(val)}
+          accentColor="indigo"
+        />
       </div>
+
+      {/* Structured / Raw Master Resume Editor */}
+      <MasterResumeEditor
+        summary={summary}
+        skills={skills}
+        education={education}
+        experience={experience}
+        resumeText={resumeText}
+        onSummaryChange={setSummary}
+        onSkillsChange={setSkills}
+        onEducationChange={setEducation}
+        onExperienceChange={setExperience}
+        onResumeTextChange={setResumeText}
+      />
+
+      {deleteResumeModal}
     </div>
   );
 }

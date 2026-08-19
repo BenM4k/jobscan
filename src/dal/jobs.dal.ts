@@ -8,6 +8,7 @@ import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 import { eq, desc, gte, lte, sql } from "drizzle-orm";
 import { isOlderThanOneMonth } from "@/lib/date-utils";
+import type { TailoredResumeData } from "@/lib/ai";
 
 export type JobInsert = typeof jobs.$inferInsert;
 export type JobSelect = typeof jobs.$inferSelect;
@@ -200,6 +201,9 @@ export async function updateJobScoreAndCoverLetter(
   scoreReasoning: string,
   coverLetterDraft: string,
   tailoredResume?: string,
+  matchedSkills?: string[],
+  missingSkills?: string[],
+  gaps?: string[],
 ): Promise<Result<JobSelect, AppError>> {
   try {
     const [updated] = await db
@@ -209,6 +213,9 @@ export async function updateJobScoreAndCoverLetter(
         scoreReasoning,
         coverLetterDraft,
         tailoredResume,
+        matchedSkills: matchedSkills || [],
+        missingSkills: missingSkills || [],
+        gaps: gaps || [],
         status: "scored",
       })
       .where(eq(jobs.id, id))
@@ -221,6 +228,92 @@ export async function updateJobScoreAndCoverLetter(
   } catch (error) {
     return err(
       new AppError("DB_ERROR", `Failed to update score for job ${id}`, error),
+    );
+  }
+}
+
+export async function updateJobScoreBreakdown(
+  id: string,
+  scoreData: {
+    overallScore: number;
+    matchedSkills: string[];
+    missingSkills: string[];
+    gaps: string[];
+    reasoning: string;
+  },
+): Promise<Result<JobSelect, AppError>> {
+  try {
+    const [updated] = await db
+      .update(jobs)
+      .set({
+        fitScore: scoreData.overallScore,
+        scoreReasoning: scoreData.reasoning,
+        matchedSkills: scoreData.matchedSkills,
+        missingSkills: scoreData.missingSkills,
+        gaps: scoreData.gaps,
+        status: "scored",
+      })
+      .where(eq(jobs.id, id))
+      .returning();
+
+    if (!updated) {
+      return err(new AppError("NOT_FOUND", `Job with ID ${id} not found`));
+    }
+    return ok(updated);
+  } catch (error) {
+    return err(
+      new AppError("DB_ERROR", `Failed to update score breakdown for job ${id}`, error),
+    );
+  }
+}
+
+export async function updateJobTailoredResume(
+  id: string,
+  tailoredResumeText: string,
+  tailoredResumeData?: TailoredResumeData | null,
+): Promise<Result<JobSelect, AppError>> {
+  try {
+    const [updated] = await db
+      .update(jobs)
+      .set({
+        tailoredResume: tailoredResumeText,
+        tailoredResumeData: tailoredResumeData || null,
+        status: "tailored",
+      })
+      .where(eq(jobs.id, id))
+      .returning();
+
+    if (!updated) {
+      return err(new AppError("NOT_FOUND", `Job with ID ${id} not found`));
+    }
+    return ok(updated);
+  } catch (error) {
+    return err(
+      new AppError("DB_ERROR", `Failed to update tailored resume for job ${id}`, error),
+    );
+  }
+}
+
+export async function updateJobCoverLetter(
+  id: string,
+  coverLetterText: string,
+): Promise<Result<JobSelect, AppError>> {
+  try {
+    const [updated] = await db
+      .update(jobs)
+      .set({
+        coverLetterDraft: coverLetterText,
+      })
+      .where(eq(jobs.id, id))
+      .returning();
+
+    if (!updated) {
+      return err(new AppError("NOT_FOUND", `Job with ID ${id} not found`));
+    }
+    return ok(updated);
+  } catch (error) {
+    return err(
+      new AppError("DB_ERROR", `Failed to update cover letter for job ${id}`, error),
     );
   }
 }

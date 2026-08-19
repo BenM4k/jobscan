@@ -8,6 +8,7 @@ import {
   uuid,
   unique,
 } from "drizzle-orm/pg-core";
+import type { EducationItem, ExperienceItem, TailoredResumeData } from "@/lib/ai";
 
 // ---------------------------------------------------------------------------
 // 1. better-auth Required Tables (UUID enforced)
@@ -49,6 +50,7 @@ export const account = pgTable("account", {
   refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
   scope: text("scope"),
   password: text("password"),
+  issuer: text("issuer"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -68,7 +70,9 @@ export const verification = pgTable("verification", {
 // ---------------------------------------------------------------------------
 export const jobStatusEnum = [
   "new",
+  "saved",
   "scored",
+  "tailored",
   "applied",
   "interviewing",
   "rejected",
@@ -81,7 +85,7 @@ export const jobs = pgTable(
   "jobs",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    source: text("source").notNull(), // 'greenhouse' | 'remoteok' | 'lever' | 'ashby'
+    source: text("source").notNull(), // 'greenhouse' | 'remoteok' | 'lever' | 'ashby' | 'manual'
     externalId: text("external_id").notNull(),
     title: text("title").notNull(),
     company: text("company").notNull(),
@@ -95,23 +99,31 @@ export const jobs = pgTable(
     remoteRegions: jsonb("remote_regions").$type<string[]>(),
     fitScore: integer("fit_score"),
     scoreReasoning: text("score_reasoning"),
+    matchedSkills: jsonb("matched_skills").$type<string[]>().default([]),
+    missingSkills: jsonb("missing_skills").$type<string[]>().default([]),
+    gaps: jsonb("gaps").$type<string[]>().default([]),
     coverLetterDraft: text("cover_letter_draft"),
     tailoredResume: text("tailored_resume"),
+    tailoredResumeData: jsonb("tailored_resume_data").$type<TailoredResumeData>(),
     status: text("status", { enum: jobStatusEnum })
       .default("new")
       .notNull(),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (table) => ({
-    uniqSourceExternal: unique().on(table.source, table.externalId),
-  })
+  (table) => [
+    unique("uniq_source_external").on(table.source, table.externalId),
+  ]
 );
 
 export const profile = pgTable("profile", {
   id: uuid("id").defaultRandom().primaryKey(),
   resumeText: text("resume_text").notNull(),
+  rawText: text("raw_text"),
+  summary: text("summary"),
   skills: jsonb("skills").$type<string[]>().default([]),
+  education: jsonb("education").$type<EducationItem[]>().default([]),
+  experience: jsonb("experience").$type<ExperienceItem[]>().default([]),
   aiProvider: text("ai_provider").default("gemini").notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -124,8 +136,9 @@ export const deletedJobs = pgTable(
     externalId: text("external_id").notNull(),
     deletedAt: timestamp("deleted_at").defaultNow().notNull(),
   },
-  (table) => ({
-    uniqDeletedSourceExternal: unique().on(table.source, table.externalId),
-  })
+  (table) => [
+    unique("uniq_deleted_source_external").on(table.source, table.externalId),
+  ]
 );
+
 

@@ -4,7 +4,9 @@ import React, { useState } from "react";
 import { signIn, signUp } from "@/services/auth/auth-client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 
 interface AuthViewProps {
   mode: "sign-in" | "sign-up";
@@ -13,6 +15,7 @@ interface AuthViewProps {
 export function AuthView({ mode }: AuthViewProps) {
   const router = useRouter();
   const isSignUp = mode === "sign-up";
+  const t = useTranslations("auth");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -54,8 +57,9 @@ export function AuthView({ mode }: AuthViewProps) {
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 flex flex-col justify-center items-center p-6 text-gray-900 dark:text-slate-100 font-sans relative overflow-hidden selection:bg-blue-500 selection:text-white transition-colors duration-300">
-      {/* Top Bar Theme Toggle */}
-      <div className="absolute top-6 right-6 z-20">
+      {/* Top Bar Theme Toggle & Locale Switcher */}
+      <div className="absolute top-6 right-6 z-20 flex items-center gap-2">
+        <LocaleSwitcher />
         <ThemeToggle />
       </div>
 
@@ -69,21 +73,25 @@ export function AuthView({ mode }: AuthViewProps) {
       />
 
       {/* Floating Left Note Widget */}
-      <div className="hidden lg:block absolute top-20 left-12 -rotate-3 bg-[#FEF08A] dark:bg-yellow-400 text-gray-900 p-4 rounded-xl shadow-lg border border-yellow-300 max-w-[200px] text-left transform hover:rotate-0 transition duration-300">
-        <div className="w-2.5 h-2.5 rounded-full bg-rose-500 mx-auto -mt-2 mb-2 shadow-sm" />
+      <div className="hidden lg:block absolute top-20 left-12 -rotate-3 bg-[#FEF08A] dark:bg-yellow-400 text-gray-900 p-4 rounded-xl shadow-lg border border-yellow-300 max-w-50 text-left transform hover:rotate-0 transition duration-300">
+        <div className="w-2.5 h-2.5 rounded-full bg-rose-500 mx-auto -mt-2 mb-2 shadow-xs" />
         <p className="text-xs font-handwriting font-bold leading-snug">
-          Secure, single-user auth with better-auth & Resend verification!
+          {t("noteWidget")}
         </p>
       </div>
 
       {/* Floating Right Status Widget */}
-      <div className="hidden lg:block absolute top-20 right-12 rotate-3 bg-white dark:bg-slate-900 text-gray-800 dark:text-slate-200 p-4 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-800 max-w-[210px] text-left transform hover:rotate-0 transition duration-300">
+      <div className="hidden lg:block absolute top-20 right-12 rotate-3 bg-white dark:bg-slate-900 text-gray-800 dark:text-slate-200 p-4 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-800 max-w-52 text-left transform hover:rotate-0 transition duration-300">
         <div className="flex items-center gap-2 mb-1.5">
-          <span className="text-xs font-bold text-gray-900 dark:text-slate-100">✦ JobPilot Pipeline</span>
+          <span className="text-xs font-bold text-gray-900 dark:text-slate-100">
+            {t("statusTitle")}
+          </span>
         </div>
-        <p className="text-[11px] text-gray-500 dark:text-slate-400">Automated candidate fit scoring</p>
+        <p className="text-[11px] text-gray-500 dark:text-slate-400">
+          {t("statusSubtitle")}
+        </p>
         <div className="mt-2 text-[10px] font-mono bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-300 px-2 py-0.5 rounded font-bold inline-block">
-          Active Session Guard
+          {t("statusBadge")}
         </div>
       </div>
 
@@ -108,12 +116,10 @@ export function AuthView({ mode }: AuthViewProps) {
       <div className="bg-white dark:bg-slate-900 border border-gray-200/90 dark:border-slate-800 p-8 rounded-3xl max-w-md w-full space-y-6 shadow-[0_20px_50px_rgba(0,0,0,0.08)] dark:shadow-none z-10 transition duration-300">
         <div className="text-center space-y-1">
           <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">
-            {isSignUp ? "Create your account" : "Welcome back"}
+            {isSignUp ? t("signUpTitle") : t("signInTitle")}
           </h2>
           <p className="text-xs text-gray-500 dark:text-slate-400">
-            {isSignUp
-              ? "Start managing your job search pipeline in one place"
-              : "Sign in to access your job search command center"}
+            {isSignUp ? t("signUpSubtitle") : t("signInSubtitle")}
           </p>
         </div>
 
@@ -128,12 +134,12 @@ export function AuthView({ mode }: AuthViewProps) {
           {isSignUp && (
             <div>
               <label className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider mb-1">
-                Full Name
+                {t("fullNameLabel")}
               </label>
               <input
                 type="text"
                 required
-                placeholder="Alex Developer"
+                placeholder={t("fullNamePlaceholder")}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-800 dark:text-slate-200 text-xs font-medium rounded-xl p-3 focus:ring-2 focus:ring-blue-500 transition"
@@ -143,12 +149,12 @@ export function AuthView({ mode }: AuthViewProps) {
 
           <div>
             <label className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider mb-1">
-              Email Address
+              {t("emailLabel")}
             </label>
             <input
               type="email"
               required
-              placeholder="alex@example.com"
+              placeholder={t("emailPlaceholder")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-800 dark:text-slate-200 text-xs font-medium rounded-xl p-3 focus:ring-2 focus:ring-blue-500 transition"
@@ -157,12 +163,12 @@ export function AuthView({ mode }: AuthViewProps) {
 
           <div>
             <label className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider mb-1">
-              Password
+              {t("passwordLabel")}
             </label>
             <input
               type="password"
               required
-              placeholder="••••••••"
+              placeholder={t("passwordPlaceholder")}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-800 dark:text-slate-200 text-xs font-medium rounded-xl p-3 focus:ring-2 focus:ring-blue-500 transition"
@@ -172,13 +178,13 @@ export function AuthView({ mode }: AuthViewProps) {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs py-3.5 rounded-xl transition disabled:opacity-50 shadow-lg shadow-blue-500/25"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs py-3.5 rounded-xl transition disabled:opacity-50 shadow-lg shadow-blue-500/25 cursor-pointer"
           >
             {isLoading
-              ? "Processing..."
+              ? t("processing")
               : isSignUp
-              ? "Create free account"
-              : "Sign in to pipeline"}
+                ? t("signUpButton")
+                : t("signInButton")}
           </button>
         </form>
 
@@ -188,14 +194,14 @@ export function AuthView({ mode }: AuthViewProps) {
               href="/sign-in"
               className="text-xs text-blue-600 dark:text-indigo-400 hover:text-blue-800 font-semibold"
             >
-              Already have an account? <span className="underline">Sign in</span>
+              {t("alreadyHaveAccount")}
             </Link>
           ) : (
             <Link
               href="/sign-up"
               className="text-xs text-blue-600 dark:text-indigo-400 hover:text-blue-800 font-semibold"
             >
-              Don't have an account? <span className="underline">Sign up free</span>
+              {t("dontHaveAccount")}
             </Link>
           )}
         </div>

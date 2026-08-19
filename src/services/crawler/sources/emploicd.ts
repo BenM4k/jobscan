@@ -96,7 +96,7 @@ export async function fetchEmploiCdJobs(): Promise<{ jobs: CrawledJob[]; result:
           workplaceType: "on-site",
         });
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (page === 0) {
         throw err;
       }

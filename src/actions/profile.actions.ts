@@ -7,7 +7,7 @@ import { z } from "zod";
 const updateProfileSchema = z.object({
   resumeText: z.string().min(10, "Resume text must be at least 10 characters"),
   skills: z.array(z.string()).optional(),
-  aiProvider: z.enum(["claude", "gemini", "openai"]).optional(),
+  aiProvider: z.enum(["claude", "gemini", "openai", "gateway"]).optional(),
 });
 
 export async function saveProfileTextAction(formData: FormData) {
@@ -40,6 +40,65 @@ export async function saveProfileTextAction(formData: FormData) {
   }
 
   return { success: true, data: reformatResult.value };
+}
+
+export async function saveMasterResumeAction(data: {
+  summary: string;
+  skills: string[];
+  education?: Array<{ institution: string; degree: string; field?: string; startDate?: string; endDate?: string }>;
+  experience?: Array<{ company: string; title: string; startDate?: string; endDate?: string; bullets: string[] }>;
+  rawText?: string;
+  resumeText?: string;
+  aiProvider?: string;
+}) {
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok) return { success: false, error: sessionResult.error.message };
+
+  const profileDal = await import("@/dal/profile.dal");
+  
+  // Format readable text if not provided
+  let formattedResume = data.resumeText || "";
+  if (!formattedResume) {
+    const summaryBlock = data.summary ? `## Professional Summary\n${data.summary}` : "";
+    const skillsBlock = data.skills?.length ? `## Core Skills\n${data.skills.join(", ")}` : "";
+    const expBlock = data.experience?.length
+      ? `## Work Experience\n\n` +
+        data.experience
+          .map(
+            (exp) =>
+              `### ${exp.title} — ${exp.company}${exp.startDate || exp.endDate ? ` (${[exp.startDate, exp.endDate].filter(Boolean).join(" - ")})` : ""}\n` +
+              exp.bullets.map((b) => `• ${b}`).join("\n")
+          )
+          .join("\n\n")
+      : "";
+    const eduBlock = data.education?.length
+      ? `## Education\n\n` +
+        data.education
+          .map(
+            (edu) =>
+              `• ${edu.degree}${edu.field ? ` in ${edu.field}` : ""} — ${edu.institution}${edu.startDate || edu.endDate ? ` (${[edu.startDate, edu.endDate].filter(Boolean).join(" - ")})` : ""}`
+          )
+          .join("\n")
+      : "";
+
+    formattedResume = [summaryBlock, skillsBlock, expBlock, eduBlock].filter(Boolean).join("\n\n");
+  }
+
+  const result = await profileDal.upsertProfile({
+    summary: data.summary,
+    skills: data.skills,
+    education: data.education || [],
+    experience: data.experience || [],
+    rawText: data.rawText || formattedResume,
+    resumeText: formattedResume,
+    aiProvider: data.aiProvider || "gemini",
+  });
+
+  if (!result.ok) {
+    return { success: false, error: result.error.message };
+  }
+
+  return { success: true, data: result.value };
 }
 
 export async function uploadResumeFileAction(formData: FormData) {

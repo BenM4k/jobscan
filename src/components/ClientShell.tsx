@@ -5,6 +5,7 @@ import { useQueryState, parseAsStringEnum } from "nuqs";
 import { JobStatus, jobStatusEnum } from "@/services/db/schema";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { FetchJobsPopover } from "@/components/FetchJobsPopover";
+import { useTranslations } from "next-intl";
 
 interface ClientShellProps {
   children: React.ReactNode;
@@ -25,6 +26,7 @@ type SourceOption = "all" | Source;
 type StatusOption = "all" | JobStatus;
 
 function LocalJobsButton() {
+  const t = useTranslations("dashboard");
   const [sourceFilter, setSourceFilter] = useQueryState(
     "source",
     parseAsStringEnum<SourceOption>([
@@ -44,7 +46,7 @@ function LocalJobsButton() {
   return (
     <button
       onClick={() => setSourceFilter("all")}
-      className={`font-medium text-xs px-3.5 py-2 rounded-xl border shadow-xs flex items-center gap-1.5 transition ${
+      className={`font-medium text-xs px-3.5 py-2 rounded-xl border shadow-xs flex items-center gap-1.5 transition cursor-pointer ${
         sourceFilter === "all" ||
         sourceFilter === "reliefweb" ||
         sourceFilter === "emploicd" ||
@@ -54,12 +56,13 @@ function LocalJobsButton() {
       }`}
     >
       <span aria-hidden="true">📍</span>
-      <span>Local Jobs (DRC)</span>
+      <span>{t("localJobsDrc")}</span>
     </button>
   );
 }
 
 function FilterBar() {
+  const t = useTranslations("dashboard");
   const [statusFilter, setStatusFilter] = useQueryState(
     "status",
     parseAsStringEnum<StatusOption>(["all", ...jobStatusEnum]).withDefault(
@@ -95,7 +98,7 @@ function FilterBar() {
           aria-label="Filter jobs by source platform"
           className="appearance-none bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-800 text-gray-800 dark:text-zinc-300 rounded-2xl px-4 py-2.5 sm:px-5 sm:py-3 pr-8 hover:border-slate-400 dark:hover:border-zinc-700 transition cursor-pointer text-xs sm:text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 font-semibold shadow-xs"
         >
-          <option value="all">Source: All</option>
+          <option value="all">{t("sourceAll")}</option>
           <option value="reliefweb">🇨🇩 ReliefWeb</option>
           <option value="emploicd">🇨🇩 Emploi.cd</option>
           <option value="congojob">🇨🇩 CongoJob</option>
@@ -123,13 +126,13 @@ function FilterBar() {
           aria-label="Filter jobs by status"
           className="appearance-none bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-800 text-gray-800 dark:text-zinc-300 rounded-2xl px-4 py-2.5 sm:px-5 sm:py-3 pr-8 hover:border-slate-400 dark:hover:border-zinc-700 transition cursor-pointer text-xs sm:text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 font-semibold shadow-xs"
         >
-          <option value="all">Status: All</option>
-          <option value="new">NEW</option>
-          <option value="scored">SCORED</option>
-          <option value="applied">APPLIED</option>
-          <option value="interviewing">INTERVIEWING</option>
-          <option value="rejected">REJECTED</option>
-          <option value="offer">OFFER</option>
+          <option value="all">{t("statusAll")}</option>
+          <option value="new">{t("statusNew")}</option>
+          <option value="scored">{t("statusScored")}</option>
+          <option value="applied">{t("statusApplied")}</option>
+          <option value="interviewing">{t("statusInterviewing")}</option>
+          <option value="rejected">{t("statusRejected")}</option>
+          <option value="offer">{t("statusOffer")}</option>
         </select>
         <span
           className="absolute right-3 top-3 sm:top-3.5 pointer-events-none text-xs text-gray-400 dark:text-zinc-500"
@@ -143,10 +146,10 @@ function FilterBar() {
       <DateRangeFilter />
 
       <button
-        aria-label="Filter by Country"
-        className="bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-800 text-gray-800 dark:text-zinc-300 px-4 py-2.5 sm:px-5 sm:py-3 rounded-2xl hover:border-slate-400 dark:hover:border-zinc-700 transition flex items-center gap-1.5 font-semibold shadow-xs"
+        aria-label={t("country")}
+        className="bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-800 text-gray-800 dark:text-zinc-300 px-4 py-2.5 sm:px-5 sm:py-3 rounded-2xl hover:border-slate-400 dark:hover:border-zinc-700 transition flex items-center gap-1.5 font-semibold shadow-xs cursor-pointer"
       >
-        <span>Country</span>
+        <span>{t("country")}</span>
         <span
           className="text-xs text-gray-400 dark:text-zinc-500"
           aria-hidden="true"
@@ -156,10 +159,10 @@ function FilterBar() {
       </button>
 
       <button
-        aria-label="Filter by City"
-        className="bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-800 text-gray-800 dark:text-zinc-300 px-4 py-2.5 sm:px-5 sm:py-3 rounded-2xl hover:border-slate-400 dark:hover:border-zinc-700 transition flex items-center gap-1.5 font-semibold shadow-xs"
+        aria-label={t("city")}
+        className="bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-800 text-gray-800 dark:text-zinc-300 px-4 py-2.5 sm:px-5 sm:py-3 rounded-2xl hover:border-slate-400 dark:hover:border-zinc-700 transition flex items-center gap-1.5 font-semibold shadow-xs cursor-pointer"
       >
-        <span>City</span>
+        <span>{t("city")}</span>
         <span
           className="text-xs text-gray-400 dark:text-zinc-500"
           aria-hidden="true"
@@ -169,10 +172,10 @@ function FilterBar() {
       </button>
 
       <button
-        aria-label="Filter by Workplace Type"
-        className="bg-white dark:bg-[#18181B] border border-gray-200 dark:border-zinc-800 text-gray-700 dark:text-zinc-300 px-4 py-2.5 sm:px-5 sm:py-3 rounded-2xl hover:border-gray-300 dark:hover:border-zinc-700 transition flex items-center gap-1.5 font-semibold shadow-xs"
+        aria-label={t("workplace")}
+        className="bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-800 text-gray-700 dark:text-zinc-300 px-4 py-2.5 sm:px-5 sm:py-3 rounded-2xl hover:border-slate-400 dark:hover:border-zinc-700 transition flex items-center gap-1.5 font-semibold shadow-xs cursor-pointer"
       >
-        <span>Workplace</span>
+        <span>{t("workplace")}</span>
         <span
           className="text-xs text-gray-400 dark:text-zinc-500"
           aria-hidden="true"
@@ -188,18 +191,18 @@ export function ClientShell({ children }: ClientShellProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const t = useTranslations("dashboard");
+  const tCommon = useTranslations("common");
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
       {/* Hero Header Section - Synchronous Static Shell */}
       <div className="space-y-4 pt-2">
         <h1 className="text-3xl sm:text-5xl font-serif text-gray-900 dark:text-slate-100 leading-tight tracking-tight font-medium">
-          Discover opportunities
-          <br className="hidden sm:inline" /> that match your skills
+          {t("heroTitle")}
         </h1>
         <p className="text-sm text-gray-500 dark:text-zinc-400 max-w-xl font-sans">
-          Find relevant local opportunities first, with access to global
-          international opportunities when needed.
+          {t("heroSubtitle")}
         </p>
 
         {/* Local / Global Opportunities Toggle Pills */}
@@ -237,9 +240,9 @@ export function ClientShell({ children }: ClientShellProps) {
           <button
             onClick={() => setErrorMsg(null)}
             aria-label="Dismiss error message"
-            className="text-xs font-bold opacity-75 hover:opacity-100"
+            className="text-xs font-bold opacity-75 hover:opacity-100 cursor-pointer"
           >
-            Dismiss
+            {tCommon("dismiss")}
           </button>
         </div>
       )}
@@ -254,9 +257,9 @@ export function ClientShell({ children }: ClientShellProps) {
           <button
             onClick={() => setSuccessMsg(null)}
             aria-label="Dismiss notification message"
-            className="text-xs font-bold opacity-75 hover:opacity-100"
+            className="text-xs font-bold opacity-75 hover:opacity-100 cursor-pointer"
           >
-            Dismiss
+            {tCommon("dismiss")}
           </button>
         </div>
       )}
@@ -276,8 +279,8 @@ export function ClientShell({ children }: ClientShellProps) {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search jobs, companies, skills..."
-            aria-label="Search jobs by title, company, or skills"
+            placeholder={t("searchPlaceholder")}
+            aria-label={t("searchPlaceholder")}
             className="w-full bg-white dark:bg-[#141417] border border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 text-sm font-medium rounded-2xl pl-12 pr-5 py-3.5 sm:py-4 focus:outline-none focus:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/20 transition shadow-xs placeholder-gray-400 dark:placeholder-zinc-500"
           />
         </div>

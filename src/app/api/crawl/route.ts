@@ -16,11 +16,12 @@ export async function GET(request: NextRequest) {
   try {
     const result = await runDrcCrawler();
     return NextResponse.json(result, { status: 200 });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to execute DRC crawl process";
     return NextResponse.json(
       {
         success: false,
-        error: error.message || "Failed to execute DRC crawl process",
+        error: message,
       },
       { status: 500 }
     );

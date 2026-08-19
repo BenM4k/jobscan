@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useQueryState, parseAsString } from "nuqs";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { useTranslations } from "next-intl";
 
 function formatDateToInput(date: Date): string {
   const yyyy = date.getFullYear();
@@ -12,6 +13,7 @@ function formatDateToInput(date: Date): string {
 }
 
 export function DateRangeFilter() {
+  const t = useTranslations("dashboard");
   const [startDate, setStartDate] = useQueryState(
     "startDate",
     parseAsString.withDefault(""),
@@ -52,13 +54,13 @@ export function DateRangeFilter() {
   };
 
   // Compute label text for trigger pill
-  let label = "Date Range: All";
+  let label = t("dateRangeAll");
   if (startDate && endDate) {
-    label = `${startDate} to ${endDate}`;
+    label = `${startDate} - ${endDate}`;
   } else if (startDate) {
-    label = `From ${startDate}`;
+    label = `≥ ${startDate}`;
   } else if (endDate) {
-    label = `Until ${endDate}`;
+    label = `≤ ${endDate}`;
   }
 
   const isFiltered = Boolean(startDate || endDate);
@@ -66,7 +68,7 @@ export function DateRangeFilter() {
   return (
     <Popover>
       <PopoverTrigger
-        aria-label="Filter jobs by date range"
+        aria-label={t("filterByDate")}
         className={`appearance-none bg-white dark:bg-[#18181B] border ${
           isFiltered
             ? "border-blue-500 text-blue-600 dark:text-blue-400 font-semibold"
@@ -86,14 +88,14 @@ export function DateRangeFilter() {
       >
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-gray-900 dark:text-slate-100 uppercase tracking-wider">
-            Filter by Date
+            {t("filterByDate")}
           </span>
           {isFiltered && (
             <button
               onClick={() => handlePreset(undefined)}
               className="text-[11px] text-rose-500 hover:text-rose-600 font-medium cursor-pointer"
             >
-              Clear Filter
+              {t("clearFilter")}
             </button>
           )}
         </div>
@@ -104,32 +106,32 @@ export function DateRangeFilter() {
             onClick={() => handlePreset(undefined)}
             className="px-2.5 py-1.5 rounded-xl border border-slate-300 dark:border-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-800 text-xs text-gray-800 dark:text-zinc-300 font-medium transition cursor-pointer"
           >
-            All Time
+            {t("allTime")}
           </button>
           <button
             onClick={() => handlePreset(1)}
             className="px-2.5 py-1.5 rounded-xl border border-slate-300 dark:border-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-800 text-xs text-gray-800 dark:text-zinc-300 font-medium transition cursor-pointer"
           >
-            Last 24h
+            {t("last24h")}
           </button>
           <button
             onClick={() => handlePreset(7)}
             className="px-2.5 py-1.5 rounded-xl border border-slate-300 dark:border-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-800 text-xs text-gray-800 dark:text-zinc-300 font-medium transition cursor-pointer"
           >
-            Last 7 Days
+            {t("last7Days")}
           </button>
           <button
             onClick={() => handlePreset(30)}
             className="px-2.5 py-1.5 rounded-xl border border-slate-300 dark:border-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-800 text-xs text-gray-800 dark:text-zinc-300 font-medium transition cursor-pointer"
           >
-            Last 30 Days
+            {t("last30Days")}
           </button>
         </div>
 
         {/* Custom Range */}
         <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-zinc-800">
           <span className="text-[11px] text-gray-500 dark:text-zinc-500 font-semibold block">
-            Custom Range
+            {t("customRange")}
           </span>
           <div className="space-y-2">
             <div>
@@ -137,7 +139,7 @@ export function DateRangeFilter() {
                 htmlFor="start-date-input"
                 className="text-[10px] text-gray-600 dark:text-zinc-400 font-medium block mb-1"
               >
-                Start Date
+                {t("startDate")}
               </label>
               <input
                 id="start-date-input"
@@ -152,7 +154,7 @@ export function DateRangeFilter() {
                 htmlFor="end-date-input"
                 className="text-[10px] text-gray-600 dark:text-zinc-400 font-medium block mb-1"
               >
-                End Date
+                {t("endDate")}
               </label>
               <input
                 id="end-date-input"
@@ -164,9 +166,9 @@ export function DateRangeFilter() {
             </div>
             <button
               onClick={handleApplyCustom}
-              className="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs py-2 rounded-xl transition shadow-xs"
+              className="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs py-2 rounded-xl transition shadow-xs cursor-pointer"
             >
-              Apply Range
+              {t("applyRange")}
             </button>
           </div>
         </div>
