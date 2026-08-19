@@ -9,9 +9,15 @@ const connectionString =
   process.env.DATABASE_URL ||
   "postgres://benny:bennymak@localhost:5432/jobscan";
 
+const isRemote =
+  connectionString.includes("prisma.io") ||
+  connectionString.includes("neon.tech") ||
+  connectionString.includes("supabase.co") ||
+  connectionString.includes("sslmode");
+
 const pool = new Pool({
   connectionString,
+  ssl: isRemote ? { rejectUnauthorized: false } : undefined,
 });
 
 export const db = drizzle(pool, { schema });
-

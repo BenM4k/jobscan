@@ -2,12 +2,6 @@ import "server-only";
 import * as profileDal from "@/dal/profile.dal";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
-import mammoth from "mammoth";
-
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require("pdf-parse");
-
-
 
 export async function parseResumeFile(
   fileBuffer: Buffer,
@@ -15,22 +9,29 @@ export async function parseResumeFile(
 ): Promise<Result<string, AppError>> {
   try {
     if (mimeType === "application/pdf") {
-      const parsed = await pdfParse(fileBuffer);
-      return ok(parsed.text);
+      const { extractText, getDocumentProxy } = await import("unpdf");
+      const pdf = await getDocumentProxy(new Uint8Array(fileBuffer));
+      const { text } = await extractText(pdf, { mergePages: true });
+      return ok(text || "");
     } else if (
       mimeType ===
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
       mimeType === "application/msword"
     ) {
+      const mammoth = await import("mammoth");
       const parsed = await mammoth.extractRawText({ buffer: fileBuffer });
-      return ok(parsed.value);
+      return ok(parsed.value || "");
     } else {
       // Plain text fallback
       return ok(fileBuffer.toString("utf-8"));
     }
   } catch (error) {
     return err(
-      new AppError("VALIDATION_ERROR", "Failed to parse document content", error)
+      new AppError(
+        "VALIDATION_ERROR",
+        "Failed to parse document content",
+        error
+      )
     );
   }
 }
@@ -59,10 +60,17 @@ export async function reformatProfileWithGemini(
     "";
 
   if (!textToFormat.trim()) {
-    return err(new AppError("VALIDATION_ERROR", "No resume text found to format. Please upload or enter resume text first."));
+    return err(
+      new AppError(
+        "VALIDATION_ERROR",
+        "No resume text found to format. Please upload or enter resume text first."
+      )
+    );
   }
 
-  const { formatResumeWithGemini } = await import("@/services/ai/gemini-profile-formatter");
+  const { formatResumeWithGemini } = await import(
+    "@/services/ai/gemini-profile-formatter"
+  );
   const formatResult = await formatResumeWithGemini(textToFormat);
   if (!formatResult.ok) {
     return err(formatResult.error);
@@ -71,7 +79,9 @@ export async function reformatProfileWithGemini(
   const formattedData = formatResult.value;
 
   // Merge existing skills with Gemini extracted skills
-  const existingSkills = currentProfileResult.ok ? currentProfileResult.value?.skills || [] : [];
+  const existingSkills = currentProfileResult.ok
+    ? currentProfileResult.value?.skills || []
+    : [];
   const combinedSkills = Array.from(
     new Set([...existingSkills, ...formattedData.extractedSkills])
   );

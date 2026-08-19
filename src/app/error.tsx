@@ -3,7 +3,7 @@
 import React, { useEffect } from "react";
 import Link from "next/link";
 
-export default function GlobalError({
+export default function RouteError({
   error,
   reset,
 }: {
@@ -36,12 +36,13 @@ export default function GlobalError({
             Something went wrong
           </h1>
           <p className="text-xs text-gray-500 dark:text-zinc-400 leading-relaxed">
-            An unexpected application error occurred. You can retry the action or return to the main dashboard.
+            An unexpected application error occurred. You can retry the action
+            or return to the main dashboard.
           </p>
         </div>
 
         {error.message && (
-          <div className="bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-300 p-3.5 rounded-xl text-left text-xs font-mono break-words leading-snug">
+          <div className="bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-300 p-3.5 rounded-xl text-left text-xs font-mono wrap-break-word leading-snug">
             {error.message}
           </div>
         )}
