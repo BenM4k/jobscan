@@ -7,6 +7,8 @@ import { useTranslations } from "next-intl";
 import { signOut } from "@/services/auth/auth-client";
 import { PreferencesWidget } from "@/components/PreferencesWidget";
 
+import { Logo } from "@/components/Logo";
+
 interface NavbarProps {
   userEmail?: string | null;
 }
@@ -36,20 +38,7 @@ export function Navbar({ userEmail }: NavbarProps) {
     >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         <Link href="/" aria-label="JobPilot Home" className="flex items-center gap-3 group">
-          <div
-            aria-hidden="true"
-            className="w-9 h-9 rounded-xl bg-linear-to-tr from-blue-600 via-indigo-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-blue-500/25 text-white font-black text-lg group-hover:scale-105 transition-transform duration-300"
-          >
-            ✦
-          </div>
-          <div>
-            <span className="font-black text-base sm:text-lg tracking-tight text-gray-900 dark:text-slate-100 flex items-center gap-1.5">
-              JobPilot
-              <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                PRO
-              </span>
-            </span>
-          </div>
+          <Logo size={36} showText badgeText="PRO" priority />
         </Link>
 
         {/* Desktop Navigation */}

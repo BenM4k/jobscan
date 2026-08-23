@@ -55,10 +55,10 @@ export default function RouteError({
             🔄 Try Again
           </button>
           <Link
-            href="/dashboard"
+            href="/"
             className="bg-white dark:bg-[#18181B] border border-gray-200 dark:border-zinc-800 text-gray-700 dark:text-zinc-300 text-xs font-semibold px-5 py-2.5 rounded-xl hover:border-gray-300 dark:hover:border-zinc-700 transition"
           >
-            Go to Dashboard
+            Go to Home
           </Link>
         </div>
       </div>
