@@ -55,12 +55,13 @@ export function DateRangeFilter() {
 
   // Compute label text for trigger pill
   let label = t("dateRangeAll");
+  const datePrefix = t("startDate").split(" ")[0] || "Date";
   if (startDate && endDate) {
-    label = `Date: ${startDate} - ${endDate}`;
+    label = `${datePrefix}: ${startDate} - ${endDate}`;
   } else if (startDate) {
-    label = `Date: ≥ ${startDate}`;
+    label = `${datePrefix}: ≥ ${startDate}`;
   } else if (endDate) {
-    label = `Date: ≤ ${endDate}`;
+    label = `${datePrefix}: ≤ ${endDate}`;
   }
 
   const isFiltered = Boolean(startDate || endDate);

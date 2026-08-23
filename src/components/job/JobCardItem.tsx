@@ -59,6 +59,7 @@ export function JobCardItem({
     ? new Date(job.postedAt).toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
+        timeZone: "UTC",
       })
     : null;
 

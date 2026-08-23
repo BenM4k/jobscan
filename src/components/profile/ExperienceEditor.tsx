@@ -94,7 +94,14 @@ export function ExperienceEditor({ experiences, onChange }: ExperienceEditorProp
                   type="text"
                   placeholder={t("periodPlaceholder")}
                   value={exp.startDate || exp.endDate || ""}
-                  onChange={(e) => handleUpdateRole(rIdx, "startDate", e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (!exp.startDate && exp.endDate) {
+                      handleUpdateRole(rIdx, "endDate", val);
+                    } else {
+                      handleUpdateRole(rIdx, "startDate", val);
+                    }
+                  }}
                   className="bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-xs p-2.5 rounded-xl text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 shadow-2xs"
                 />
               </div>

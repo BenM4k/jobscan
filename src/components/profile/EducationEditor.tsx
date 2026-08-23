@@ -67,7 +67,14 @@ export function EducationEditor({ education, onChange }: EducationEditorProps) {
                 type="text"
                 placeholder={t("yearPlaceholder")}
                 value={edu.endDate || edu.startDate || ""}
-                onChange={(e) => handleUpdateEdu(idx, "endDate", e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (!edu.endDate && edu.startDate) {
+                    handleUpdateEdu(idx, "startDate", val);
+                  } else {
+                    handleUpdateEdu(idx, "endDate", val);
+                  }
+                }}
                 className="bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-xs p-2.5 rounded-xl text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 shadow-2xs"
               />
             </div>

@@ -83,11 +83,11 @@ export function JobTailoredResumeSection({ job, onJobUpdated }: JobTailoredResum
               id="tailored-resume-heading"
               className="text-sm sm:text-base font-bold text-gray-900 dark:text-white"
             >
-              Tailored Resume
+              {t("tailoredResumeHeading")}
             </h3>
           </div>
           <p className="text-xs text-gray-600 dark:text-zinc-400 max-w-xl leading-relaxed">
-            Optimized for this role without fabrication of unverified experience.
+            {t("tailoredResumeSubtitle")}
           </p>
         </div>
 

@@ -1,12 +1,14 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 
 interface JobDescriptionSectionProps {
   description?: string | null;
 }
 
 export function JobDescriptionSection({ description }: JobDescriptionSectionProps) {
+  const t = useTranslations("jobDetail");
   const isHtml = description && description.includes("<");
 
   return (
@@ -18,7 +20,7 @@ export function JobDescriptionSection({ description }: JobDescriptionSectionProp
         id="job-description-heading"
         className="text-[11px] font-mono font-semibold uppercase tracking-widest text-gray-500 dark:text-zinc-400"
       >
-        JOB DESCRIPTION & REQUIREMENTS
+        {t("jobDescriptionHeading")}
       </h2>
 
       {isHtml ? (

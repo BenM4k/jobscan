@@ -200,7 +200,7 @@ export function JobList({
           {t("opportunitiesMatching")}
         </span>
         <span className="text-xs text-gray-400 dark:text-zinc-500 font-sans">
-          Sort by: Relevance
+          {t("sortedRecent")}
         </span>
       </div>
 

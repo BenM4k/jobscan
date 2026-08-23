@@ -137,10 +137,10 @@ export function FetchJobsPopover({
             </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-slate-100 tracking-tight">
-            Fetch New Job Listings
+            {t("fetchPopoverTitle")}
           </h2>
           <p className="text-xs sm:text-sm text-gray-500 dark:text-zinc-400">
-            Select platform source and search parameter.
+            {t("fetchPopoverSubtitle")}
           </p>
         </div>
 

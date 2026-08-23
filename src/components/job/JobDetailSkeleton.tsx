@@ -78,6 +78,21 @@ export function JobDetailSkeleton() {
         </div>
       </section>
 
+      {/* Cover Letter Section Skeleton */}
+      <section className="bg-white dark:bg-[#121215] border border-slate-200/80 dark:border-zinc-800 p-6 sm:p-8 rounded-2xl shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+          <div className="space-y-2">
+            <div className="w-52 h-5 rounded bg-slate-200/80 dark:bg-zinc-800" />
+            <div className="w-72 h-3.5 rounded bg-slate-200/80 dark:bg-zinc-800" />
+          </div>
+          <div className="w-32 h-8 rounded-xl bg-slate-200/80 dark:bg-zinc-800 shrink-0" />
+        </div>
+        <div className="space-y-2.5 pt-2">
+          <div className="w-full h-4 rounded bg-slate-200/80 dark:bg-zinc-800" />
+          <div className="w-4/5 h-4 rounded bg-slate-200/80 dark:bg-zinc-800" />
+        </div>
+      </section>
+
       {/* Job Description Section Skeleton */}
       <section className="bg-white dark:bg-[#121215] border border-slate-200/80 dark:border-zinc-800 p-6 sm:p-8 rounded-2xl shadow-xs space-y-4">
         <div className="w-40 h-5 rounded bg-slate-200/80 dark:bg-zinc-800" />

@@ -163,8 +163,7 @@ export function ClientShell({ children }: ClientShellProps) {
       {/* Hero Header Section */}
       <div className="space-y-3 pt-2">
         <h1 className="text-3xl sm:text-4xl lg:text-[40px] font-bold text-gray-900 dark:text-slate-100 leading-[1.15] tracking-tight font-sans max-w-xl">
-          Discover opportunities that <br className="hidden sm:inline" />
-          match your skills
+          {t("heroTitle")}
         </h1>
 
         {/* Subtitle row: text left, Fetch Jobs button right */}

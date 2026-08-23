@@ -12,13 +12,25 @@ interface ProfileSidebarProps {
   educationCount?: number;
 }
 
+const AI_ENGINE_LABELS: Record<string, string> = {
+  gemini: "GEMINI 3.6 FLASH",
+  gateway: "AI GATEWAY",
+  openai: "OPENAI GPT-4O",
+  claude: "CLAUDE 3.5 SONNET",
+};
+
 export function ProfileSidebar({
+  aiProvider,
   skillsCount,
   resumeLength,
   experienceCount = 0,
   educationCount = 0,
 }: ProfileSidebarProps) {
   const t = useTranslations("profile");
+  const engineLabel =
+    AI_ENGINE_LABELS[aiProvider?.toLowerCase()] ||
+    aiProvider?.toUpperCase() ||
+    "GEMINI 3.6 FLASH";
 
   const strengthPercentage = Math.min(
     100,
@@ -97,7 +109,7 @@ export function ProfileSidebar({
                 {t("activeAiEngine")}
               </p>
               <p className="text-[10px] font-mono font-bold text-[#7C3AED] dark:text-[#A78BFA] uppercase tracking-wider leading-none">
-                GEMINI 3.6 FLASH
+                {engineLabel}
               </p>
             </div>
           </div>

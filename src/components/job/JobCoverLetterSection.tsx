@@ -122,17 +122,17 @@ export function JobCoverLetterSection({ job, onJobUpdated }: JobCoverLetterSecti
               id="cover-letter-heading"
               className="text-sm sm:text-base font-bold text-gray-900 dark:text-white"
             >
-              Tailored Cover Letter
+              {t("coverLetterHeading")}
             </h3>
           </div>
           <p className="text-xs text-gray-600 dark:text-zinc-400 max-w-xl leading-relaxed">
-            Role-specific pitch written and streamed live with Gemini 3.6 Flash.
+            {t("coverLetterSubtitle")}
           </p>
 
           {/* AI Notice Banner right under description */}
           <div className="inline-flex items-center gap-1.5 p-1.5 px-3 rounded-md bg-[#fef2f2] dark:bg-rose-950/30 border border-[#fecaca] dark:border-rose-900/50 text-[#dc2626] dark:text-rose-300 font-mono text-[11px] mt-1.5">
             <span>⚠</span>
-            <span>AI-generated content – please review and verify all details before submitting to employers.</span>
+            <span>{tCommon("aiNotice")}</span>
           </div>
         </div>
 
