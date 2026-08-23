@@ -3,17 +3,20 @@ import { Navbar } from "@/components/layout/Navbar";
 import { DashboardFooter } from "@/components/layout/DashboardFooter";
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
-export const metadata: Metadata = {
-  title: "Terms of Service — JobPilot",
-  description:
-    "Read JobPilot's Terms of Service to understand your rights and obligations when using our AI-powered job search automation platform.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("terms");
+  return {
+    title: t("metaTitle"),
+    description: t("metaDescription"),
+  };
+}
 
 export const instant = false;
 
-export default function TermsOfServicePage() {
-  const lastUpdated = "August 23, 2025";
+export default async function TermsOfServicePage() {
+  const t = await getTranslations("terms");
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0A0A0C] text-gray-900 dark:text-zinc-100 font-sans flex flex-col relative overflow-hidden transition-colors duration-300">
@@ -42,135 +45,75 @@ export default function TermsOfServicePage() {
               href="/"
               className="hover:text-gray-700 dark:hover:text-zinc-300 transition-colors"
             >
-              Home
+              {t("home")}
             </Link>
             <span>/</span>
-            <span className="text-gray-600 dark:text-zinc-400">Terms of Service</span>
+            <span className="text-gray-600 dark:text-zinc-400">{t("title")}</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-serif font-medium text-gray-900 dark:text-slate-100 leading-tight tracking-tight">
-            Terms of Service
+            {t("title")}
           </h1>
           <p className="text-sm text-gray-500 dark:text-zinc-400">
-            Last updated: {lastUpdated}
+            {t("lastUpdated")}
           </p>
         </div>
 
         {/* Content */}
         <div className="space-y-10">
-          <Section title="1. Acceptance of Terms">
-            <p>
-              By accessing or using JobPilot (&quot;the Service&quot;), you agree to be
-              bound by these Terms of Service (&quot;Terms&quot;). If you do not agree to
-              these Terms, please do not use the Service.
-            </p>
+          <Section title={t("s1Title")}>
+            <p>{t("s1P")}</p>
           </Section>
 
-          <Section title="2. Description of Service">
-            <p>
-              JobPilot is a personal job search automation tool that aggregates job
-              postings from public sources, provides AI-powered fit scoring against your
-              resume, and helps you manage your application pipeline.
-            </p>
+          <Section title={t("s2Title")}>
+            <p>{t("s2P")}</p>
           </Section>
 
-          <Section title="3. Account Registration">
-            <p>
-              You must register for an account to use most features of the Service. You
-              are responsible for maintaining the confidentiality of your account
-              credentials and for all activity that occurs under your account. You must
-              provide accurate and complete information when registering.
-            </p>
+          <Section title={t("s3Title")}>
+            <p>{t("s3P")}</p>
           </Section>
 
-          <Section title="4. Acceptable Use">
-            <p>You agree not to:</p>
+          <Section title={t("s4Title")}>
+            <p>{t("s4P")}</p>
             <ul>
-              <li>Use the Service for any unlawful purpose or in violation of any regulations</li>
-              <li>Attempt to reverse-engineer, scrape, or abuse the Service infrastructure</li>
-              <li>
-                Share your account credentials with others or create accounts on behalf of
-                third parties without authorization
-              </li>
-              <li>
-                Use the AI scoring features to process data belonging to third parties
-                without their consent
-              </li>
-              <li>
-                Attempt to circumvent rate limits or access controls implemented in the
-                Service
-              </li>
+              <li>{t("s4Item1")}</li>
+              <li>{t("s4Item2")}</li>
+              <li>{t("s4Item3")}</li>
+              <li>{t("s4Item4")}</li>
+              <li>{t("s4Item5")}</li>
             </ul>
           </Section>
 
-          <Section title="5. AI Features & Third-Party Services">
-            <p>
-              The AI scoring features rely on third-party AI APIs (Google Gemini, Anthropic
-              Claude, OpenAI). By using these features, you acknowledge that your resume
-              content and job descriptions will be transmitted to these providers under
-              their respective terms. We are not responsible for the output accuracy of
-              AI-generated scores and recommendations — they are advisory only.
-            </p>
+          <Section title={t("s5Title")}>
+            <p>{t("s5P")}</p>
           </Section>
 
-          <Section title="6. Intellectual Property">
-            <p>
-              The JobPilot application, its design, and underlying code are the intellectual
-              property of JobPilot and its contributors. Job listing content displayed
-              within the Service originates from third-party job boards and remains the
-              property of their respective owners.
-            </p>
-            <p>
-              You retain ownership of your resume and profile content. By uploading it, you
-              grant JobPilot a limited, non-exclusive license to process it for the purpose
-              of delivering the Service features to you.
-            </p>
+          <Section title={t("s6Title")}>
+            <p>{t("s6P1")}</p>
+            <p>{t("s6P2")}</p>
           </Section>
 
-          <Section title="7. Disclaimer of Warranties">
-            <p>
-              The Service is provided &quot;as is&quot; without warranties of any kind,
-              express or implied. We do not guarantee the accuracy, completeness, or
-              availability of job listings, nor the accuracy of AI-generated fit scores.
-              Job search outcomes depend on many factors outside our control.
-            </p>
+          <Section title={t("s7Title")}>
+            <p>{t("s7P")}</p>
           </Section>
 
-          <Section title="8. Limitation of Liability">
-            <p>
-              To the fullest extent permitted by law, JobPilot shall not be liable for any
-              indirect, incidental, special, consequential, or punitive damages arising
-              from your use of the Service, including but not limited to loss of employment
-              opportunities, data, or revenue.
-            </p>
+          <Section title={t("s8Title")}>
+            <p>{t("s8P")}</p>
           </Section>
 
-          <Section title="9. Termination">
-            <p>
-              We reserve the right to suspend or terminate your account at our discretion
-              if you violate these Terms. You may delete your account at any time from
-              your profile settings. Upon termination, your personal data will be handled
-              as described in our Privacy Policy.
-            </p>
+          <Section title={t("s9Title")}>
+            <p>{t("s9P")}</p>
           </Section>
 
-          <Section title="10. Changes to Terms">
-            <p>
-              We may modify these Terms at any time. We will notify you of significant
-              changes via email or in-app notification. Continued use of the Service after
-              changes take effect constitutes acceptance of the revised Terms.
-            </p>
+          <Section title={t("s10Title")}>
+            <p>{t("s10P")}</p>
           </Section>
 
-          <Section title="11. Governing Law">
-            <p>
-              These Terms shall be governed by and construed in accordance with applicable
-              laws. Any disputes shall be resolved through good-faith negotiation before
-              pursuing formal legal remedies.
-            </p>
+          <Section title={t("s11Title")}>
+            <p>{t("s11P")}</p>
           </Section>
 
-          <Section title="12. Contact">
-            <p>For questions about these Terms, contact us at:</p>
+          <Section title={t("s12Title")}>
+            <p>{t("s12P")}</p>
             <div className="mt-3 p-4 bg-white dark:bg-[#141417] border border-slate-200 dark:border-zinc-800 rounded-2xl text-sm">
               <p className="font-semibold text-gray-900 dark:text-slate-100">JobPilot</p>
               <p className="text-gray-500 dark:text-zinc-400">legal@jobpilot.app</p>
@@ -184,13 +127,13 @@ export default function TermsOfServicePage() {
             href="/"
             className="text-sm text-violet-600 dark:text-violet-400 hover:underline underline-offset-2 font-medium transition-colors"
           >
-            ← Back to JobPilot
+            {t("backToJobPilot")}
           </Link>
           <Link
             href="/privacy"
             className="text-sm text-gray-500 dark:text-zinc-400 hover:underline underline-offset-2 transition-colors"
           >
-            Privacy Policy →
+            {t("privacyPolicy")}
           </Link>
         </div>
       </main>

@@ -1,20 +1,24 @@
-"use cache";
-
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
+import { getTranslations } from "next-intl/server";
 
 export async function DashboardFooter() {
   const currentYear = new Date().getFullYear();
+  const [tNav, tPrivacy, tTerms] = await Promise.all([
+    getTranslations("nav"),
+    getTranslations("privacy"),
+    getTranslations("terms"),
+  ]);
 
   const legalLinks = [
-    { href: "/privacy", label: "Privacy Policy" },
-    { href: "/terms", label: "Terms of Service" },
+    { href: "/privacy", label: tPrivacy("title") },
+    { href: "/terms", label: tTerms("title") },
   ];
 
   const productLinks = [
-    { href: "/dashboard", label: "Pipeline" },
-    { href: "/dashboard/add-job", label: "Add Job" },
-    { href: "/dashboard/profile", label: "Profile" },
+    { href: "/dashboard", label: tNav("pipeline") },
+    { href: "/dashboard/add-job", label: tNav("addJob") },
+    { href: "/dashboard/profile", label: tNav("profile") },
   ];
 
   return (

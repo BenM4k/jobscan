@@ -3,17 +3,20 @@ import { Navbar } from "@/components/layout/Navbar";
 import { DashboardFooter } from "@/components/layout/DashboardFooter";
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
-export const metadata: Metadata = {
-  title: "Privacy Policy — JobPilot",
-  description:
-    "Learn how JobPilot collects, uses, and protects your personal data when you use our AI-powered job search automation service.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("privacy");
+  return {
+    title: t("metaTitle"),
+    description: t("metaDescription"),
+  };
+}
 
 export const instant = false;
 
-export default function PrivacyPolicyPage() {
-  const lastUpdated = "August 23, 2025";
+export default async function PrivacyPolicyPage() {
+  const t = await getTranslations("privacy");
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0A0A0C] text-gray-900 dark:text-zinc-100 font-sans flex flex-col relative overflow-hidden transition-colors duration-300">
@@ -42,219 +45,126 @@ export default function PrivacyPolicyPage() {
               href="/"
               className="hover:text-gray-700 dark:hover:text-zinc-300 transition-colors"
             >
-              Home
+              {t("home")}
             </Link>
             <span>/</span>
-            <span className="text-gray-600 dark:text-zinc-400">Privacy Policy</span>
+            <span className="text-gray-600 dark:text-zinc-400">{t("title")}</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-serif font-medium text-gray-900 dark:text-slate-100 leading-tight tracking-tight">
-            Privacy Policy
+            {t("title")}
           </h1>
           <p className="text-sm text-gray-500 dark:text-zinc-400">
-            Last updated: {lastUpdated}
+            {t("lastUpdated")}
           </p>
         </div>
 
         {/* Content */}
         <div className="space-y-10 prose-like">
-          <Section title="1. Introduction">
-            <p>
-              Welcome to <strong>JobPilot</strong> (&quot;we,&quot; &quot;our,&quot; or
-              &quot;us&quot;). JobPilot is a personal job search automation tool that helps
-              you discover relevant job opportunities, score them against your resume using
-              AI, and manage your application pipeline.
-            </p>
-            <p>
-              This Privacy Policy explains how we collect, use, store, and protect your
-              information when you use our web application at{" "}
-              <span className="font-medium text-gray-800 dark:text-zinc-200">
-                jobpilot.app
-              </span>{" "}
-              (&quot;the Service&quot;). By using the Service, you agree to the terms
-              described here.
-            </p>
+          <Section title={t("s1Title")}>
+            <p>{t("s1P1")}</p>
+            <p>{t("s1P2")}</p>
           </Section>
 
-          <Section title="2. Information We Collect">
-            <SubHeading>2.1 Account Information</SubHeading>
-            <p>
-              When you register, we collect your <strong>email address</strong> and a
-              hashed version of your <strong>password</strong>. We never store your
-              password in plain text.
-            </p>
-            <SubHeading>2.2 Resume &amp; Profile Data</SubHeading>
-            <p>
-              You may upload a master resume and fill in profile details (skills,
-              preferences, target roles). This data is stored securely and used solely to
-              power AI scoring features within your account.
-            </p>
-            <SubHeading>2.3 Job Pipeline Data</SubHeading>
-            <p>
-              Job postings fetched from external sources (RemoteOK, Greenhouse, ReliefWeb,
-              etc.) are stored in association with your account so you can manage your
-              pipeline. This data originates from publicly available job boards.
-            </p>
-            <SubHeading>2.4 Usage Data</SubHeading>
-            <p>
-              We may collect basic usage information such as pages visited, feature
-              interactions, and timestamps to improve the product. We do not sell this
-              data to third parties.
-            </p>
+          <Section title={t("s2Title")}>
+            <SubHeading>{t("s2Sub1")}</SubHeading>
+            <p>{t("s2Sub1P")}</p>
+            <SubHeading>{t("s2Sub2")}</SubHeading>
+            <p>{t("s2Sub2P")}</p>
+            <SubHeading>{t("s2Sub3")}</SubHeading>
+            <p>{t("s2Sub3P")}</p>
+            <SubHeading>{t("s2Sub4")}</SubHeading>
+            <p>{t("s2Sub4P")}</p>
           </Section>
 
-          <Section title="3. How We Use Your Information">
+          <Section title={t("s3Title")}>
             <ul>
-              <li>To authenticate you and manage your account session securely</li>
-              <li>To fetch, store, and display job postings relevant to your preferences</li>
-              <li>
-                To send your resume and job descriptions to AI providers (Google Gemini,
-                Anthropic Claude, or OpenAI) for fit scoring — see Section 4
-              </li>
-              <li>To improve the reliability, performance, and features of the Service</li>
-              <li>
-                To communicate with you about important service changes (we do not send
-                marketing emails without explicit consent)
-              </li>
+              <li>{t("s3Item1")}</li>
+              <li>{t("s3Item2")}</li>
+              <li>{t("s3Item3")}</li>
+              <li>{t("s3Item4")}</li>
+              <li>{t("s3Item5")}</li>
             </ul>
           </Section>
 
-          <Section title="4. AI Processing &amp; Third-Party AI Providers">
-            <p>
-              JobPilot&apos;s AI scoring features send your resume content and job
-              descriptions to third-party AI APIs. Depending on the AI engine you select
-              when scoring a job, your data may be processed by:
-            </p>
+          <Section title={t("s4Title")}>
+            <p>{t("s4P1")}</p>
             <ul>
               <li>
-                <strong>Google Gemini</strong> — governed by{" "}
+                <strong>Google Gemini</strong> —{" "}
                 <a
                   href="https://policies.google.com/privacy"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-violet-600 dark:text-violet-400 underline underline-offset-2"
                 >
-                  Google&apos;s Privacy Policy
+                  Google Privacy Policy
                 </a>
               </li>
               <li>
-                <strong>Anthropic Claude</strong> — governed by{" "}
+                <strong>Anthropic Claude</strong> —{" "}
                 <a
                   href="https://www.anthropic.com/legal/privacy"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-violet-600 dark:text-violet-400 underline underline-offset-2"
                 >
-                  Anthropic&apos;s Privacy Policy
+                  Anthropic Privacy Policy
                 </a>
               </li>
               <li>
-                <strong>OpenAI</strong> — governed by{" "}
+                <strong>OpenAI</strong> —{" "}
                 <a
                   href="https://openai.com/privacy"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-violet-600 dark:text-violet-400 underline underline-offset-2"
                 >
-                  OpenAI&apos;s Privacy Policy
+                  OpenAI Privacy Policy
                 </a>
               </li>
             </ul>
-            <p>
-              We recommend reviewing each provider&apos;s policy. We use API access only
-              and do not enable training on your data where providers offer such controls.
-            </p>
+            <p>{t("s4P2")}</p>
           </Section>
 
-          <Section title="5. Data Storage &amp; Security">
-            <p>
-              Your data is stored in a PostgreSQL database hosted on infrastructure with
-              encrypted storage at rest and in transit (TLS). We apply industry-standard
-              security practices including hashed passwords, session token rotation, and
-              CSRF protection.
-            </p>
-            <p>
-              While we take security seriously, no system is 100% secure. We encourage
-              you to use a strong, unique password and to notify us immediately if you
-              suspect unauthorized account access.
-            </p>
+          <Section title={t("s5Title")}>
+            <p>{t("s5P1")}</p>
+            <p>{t("s5P2")}</p>
           </Section>
 
-          <Section title="6. Cookies &amp; Local Storage">
-            <p>
-              We use session cookies to keep you authenticated between visits. We also use
-              browser local storage for theme preferences (light/dark mode) and locale
-              settings. We do not use advertising cookies or track you across third-party
-              websites.
-            </p>
+          <Section title={t("s6Title")}>
+            <p>{t("s6P1")}</p>
           </Section>
 
-          <Section title="7. Third-Party Job Sources">
-            <p>
-              JobPilot fetches job listings from external platforms (ReliefWeb, RemoteOK,
-              Greenhouse, Lever, Ashby, CongoJob, Emploi.cd, UNJobs). These platforms
-              operate independently and have their own privacy policies. We only store the
-              publicly available job listing data, not any personal data from those
-              platforms.
-            </p>
+          <Section title={t("s7Title")}>
+            <p>{t("s7P1")}</p>
           </Section>
 
-          <Section title="8. Your Rights">
-            <p>Depending on your location, you may have the right to:</p>
+          <Section title={t("s8Title")}>
+            <p>{t("s8P1")}</p>
             <ul>
-              <li>
-                <strong>Access</strong> the personal data we hold about you
-              </li>
-              <li>
-                <strong>Correct</strong> inaccurate data
-              </li>
-              <li>
-                <strong>Delete</strong> your account and associated data
-              </li>
-              <li>
-                <strong>Export</strong> your data in a portable format
-              </li>
-              <li>
-                <strong>Withdraw consent</strong> for AI processing at any time by not
-                using the Score Job feature
-              </li>
+              <li>{t("s8Item1")}</li>
+              <li>{t("s8Item2")}</li>
+              <li>{t("s8Item3")}</li>
+              <li>{t("s8Item4")}</li>
+              <li>{t("s8Item5")}</li>
             </ul>
-            <p>
-              To exercise any of these rights, contact us at the email below.
-            </p>
+            <p>{t("s8P2")}</p>
           </Section>
 
-          <Section title="9. Data Retention">
-            <p>
-              We retain your account data for as long as your account is active. If you
-              delete your account, your personal data (email, resume, profile) will be
-              permanently deleted within 30 days. Job pipeline data you added may be
-              retained in anonymized, aggregated form.
-            </p>
+          <Section title={t("s9Title")}>
+            <p>{t("s9P1")}</p>
           </Section>
 
-          <Section title="10. Children's Privacy">
-            <p>
-              JobPilot is not intended for use by anyone under the age of 16. We do not
-              knowingly collect personal data from children. If you believe a child has
-              provided us with personal information, please contact us and we will delete
-              it promptly.
-            </p>
+          <Section title={t("s10Title")}>
+            <p>{t("s10P1")}</p>
           </Section>
 
-          <Section title="11. Changes to This Policy">
-            <p>
-              We may update this Privacy Policy from time to time. When we do, we will
-              update the &quot;Last updated&quot; date at the top of this page. For
-              significant changes, we will notify users via email or an in-app
-              notification.
-            </p>
+          <Section title={t("s11Title")}>
+            <p>{t("s11P1")}</p>
           </Section>
 
-          <Section title="12. Contact Us">
-            <p>
-              If you have any questions, requests, or concerns about this Privacy Policy
-              or how we handle your data, please contact us:
-            </p>
+          <Section title={t("s12Title")}>
+            <p>{t("s12P1")}</p>
             <div className="mt-3 p-4 bg-white dark:bg-[#141417] border border-slate-200 dark:border-zinc-800 rounded-2xl text-sm">
               <p className="font-semibold text-gray-900 dark:text-slate-100">JobPilot</p>
               <p className="text-gray-500 dark:text-zinc-400">privacy@jobpilot.app</p>
@@ -263,12 +173,18 @@ export default function PrivacyPolicyPage() {
         </div>
 
         {/* Back link */}
-        <div className="mt-12 pt-8 border-t border-slate-200 dark:border-zinc-800">
+        <div className="mt-12 pt-8 border-t border-slate-200 dark:border-zinc-800 flex flex-wrap gap-6">
           <Link
             href="/"
             className="text-sm text-violet-600 dark:text-violet-400 hover:underline underline-offset-2 font-medium transition-colors"
           >
-            ← Back to JobPilot
+            {t("backToJobPilot")}
+          </Link>
+          <Link
+            href="/terms"
+            className="text-sm text-gray-500 dark:text-zinc-400 hover:underline underline-offset-2 transition-colors"
+          >
+            {t("termsOfService")}
           </Link>
         </div>
       </main>
