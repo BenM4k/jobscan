@@ -15,10 +15,10 @@ export default function NotFound() {
         The page you are looking for does not exist or has been moved.
       </p>
       <Link
-        href="/dashboard"
+        href="/"
         className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md shadow-blue-500/20 transition"
       >
-        Return to Dashboard
+        Return to Home Page
       </Link>
     </div>
   );

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { requireSession } from "@/lib/auth-guard";
 import { Navbar } from "@/components/layout/Navbar";
+import { Logo } from "@/components/Logo";
 import { getTranslations } from "next-intl/server";
 
 export const instant = false;
@@ -99,14 +100,9 @@ export default async function LandingPage() {
         {/* Central Logo Badge */}
         <div
           aria-hidden="true"
-          className="w-16 h-16 rounded-2xl bg-white dark:bg-slate-900 border border-gray-200/80 dark:border-slate-800 shadow-xl flex items-center justify-center mb-6 relative group"
+          className="w-18 h-18 rounded-2xl bg-white dark:bg-slate-900 border border-gray-200/80 dark:border-slate-800 shadow-xl flex items-center justify-center mb-6 relative group p-2 hover:scale-105 transition duration-300"
         >
-          <div className="grid grid-cols-2 gap-1.5">
-            <span className="w-3.5 h-3.5 rounded-full bg-blue-500" />
-            <span className="w-3.5 h-3.5 rounded-full bg-gray-900 dark:bg-slate-100" />
-            <span className="w-3.5 h-3.5 rounded-full bg-gray-900 dark:bg-slate-100" />
-            <span className="w-3.5 h-3.5 rounded-full bg-gray-900 dark:bg-slate-100" />
-          </div>
+          <Logo size={48} preload />
         </div>
 
         {/* Hero Title & Subtitle */}

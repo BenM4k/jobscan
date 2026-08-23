@@ -37,7 +37,7 @@ export default function RouteError({
           </h1>
           <p className="text-xs text-gray-500 dark:text-zinc-400 leading-relaxed">
             An unexpected application error occurred. You can retry the action
-            or return to the main dashboard.
+            or return to the home page.
           </p>
         </div>
 
@@ -55,10 +55,10 @@ export default function RouteError({
             🔄 Try Again
           </button>
           <Link
-            href="/dashboard"
+            href="/"
             className="bg-white dark:bg-[#18181B] border border-gray-200 dark:border-zinc-800 text-gray-700 dark:text-zinc-300 text-xs font-semibold px-5 py-2.5 rounded-xl hover:border-gray-300 dark:hover:border-zinc-700 transition"
           >
-            Go to Dashboard
+            Go to Home
           </Link>
         </div>
       </div>
