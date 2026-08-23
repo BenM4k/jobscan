@@ -3,7 +3,7 @@ import { Logo } from "@/components/Logo";
 import { getTranslations } from "next-intl/server";
 
 export async function DashboardFooter() {
-  const currentYear = new Date().getFullYear();
+  const currentYear = 2026;
   const [tNav, tPrivacy, tTerms] = await Promise.all([
     getTranslations("nav"),
     getTranslations("privacy"),
