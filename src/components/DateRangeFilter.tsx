@@ -56,11 +56,11 @@ export function DateRangeFilter() {
   // Compute label text for trigger pill
   let label = t("dateRangeAll");
   if (startDate && endDate) {
-    label = `${startDate} - ${endDate}`;
+    label = `Date: ${startDate} - ${endDate}`;
   } else if (startDate) {
-    label = `≥ ${startDate}`;
+    label = `Date: ≥ ${startDate}`;
   } else if (endDate) {
-    label = `≤ ${endDate}`;
+    label = `Date: ≤ ${endDate}`;
   }
 
   const isFiltered = Boolean(startDate || endDate);
@@ -71,13 +71,12 @@ export function DateRangeFilter() {
         aria-label={t("filterByDate")}
         className={`appearance-none bg-white dark:bg-[#18181B] border ${
           isFiltered
-            ? "border-blue-500 text-blue-600 dark:text-blue-400 font-semibold"
-            : "border-slate-300 dark:border-zinc-800 text-gray-800 dark:text-zinc-300 font-semibold"
-        } rounded-2xl px-4 py-2.5 sm:px-5 sm:py-3 hover:border-slate-400 dark:hover:border-zinc-700 transition cursor-pointer text-xs sm:text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 shadow-xs flex items-center gap-2`}
+            ? "border-blue-500 text-blue-600 dark:text-blue-400 font-medium"
+            : "border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 font-medium"
+        } rounded-xl px-3.5 py-1.5 sm:px-4 sm:py-2 hover:border-slate-300 dark:hover:border-zinc-700 transition cursor-pointer text-xs focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500 flex items-center gap-1`}
       >
-        <span aria-hidden="true">📅</span>
         <span className="truncate max-w-[160px] sm:max-w-[200px]">{label}</span>
-        <span className="text-xs text-gray-400 dark:text-zinc-500 ml-0.5" aria-hidden="true">
+        <span className="text-[10px] text-gray-400 dark:text-zinc-500 ml-0.5" aria-hidden="true">
           ▾
         </span>
       </PopoverTrigger>

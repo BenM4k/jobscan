@@ -8,6 +8,8 @@ import { Navbar } from "@/components/layout/Navbar";
 import { searchParamsCache } from "@/lib/search-params";
 import { JobStatus } from "@/services/db/schema";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
+import { DashboardFooter } from "@/components/layout/DashboardFooter";
+import { JobCardSkeleton } from "@/components/JobCardSkeleton";
 
 export const instant = false;
 
@@ -126,9 +128,10 @@ export default function DashboardPage({ searchParams }: DashboardPageProps) {
           <ClientShell>
             <Suspense
               fallback={
-                <div className="space-y-4">
-                  <div className="h-44 rounded-3xl bg-slate-200/60 dark:bg-zinc-900/60 border border-slate-300 dark:border-zinc-800 animate-pulse" />
-                  <div className="h-44 rounded-3xl bg-slate-200/60 dark:bg-zinc-900/60 border border-slate-300 dark:border-zinc-800 animate-pulse" />
+                <div className="divide-y divide-slate-200/70 dark:divide-zinc-800/80">
+                  <JobCardSkeleton />
+                  <JobCardSkeleton />
+                  <JobCardSkeleton />
                 </div>
               }
             >
@@ -136,6 +139,8 @@ export default function DashboardPage({ searchParams }: DashboardPageProps) {
             </Suspense>
           </ClientShell>
         </main>
+
+        <DashboardFooter />
       </div>
     </NuqsAdapter>
   );

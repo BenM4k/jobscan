@@ -73,15 +73,21 @@ export function JobTailoredResumeSection({ job, onJobUpdated }: JobTailoredResum
   };
 
   return (
-    <section aria-labelledby="tailored-resume-heading" className="bg-white dark:bg-[#121215] border border-slate-300 dark:border-zinc-800 p-6 sm:p-8 rounded-3xl shadow-sm space-y-4">
+    <section aria-labelledby="tailored-resume-heading" className="space-y-4">
+      {/* Main Row */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h3 id="tailored-resume-heading" className="text-base font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
-            <span>📄</span>
-            <span>{t("tailoredResumeHeading")}</span>
-          </h3>
-          <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
-            {t("tailoredResumeSubtitle")}
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="text-base text-gray-700 dark:text-zinc-300">📄</span>
+            <h3
+              id="tailored-resume-heading"
+              className="text-sm sm:text-base font-bold text-gray-900 dark:text-white"
+            >
+              Tailored Resume
+            </h3>
+          </div>
+          <p className="text-xs text-gray-600 dark:text-zinc-400 max-w-xl leading-relaxed">
+            Optimized for this role without fabrication of unverified experience.
           </p>
         </div>
 
@@ -91,7 +97,7 @@ export function JobTailoredResumeSection({ job, onJobUpdated }: JobTailoredResum
               <button
                 type="button"
                 onClick={() => setIsEditing(!isEditing)}
-                className="bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-gray-700 dark:text-slate-200 text-xs font-bold px-3 py-1.5 rounded-xl transition border border-slate-200 dark:border-zinc-700 cursor-pointer"
+                className="bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-gray-700 dark:text-slate-200 text-xs font-semibold px-3 py-1.5 rounded-xl transition border border-slate-200 dark:border-zinc-700 cursor-pointer"
               >
                 {isEditing ? tCommon("save") : `✏️ ${tCommon("edit")}`}
               </button>
@@ -99,7 +105,7 @@ export function JobTailoredResumeSection({ job, onJobUpdated }: JobTailoredResum
               <button
                 type="button"
                 onClick={handleCopy}
-                className="bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-gray-700 dark:text-slate-200 text-xs font-bold px-3 py-1.5 rounded-xl transition border border-slate-200 dark:border-zinc-700 cursor-pointer"
+                className="bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-gray-700 dark:text-slate-200 text-xs font-semibold px-3 py-1.5 rounded-xl transition border border-slate-200 dark:border-zinc-700 cursor-pointer"
               >
                 {isCopied ? `✓ ${tCommon("copied")}` : `📋 ${tCommon("copy")}`}
               </button>
@@ -107,7 +113,7 @@ export function JobTailoredResumeSection({ job, onJobUpdated }: JobTailoredResum
               <button
                 type="button"
                 onClick={() => handleDownloadPdf(editedResume || job.tailoredResume!)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-1.5 rounded-xl transition shadow-xs cursor-pointer"
+                className="bg-[#0e4d64] hover:bg-[#0a3849] text-white text-xs font-semibold px-3.5 py-1.5 rounded-xl transition shadow-xs cursor-pointer"
               >
                 📥 {tCommon("downloadPdf")}
               </button>
@@ -116,7 +122,7 @@ export function JobTailoredResumeSection({ job, onJobUpdated }: JobTailoredResum
                 type="button"
                 onClick={handleGenerate}
                 disabled={isGenerating}
-                className="bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-800 dark:text-zinc-200 text-xs font-bold px-3.5 py-1.5 rounded-xl transition disabled:opacity-50 cursor-pointer"
+                className="bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-800 dark:text-zinc-200 text-xs font-semibold px-3 py-1.5 rounded-xl transition disabled:opacity-50 cursor-pointer"
               >
                 {isGenerating ? "..." : t("reTailor")}
               </button>
@@ -126,17 +132,17 @@ export function JobTailoredResumeSection({ job, onJobUpdated }: JobTailoredResum
               type="button"
               onClick={handleGenerate}
               disabled={isGenerating}
-              className="bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition shadow-md shadow-emerald-500/20 disabled:opacity-50 inline-flex items-center gap-2 cursor-pointer"
+              className="bg-[#0e4d64] hover:bg-[#0a3849] text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition shadow-xs disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer shrink-0"
             >
               {isGenerating ? (
                 <>
-                  <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping" />
+                  <span className="w-2 h-2 rounded-full bg-white animate-ping" />
                   <span>{t("generatingResume")}</span>
                 </>
               ) : (
                 <>
-                  <span>✦</span>
-                  <span>{t("generateResume")}</span>
+                  <span>+</span>
+                  <span>Generate Tailored Resume</span>
                 </>
               )}
             </button>
@@ -145,24 +151,21 @@ export function JobTailoredResumeSection({ job, onJobUpdated }: JobTailoredResum
       </div>
 
       {job.tailoredResume && (
-        <div className="space-y-3">
+        <div className="space-y-3 pt-2">
           {isEditing ? (
             <textarea
               rows={16}
               value={editedResume}
               onChange={(e) => setEditedResume(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-[#18181D] border border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 p-4 rounded-2xl text-xs font-mono leading-relaxed focus:outline-none focus:border-emerald-500"
+              className="w-full bg-slate-50 dark:bg-[#18181D] border border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 p-4 rounded-2xl text-xs font-mono leading-relaxed focus:outline-none focus:border-cyan-600"
             />
           ) : (
             <div className="p-5 sm:p-6 bg-slate-50/80 dark:bg-[#141418] border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl">
-              <pre className="text-xs sm:text-sm text-gray-800 dark:text-zinc-200 whitespace-pre-wrap font-mono leading-relaxed selection:bg-emerald-500 selection:text-white">
+              <pre className="text-xs sm:text-sm text-gray-800 dark:text-zinc-200 whitespace-pre-wrap font-mono leading-relaxed selection:bg-cyan-600 selection:text-white">
                 {editedResume || job.tailoredResume}
               </pre>
             </div>
           )}
-          <p className="text-[11px] text-gray-600 dark:text-zinc-300 font-medium italic">
-            ℹ️ {tCommon("aiNotice")}
-          </p>
         </div>
       )}
     </section>

@@ -25,42 +25,6 @@ type Source =
 type SourceOption = "all" | Source;
 type StatusOption = "all" | JobStatus;
 
-function LocalJobsButton() {
-  const t = useTranslations("dashboard");
-  const [sourceFilter, setSourceFilter] = useQueryState(
-    "source",
-    parseAsStringEnum<SourceOption>([
-      "all",
-      "reliefweb",
-      "emploicd",
-      "congojob",
-      "unjobs",
-      "greenhouse",
-      "remoteok",
-      "lever",
-      "ashby",
-      "manual",
-    ]).withDefault("all"),
-  );
-
-  return (
-    <button
-      onClick={() => setSourceFilter("all")}
-      className={`font-medium text-xs px-3.5 py-2 rounded-xl border shadow-xs flex items-center gap-1.5 transition cursor-pointer ${
-        sourceFilter === "all" ||
-        sourceFilter === "reliefweb" ||
-        sourceFilter === "emploicd" ||
-        sourceFilter === "congojob"
-          ? "bg-white dark:bg-[#18181B] text-gray-900 dark:text-slate-100 border-slate-400 dark:border-zinc-800"
-          : "bg-transparent text-gray-700 dark:text-zinc-400 border-slate-300 dark:border-zinc-800/80 hover:border-slate-400 dark:hover:border-zinc-700"
-      }`}
-    >
-      <span aria-hidden="true">📍</span>
-      <span>{t("localJobsDrc")}</span>
-    </button>
-  );
-}
-
 function FilterBar() {
   const t = useTranslations("dashboard");
   const [statusFilter, setStatusFilter] = useQueryState(
@@ -87,7 +51,7 @@ function FilterBar() {
   );
 
   return (
-    <div className="flex flex-wrap items-center gap-3 sm:gap-3.5 text-xs sm:text-sm font-medium pt-1">
+    <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 text-xs font-normal">
       {/* Source Dropdown Filter Pill */}
       <div className="relative">
         <select
@@ -96,7 +60,7 @@ function FilterBar() {
             setSourceFilter(e.target.value as SourceOption, { shallow: false })
           }
           aria-label="Filter jobs by source platform"
-          className="appearance-none bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-800 text-gray-800 dark:text-zinc-300 rounded-2xl px-4 py-2.5 sm:px-5 sm:py-3 pr-8 hover:border-slate-400 dark:hover:border-zinc-700 transition cursor-pointer text-xs sm:text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 font-semibold shadow-xs"
+          className="appearance-none bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 rounded-xl px-3.5 py-1.5 sm:px-4 sm:py-2 pr-7 hover:border-slate-300 dark:hover:border-zinc-700 transition cursor-pointer text-xs focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500 font-medium"
         >
           <option value="all">{t("sourceAll")}</option>
           <option value="reliefweb">🇨🇩 ReliefWeb</option>
@@ -109,7 +73,7 @@ function FilterBar() {
           <option value="remoteok">RemoteOK</option>
         </select>
         <span
-          className="absolute right-3 top-3 sm:top-3.5 pointer-events-none text-xs text-gray-400 dark:text-zinc-500"
+          className="absolute right-2.5 top-2 sm:top-2.5 pointer-events-none text-[10px] text-gray-400 dark:text-zinc-500"
           aria-hidden="true"
         >
           ▾
@@ -124,7 +88,7 @@ function FilterBar() {
             setStatusFilter(e.target.value as StatusOption, { shallow: false })
           }
           aria-label="Filter jobs by status"
-          className="appearance-none bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-800 text-gray-800 dark:text-zinc-300 rounded-2xl px-4 py-2.5 sm:px-5 sm:py-3 pr-8 hover:border-slate-400 dark:hover:border-zinc-700 transition cursor-pointer text-xs sm:text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 font-semibold shadow-xs"
+          className="appearance-none bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 rounded-xl px-3.5 py-1.5 sm:px-4 sm:py-2 pr-7 hover:border-slate-300 dark:hover:border-zinc-700 transition cursor-pointer text-xs focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500 font-medium"
         >
           <option value="all">{t("statusAll")}</option>
           <option value="new">{t("statusNew")}</option>
@@ -135,7 +99,7 @@ function FilterBar() {
           <option value="offer">{t("statusOffer")}</option>
         </select>
         <span
-          className="absolute right-3 top-3 sm:top-3.5 pointer-events-none text-xs text-gray-400 dark:text-zinc-500"
+          className="absolute right-2.5 top-2 sm:top-2.5 pointer-events-none text-[10px] text-gray-400 dark:text-zinc-500"
           aria-hidden="true"
         >
           ▾
@@ -147,11 +111,11 @@ function FilterBar() {
 
       <button
         aria-label={t("country")}
-        className="bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-800 text-gray-800 dark:text-zinc-300 px-4 py-2.5 sm:px-5 sm:py-3 rounded-2xl hover:border-slate-400 dark:hover:border-zinc-700 transition flex items-center gap-1.5 font-semibold shadow-xs cursor-pointer"
+        className="bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl hover:border-slate-300 dark:hover:border-zinc-700 transition flex items-center gap-1 font-medium cursor-pointer"
       >
         <span>{t("country")}</span>
         <span
-          className="text-xs text-gray-400 dark:text-zinc-500"
+          className="text-[10px] text-gray-400 dark:text-zinc-500 ml-0.5"
           aria-hidden="true"
         >
           ▾
@@ -160,11 +124,11 @@ function FilterBar() {
 
       <button
         aria-label={t("city")}
-        className="bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-800 text-gray-800 dark:text-zinc-300 px-4 py-2.5 sm:px-5 sm:py-3 rounded-2xl hover:border-slate-400 dark:hover:border-zinc-700 transition flex items-center gap-1.5 font-semibold shadow-xs cursor-pointer"
+        className="bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl hover:border-slate-300 dark:hover:border-zinc-700 transition flex items-center gap-1 font-medium cursor-pointer"
       >
         <span>{t("city")}</span>
         <span
-          className="text-xs text-gray-400 dark:text-zinc-500"
+          className="text-[10px] text-gray-400 dark:text-zinc-500 ml-0.5"
           aria-hidden="true"
         >
           ▾
@@ -173,11 +137,11 @@ function FilterBar() {
 
       <button
         aria-label={t("workplace")}
-        className="bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-800 text-gray-700 dark:text-zinc-300 px-4 py-2.5 sm:px-5 sm:py-3 rounded-2xl hover:border-slate-400 dark:hover:border-zinc-700 transition flex items-center gap-1.5 font-semibold shadow-xs cursor-pointer"
+        className="bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl hover:border-slate-300 dark:hover:border-zinc-700 transition flex items-center gap-1 font-medium cursor-pointer"
       >
         <span>{t("workplace")}</span>
         <span
-          className="text-xs text-gray-400 dark:text-zinc-500"
+          className="text-[10px] text-gray-400 dark:text-zinc-500 ml-0.5"
           aria-hidden="true"
         >
           ▾
@@ -195,27 +159,21 @@ export function ClientShell({ children }: ClientShellProps) {
   const tCommon = useTranslations("common");
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto">
-      {/* Hero Header Section - Synchronous Static Shell */}
-      <div className="space-y-4 pt-2">
-        <h1 className="text-3xl sm:text-5xl font-serif text-gray-900 dark:text-slate-100 leading-tight tracking-tight font-medium">
-          {t("heroTitle")}
+    <div className="space-y-7 max-w-5xl w-full mx-auto">
+      {/* Hero Header Section */}
+      <div className="space-y-3 pt-2">
+        <h1 className="text-3xl sm:text-4xl lg:text-[40px] font-bold text-gray-900 dark:text-slate-100 leading-[1.15] tracking-tight font-sans max-w-xl">
+          Discover opportunities that <br className="hidden sm:inline" />
+          match your skills
         </h1>
-        <p className="text-sm text-gray-500 dark:text-zinc-400 max-w-xl font-sans">
-          {t("heroSubtitle")}
-        </p>
 
-        {/* Local / Global Opportunities Toggle Pills */}
-        <div className="flex flex-wrap items-center gap-2 pt-2">
-          <Suspense
-            fallback={
-              <div className="h-9 w-36 bg-slate-200 dark:bg-zinc-800 rounded-xl animate-pulse" />
-            }
-          >
-            <LocalJobsButton />
-          </Suspense>
+        {/* Subtitle row: text left, Fetch Jobs button right */}
+        <div className="flex flex-wrap items-start justify-between gap-4 pt-1">
+          <p className="text-sm text-gray-500 dark:text-zinc-400 max-w-xl font-sans leading-relaxed">
+            {t("heroSubtitle")}
+          </p>
 
-          <div className="ml-auto">
+          <div className="shrink-0">
             <FetchJobsPopover
               onSuccess={(msg) => {
                 setSuccessMsg(msg);
@@ -264,12 +222,12 @@ export function ClientShell({ children }: ClientShellProps) {
         </div>
       )}
 
-      {/* Full-width Search & Filter Pills Section */}
-      <div className="space-y-4 pt-1">
-        {/* Full-width Search Bar - Synchronous Static Shell */}
-        <div className="relative">
+      {/* Search Bar & Filter Pills Section */}
+      <div className="space-y-5 pt-2">
+        {/* Clean Search Input with bottom border line */}
+        <div className="relative pb-3 border-b border-slate-200/90 dark:border-zinc-800 flex items-center">
           <span
-            className="absolute inset-y-0 left-4.5 flex items-center text-gray-400 dark:text-zinc-500 text-base"
+            className="text-gray-400 dark:text-zinc-500 text-sm mr-3 select-none"
             aria-hidden="true"
           >
             🔍
@@ -281,17 +239,17 @@ export function ClientShell({ children }: ClientShellProps) {
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t("searchPlaceholder")}
             aria-label={t("searchPlaceholder")}
-            className="w-full bg-white dark:bg-[#141417] border border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 text-sm font-medium rounded-2xl pl-12 pr-5 py-3.5 sm:py-4 focus:outline-none focus:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/20 transition shadow-xs placeholder-gray-400 dark:placeholder-zinc-500"
+            className="w-full bg-transparent text-gray-900 dark:text-slate-100 text-sm font-normal focus:outline-none placeholder-gray-400 dark:placeholder-zinc-500"
           />
         </div>
 
-        {/* Filter Pills Row - Suspense Boundary around URL Readers */}
+        {/* Filter Pills Row */}
         <Suspense
           fallback={
-            <div className="flex flex-wrap items-center gap-3 text-xs font-medium">
-              <div className="w-32 h-10 rounded-2xl bg-slate-200 dark:bg-zinc-800 animate-pulse" />
-              <div className="w-32 h-10 rounded-2xl bg-slate-200 dark:bg-zinc-800 animate-pulse" />
-              <div className="w-28 h-10 rounded-2xl bg-slate-200 dark:bg-zinc-800 animate-pulse" />
+            <div className="flex flex-wrap items-center gap-2.5 text-xs font-medium">
+              <div className="w-28 h-8 rounded-xl bg-slate-200 dark:bg-zinc-800 animate-pulse" />
+              <div className="w-28 h-8 rounded-xl bg-slate-200 dark:bg-zinc-800 animate-pulse" />
+              <div className="w-28 h-8 rounded-xl bg-slate-200 dark:bg-zinc-800 animate-pulse" />
             </div>
           }
         >
@@ -300,7 +258,7 @@ export function ClientShell({ children }: ClientShellProps) {
       </div>
 
       {/* Rendered Job List */}
-      <div>{children}</div>
+      <div className="pt-2">{children}</div>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/auth-guard";
 import { Navbar } from "@/components/layout/Navbar";
 import { Logo } from "@/components/Logo";
 import { getTranslations } from "next-intl/server";
+import { DashboardFooter } from "@/components/layout/DashboardFooter";
 
 export const instant = false;
 
@@ -213,6 +214,8 @@ export default async function LandingPage() {
           </div>
         </div>
       </main>
+
+      <DashboardFooter />
     </div>
   );
 }

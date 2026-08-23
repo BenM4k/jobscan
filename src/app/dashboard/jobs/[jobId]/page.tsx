@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Navbar } from "@/components/layout/Navbar";
 import { JobDetailView } from "@/components/job/JobDetailView";
+import { JobDetailSkeleton } from "@/components/job/JobDetailSkeleton";
+import { DashboardFooter } from "@/components/layout/DashboardFooter";
 
 export const instant = false;
 
@@ -84,34 +86,28 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
         <JobNavbar />
       </Suspense>
 
-      <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 space-y-6 z-10">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 z-10">
         {/* Breadcrumb Navigation */}
-        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-zinc-400">
+        <div className="flex items-center gap-2.5 font-mono text-xs text-gray-500 dark:text-zinc-400">
           <Link
             href="/dashboard"
-            className="hover:text-blue-600 dark:hover:text-indigo-400 transition font-semibold inline-flex items-center gap-1.5"
+            className="hover:text-gray-900 dark:hover:text-white transition font-medium inline-flex items-center gap-1.5"
           >
             <span>←</span>
             <span>Pipeline</span>
           </Link>
-          <span>/</span>
-          <span className="text-gray-900 dark:text-slate-200 font-bold truncate max-w-xs">
+          <span className="text-gray-400 dark:text-zinc-600">/</span>
+          <span className="text-gray-700 dark:text-zinc-300 font-medium">
             Job Opportunity
           </span>
         </div>
 
-        <Suspense
-          fallback={
-            <div className="space-y-6 animate-pulse">
-              <div className="h-44 rounded-3xl bg-slate-200/60 dark:bg-zinc-900/60 border border-slate-300 dark:border-zinc-800" />
-              <div className="h-32 rounded-3xl bg-slate-200/60 dark:bg-zinc-900/60 border border-slate-300 dark:border-zinc-800" />
-              <div className="h-64 rounded-3xl bg-slate-200/60 dark:bg-zinc-900/60 border border-slate-300 dark:border-zinc-800" />
-            </div>
-          }
-        >
+        <Suspense fallback={<JobDetailSkeleton />}>
           <JobDetailContent params={params} />
         </Suspense>
       </main>
+
+      <DashboardFooter />
     </div>
   );
 }

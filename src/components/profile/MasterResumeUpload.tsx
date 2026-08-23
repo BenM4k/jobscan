@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { ResumeProfileData } from "@/lib/ai";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
+import { FileText } from "lucide-react";
 
 interface MasterResumeUploadProps {
   onExtracted: (data: ResumeProfileData, rawText: string) => void;
@@ -67,27 +68,25 @@ export function MasterResumeUpload({ onExtracted, disabled }: MasterResumeUpload
   };
 
   return (
-    <div className="border-2 border-dashed border-slate-300 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 bg-slate-50/60 dark:bg-[#15151A]/60 flex flex-col items-center justify-center text-center gap-3 transition hover:border-blue-500 shadow-xs">
-      <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xl shadow-xs">
-        📄
-      </div>
+    <div className="border border-dashed border-slate-300 dark:border-zinc-800 rounded-2xl p-8 sm:p-10 bg-white/60 dark:bg-[#121215]/60 flex flex-col items-center justify-center text-center gap-2.5 transition hover:border-blue-500 shadow-2xs">
+      <FileText className="w-7 h-7 text-blue-600 dark:text-blue-400" />
 
-      <div>
-        <h4 className="text-sm font-bold text-gray-900 dark:text-slate-100">
+      <div className="space-y-0.5 max-w-md">
+        <h4 className="text-sm font-bold text-slate-900 dark:text-zinc-100">
           {t("uploadTitle")}
         </h4>
-        <p className="text-xs text-gray-500 dark:text-zinc-400 max-w-sm mt-0.5">
+        <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
           {t("uploadSubtitle")}
         </p>
       </div>
 
       {isProcessing ? (
         <div className="flex items-center gap-2 text-xs font-bold text-blue-600 dark:text-blue-400 py-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-ping" />
+          <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-ping" />
           <span>{stepLabel}</span>
         </div>
       ) : (
-        <label className="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow-md shadow-blue-500/20 inline-flex items-center gap-2">
+        <label className="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-5 py-2.5 rounded-lg transition shadow-xs inline-flex items-center gap-2 mt-1 select-none">
           <span>{t("chooseFile")}</span>
           <input
             type="file"

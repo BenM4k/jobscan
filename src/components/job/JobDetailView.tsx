@@ -84,7 +84,7 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10 sm:space-y-12">
       <JobDetailHeader job={job} onStatusChange={handleStatusChange} />
 
       <JobScoreSection
