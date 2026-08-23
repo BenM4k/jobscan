@@ -46,7 +46,7 @@ export function JobCardItem({
     ? job.description
         .replace(/<[^>]*>?/gm, "")
         .trim()
-        .slice(0, 160)
+        .slice(0, 240)
     : "No preview snippet available.";
 
   const locationText = [job.city, job.countryCode || job.country || "DRC"]
@@ -55,109 +55,123 @@ export function JobCardItem({
 
   const companyInitials = getCompanyInitials(job.company);
 
+  const postedDate = job.postedAt
+    ? new Date(job.postedAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        timeZone: "UTC",
+      })
+    : null;
+
+  const workplaceLabel =
+    job.workplaceType === "remote"
+      ? t("remote")
+      : job.workplaceType === "hybrid"
+        ? t("hybrid")
+        : job.workplaceType === "onsite"
+          ? t("onSite")
+          : "REMOTE";
+
   return (
     <article
       onClick={() => onSelect(job)}
       aria-labelledby={`job-title-${job.id}`}
-      className="bg-white dark:bg-[#121215] border border-slate-300 dark:border-zinc-800 p-5 sm:p-6 lg:p-7 rounded-2xl sm:rounded-3xl flex flex-col justify-between hover:border-slate-400 dark:hover:border-zinc-700 transition duration-200 shadow-sm relative group cursor-pointer"
+      className="py-8 sm:py-9 transition duration-150 cursor-pointer group"
     >
+      {/* Top Header: Company Avatar + Job Info + Actions */}
       <div className="flex items-start gap-4 sm:gap-5">
-        {/* Company Initial Logo Box */}
+        {/* Company Initials Avatar Box */}
         <div
           aria-hidden="true"
-          className="w-11 h-11 sm:w-13 sm:h-13 rounded-2xl bg-linear-to-br from-slate-100 to-slate-200 dark:from-[#1C1C22] dark:to-[#16161B] border border-slate-300 dark:border-zinc-700/60 text-gray-900 dark:text-slate-100 font-extrabold flex items-center justify-center text-xs sm:text-sm shrink-0 font-sans tracking-wider shadow-xs"
+          className="w-12 h-12 rounded-lg bg-[#E2E8F0] dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 font-bold flex items-center justify-center text-xs font-mono tracking-wider shrink-0"
         >
           {companyInitials}
         </div>
 
-        {/* Title, Company, Description & Metadata */}
-        <div className="flex-1 space-y-2 min-w-0">
-          <div className="flex justify-between items-start gap-3">
+        {/* Info & Text Area */}
+        <div className="flex-1 min-w-0">
+          {/* Title Row & Star/Close Buttons */}
+          <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
               <h3
                 id={`job-title-${job.id}`}
-                className="text-base sm:text-lg font-bold text-gray-900 dark:text-slate-100 leading-snug truncate"
+                className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-slate-100 leading-snug tracking-tight font-sans"
               >
                 {job.title}
               </h3>
-              <p className="text-xs sm:text-sm text-gray-500 dark:text-zinc-400 font-semibold mt-0.5 truncate">
+              <p className="text-sm text-gray-500 dark:text-zinc-400 font-normal mt-0.5">
                 {job.company}
               </p>
             </div>
 
-            {/* Bookmark & Action Buttons */}
+            {/* Bookmark & Delete action buttons */}
             <div
-              className="flex items-center gap-1 sm:gap-2 shrink-0"
+              className="flex items-center gap-2 shrink-0 pt-0.5"
               onClick={(e) => e.stopPropagation()}
             >
               <button
                 onClick={() => setIsBookmarked(!isBookmarked)}
-                className="text-gray-400 hover:text-amber-500 transition p-1.5 text-sm sm:text-base focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 rounded-lg cursor-pointer"
-                title={
-                  isBookmarked ? "Remove bookmark" : "Bookmark opportunity"
-                }
-                aria-label={
-                  isBookmarked ? "Remove bookmark" : "Bookmark opportunity"
-                }
+                aria-label={isBookmarked ? "Remove bookmark" : "Bookmark opportunity"}
+                className="text-gray-400 hover:text-amber-500 transition p-1 text-base focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 rounded cursor-pointer"
               >
                 <span className={isBookmarked ? "text-amber-500" : ""}>
                   {isBookmarked ? "★" : "☆"}
                 </span>
               </button>
-
               <button
                 onClick={() => onDeleteJob(job.id)}
-                className="text-gray-400 hover:text-rose-600 transition p-1.5 text-sm sm:text-base focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 rounded-lg cursor-pointer"
-                title="Delete opportunity"
                 aria-label={`Delete ${job.title}`}
+                className="text-gray-400 hover:text-rose-500 transition p-1 text-base focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 rounded cursor-pointer"
               >
                 ✕
               </button>
             </div>
           </div>
 
-          <p className="text-xs sm:text-sm text-gray-600 dark:text-zinc-400 leading-relaxed font-sans line-clamp-2">
-            {descriptionSnippet}
+          {/* Job description summary */}
+          <p className="mt-2 text-sm text-gray-600 dark:text-zinc-300 leading-relaxed line-clamp-2 max-w-4xl font-sans">
+            {descriptionSnippet}{descriptionSnippet.length >= 240 ? "..." : ""}
           </p>
 
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2.5 pt-2 text-[11px] sm:text-xs text-gray-500 dark:text-zinc-400 font-medium">
-            <span className="truncate max-w-35 sm:max-w-none">
-              📍 {locationText}
-            </span>
-
-            {job.workplaceType && (
-              <span className="bg-gray-100 dark:bg-[#1E1E24] text-gray-700 dark:text-zinc-300 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg font-semibold text-[10px] sm:text-[11px]">
-                {job.workplaceType === "remote"
-                  ? t("remote")
-                  : job.workplaceType === "hybrid"
-                    ? t("hybrid")
-                    : t("onSite")}
+          {/* Badges / Meta row */}
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-gray-400 dark:text-zinc-500 font-medium">
+            {locationText && (
+              <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400 font-semibold">
+                <span aria-hidden="true">📍</span>
+                <span>{locationText}</span>
               </span>
             )}
 
-            <span>• {t("via")} {job.source}</span>
+            {workplaceLabel && (
+              <span className="bg-[#E0F2FE] dark:bg-cyan-950/50 text-[#0284C7] dark:text-cyan-400 border border-[#BAE6FD] dark:border-cyan-800 text-[11px] font-bold px-2 py-0.5 rounded tracking-wide uppercase">
+                {workplaceLabel}
+              </span>
+            )}
 
-            {job.postedAt && (
-              <span>
-                •{" "}
-                {new Date(job.postedAt).toLocaleDateString(undefined, {
-                  month: "short",
-                  day: "numeric",
-                })}
+            {job.source && (
+              <span className="font-mono text-[11px] uppercase tracking-wider text-gray-400 dark:text-zinc-500">
+                • VIA {job.source}
+              </span>
+            )}
+
+            {postedDate && (
+              <span className="font-mono text-[11px] uppercase tracking-wider text-gray-400 dark:text-zinc-500">
+                • {postedDate}
               </span>
             )}
           </div>
         </div>
       </div>
 
-      {/* AI Score Bar & Interactive Actions */}
+      {/* Bottom Bar: Status / AI Engine + Score Job CTA */}
       <div
-        className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 pt-3.5 mt-3.5 sm:pt-5 sm:mt-5 border-t border-slate-200 dark:border-zinc-800/80"
+        className="mt-5 pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        {/* Status and AI Engine selectors */}
+        <div className="flex flex-wrap items-center gap-4 text-xs">
           <CardGridSelect
-            title="Status"
+            title="STATUS"
             value={job.status}
             options={[
               { id: "new", label: t("statusNew") },
@@ -172,7 +186,7 @@ export function JobCardItem({
           />
 
           <CardGridSelect
-            title="AI Engine"
+            title="AI ENGINE"
             value={aiProvider}
             options={[
               { id: "gateway", label: "Gateway" },
@@ -185,14 +199,15 @@ export function JobCardItem({
           />
         </div>
 
-        <div className="flex items-center justify-between sm:justify-end gap-2.5 sm:gap-3 w-full sm:w-auto pt-1 sm:pt-0">
+        {/* Score Badge and Score Job Button */}
+        <div className="flex items-center justify-between sm:justify-end gap-3">
           {job.fitScore !== null &&
             job.fitScore !== undefined &&
             (() => {
               const scoreStyle = getScoreBadgeStyle(job.fitScore);
               return (
                 <span
-                  className={`text-xs sm:text-sm font-extrabold px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border shrink-0 ${scoreStyle.bgColor} ${scoreStyle.borderColor} ${scoreStyle.textColor}`}
+                  className={`text-xs font-extrabold px-3 py-1.5 rounded-xl border shrink-0 ${scoreStyle.bgColor} ${scoreStyle.borderColor} ${scoreStyle.textColor}`}
                 >
                   {t("score")}: {job.fitScore}/100
                 </span>
@@ -202,7 +217,8 @@ export function JobCardItem({
           <button
             onClick={() => onScoreJob(job.id)}
             disabled={isScoring}
-            className="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold px-3.5 sm:px-4 py-2 rounded-xl transition disabled:opacity-50 shadow-xs text-center cursor-pointer"
+            aria-label={`Score ${job.title} with AI`}
+            className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold px-6 py-2 rounded-xl transition duration-150 disabled:opacity-50 shadow-sm cursor-pointer whitespace-nowrap"
           >
             {isScoring ? t("scoring") : t("scoreJob")}
           </button>

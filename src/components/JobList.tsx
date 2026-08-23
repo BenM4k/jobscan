@@ -192,23 +192,23 @@ export function JobList({
       )}
 
       {/* Header Subbar */}
-      <div className="flex justify-between items-center text-xs text-gray-500 dark:text-zinc-400 font-sans border-t border-gray-200/60 dark:border-zinc-800/80 pt-4 pb-1">
+      <div className="flex justify-between items-center text-xs text-gray-500 dark:text-zinc-400 font-sans pt-2 pb-2">
         <span>
           <strong className="text-gray-900 dark:text-slate-200 font-semibold">
             {totalJobs ?? filteredJobs.length}
           </strong>{" "}
           {t("opportunitiesMatching")}
         </span>
-        <span className="text-[11px] text-gray-400 dark:text-zinc-500 font-mono">
+        <span className="text-xs text-gray-400 dark:text-zinc-500 font-sans">
           {t("sortedRecent")}
         </span>
       </div>
 
-      {/* Stacked Job Cards List */}
+      {/* Flat Job Items List */}
       <ul
         role="list"
         aria-label="Available job opportunities"
-        className="flex flex-col space-y-6 sm:space-y-7"
+        className="divide-y divide-slate-200/70 dark:divide-zinc-800/80"
       >
         {filteredJobs.map((job) => (
           <li key={job.id}>

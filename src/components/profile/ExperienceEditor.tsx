@@ -57,54 +57,59 @@ export function ExperienceEditor({ experiences, onChange }: ExperienceEditorProp
 
   return (
     <div className="space-y-4">
+      {/* Section Header */}
       <div className="flex items-center justify-between">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-zinc-300">
+        <h4 className="text-[10px] font-mono font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-400">
           {t("experienceHeading")}
         </h4>
         <button
           type="button"
           onClick={handleAddRole}
-          className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+          className="text-xs font-mono font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
         >
           {t("addPosition")}
         </button>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-6">
         {experiences.map((exp, rIdx) => (
-          <div
-            key={rIdx}
-            className="p-4 rounded-2xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-[#15151A]/50 space-y-3"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1">
+          <div key={rIdx} className="space-y-3 pb-6 border-b border-dashed border-slate-200 dark:border-zinc-800 last:border-b-0 last:pb-0">
+            <div className="flex items-center gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 flex-1">
                 <input
                   type="text"
                   placeholder={t("jobTitlePlaceholder")}
                   value={exp.title}
                   onChange={(e) => handleUpdateRole(rIdx, "title", e.target.value)}
-                  className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-xs p-2 rounded-lg font-bold"
+                  className="bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-xs p-2.5 rounded-xl font-bold text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-blue-500 shadow-2xs"
                 />
                 <input
                   type="text"
                   placeholder={t("companyPlaceholder")}
                   value={exp.company}
                   onChange={(e) => handleUpdateRole(rIdx, "company", e.target.value)}
-                  className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-xs p-2 rounded-lg"
+                  className="bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-xs p-2.5 rounded-xl text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 shadow-2xs"
                 />
                 <input
                   type="text"
                   placeholder={t("periodPlaceholder")}
                   value={exp.startDate || exp.endDate || ""}
-                  onChange={(e) => handleUpdateRole(rIdx, "startDate", e.target.value)}
-                  className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-xs p-2 rounded-lg"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (!exp.startDate && exp.endDate) {
+                      handleUpdateRole(rIdx, "endDate", val);
+                    } else {
+                      handleUpdateRole(rIdx, "startDate", val);
+                    }
+                  }}
+                  className="bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-xs p-2.5 rounded-xl text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 shadow-2xs"
                 />
               </div>
 
               <button
                 type="button"
                 onClick={() => handleRemoveRole(rIdx)}
-                className="text-rose-500 hover:text-rose-700 text-xs font-bold p-1 cursor-pointer"
+                className="text-slate-400 hover:text-rose-500 text-xs p-1.5 cursor-pointer transition"
                 title="Remove Position"
               >
                 ✕
@@ -115,18 +120,18 @@ export function ExperienceEditor({ experiences, onChange }: ExperienceEditorProp
             <div className="space-y-1.5 pl-2">
               {exp.bullets.map((bullet, bIdx) => (
                 <div key={bIdx} className="flex items-center gap-2">
-                  <span className="text-gray-400 text-xs">•</span>
+                  <span className="text-slate-400 text-xs select-none">•</span>
                   <input
                     type="text"
                     value={bullet}
                     onChange={(e) => handleBulletChange(rIdx, bIdx, e.target.value)}
                     placeholder="Describe specific achievements, responsibilities, metrics..."
-                    className="flex-1 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-xs p-2 rounded-lg"
+                    className="flex-1 bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-xs p-2 rounded-xl text-slate-700 dark:text-zinc-300 focus:outline-none focus:border-blue-500 shadow-2xs"
                   />
                   <button
                     type="button"
                     onClick={() => handleRemoveBullet(rIdx, bIdx)}
-                    className="text-gray-400 hover:text-rose-500 text-xs px-1 cursor-pointer"
+                    className="text-slate-400 hover:text-rose-500 text-xs px-1 cursor-pointer transition"
                     title="Remove Bullet"
                   >
                     ✕
@@ -136,7 +141,7 @@ export function ExperienceEditor({ experiences, onChange }: ExperienceEditorProp
               <button
                 type="button"
                 onClick={() => handleAddBullet(rIdx)}
-                className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold hover:underline pt-1 cursor-pointer"
+                className="text-[11px] font-mono text-blue-600 dark:text-blue-400 font-semibold hover:underline pt-1 cursor-pointer"
               >
                 {t("addBullet")}
               </button>

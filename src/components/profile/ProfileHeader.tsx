@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { Settings, ChevronDown, MapPin, Briefcase, FileText, Sparkles, Link2, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 interface ProfileHeaderProps {
@@ -45,44 +46,47 @@ export function ProfileHeader({
     .toUpperCase();
 
   return (
-    <header className="bg-white dark:bg-[#121215] border border-slate-300 dark:border-zinc-800 p-6 sm:p-8 rounded-3xl shadow-sm space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+    <header className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         {/* User Identity Info */}
-        <div className="flex items-center gap-5 min-w-0">
-          <div
-            aria-hidden="true"
-            className="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl bg-linear-to-br from-blue-600 via-indigo-600 to-emerald-500 text-white font-black text-2xl sm:text-3xl flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/20 relative"
-          >
-            <span>{initials}</span>
+        <div className="flex items-start gap-4 sm:gap-5 min-w-0">
+          {/* Avatar with Verified Status */}
+          <div className="relative shrink-0">
+            <div
+              aria-hidden="true"
+              className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl bg-[#5B21B6] text-white font-black text-2xl sm:text-3xl flex items-center justify-center shadow-xs select-none tracking-tight"
+            >
+              <span>{initials}</span>
+            </div>
+            {/* Teal/Cyan verified status badge */}
             <span
               title="Profile Active"
-              className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white dark:border-[#121215] flex items-center justify-center text-[10px] text-white"
+              className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#06B6D4] border-2 border-white dark:border-[#0A0A0C] flex items-center justify-center text-[10px] text-white shadow-2xs"
             >
-              ✓
+              <span className="w-1.5 h-1.5 rounded-full bg-white" />
             </span>
           </div>
 
-          <div className="space-y-1 min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-slate-100 tracking-tight truncate">
-                {name}
-              </h1>
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 shrink-0">
-                PRO
-              </span>
-            </div>
+          <div className="space-y-1.5 min-w-0 flex-1">
+            {/* Candidate Name */}
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-zinc-100 tracking-tight leading-tight">
+              {name}
+            </h1>
 
-            <p className="text-xs sm:text-sm font-bold text-blue-600 dark:text-indigo-400 truncate">
+            {/* Headline */}
+            <p className="text-xs sm:text-sm font-semibold text-[#6366F1] dark:text-indigo-400">
               {headline}
             </p>
 
-            <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-gray-500 dark:text-zinc-400 font-medium">
-              <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-zinc-800/80 text-gray-700 dark:text-zinc-300 px-2.5 py-0.5 rounded-lg border border-slate-200 dark:border-zinc-700/60">
-                📍 {location}
+            {/* Location and Open to Opportunities Pill Badges */}
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <span className="inline-flex items-center gap-1 bg-slate-100/90 dark:bg-zinc-800/80 text-slate-600 dark:text-zinc-300 px-2.5 py-1 rounded-md border border-slate-200 dark:border-zinc-700/70 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider font-mono">
+                <MapPin className="w-3 h-3 text-slate-500 shrink-0" />
+                <span>{location}</span>
               </span>
 
-              <span className="inline-flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-0.5 rounded-lg border border-emerald-200 dark:border-emerald-800/60 font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="inline-flex items-center gap-1.5 text-cyan-700 dark:text-cyan-300 bg-cyan-50/60 dark:bg-cyan-950/30 px-2.5 py-1 rounded-md border border-cyan-300/80 dark:border-cyan-800/60 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider font-mono">
+                <Briefcase className="w-3 h-3 text-cyan-600 dark:text-cyan-400 shrink-0" />
                 <span>{t("openToWork")}</span>
               </span>
             </div>
@@ -90,17 +94,20 @@ export function ProfileHeader({
         </div>
 
         {/* Actions Dropdown Button */}
-        <div className="relative shrink-0 self-start sm:self-center" ref={dropdownRef}>
+        <div className="relative shrink-0 self-start mt-1" ref={dropdownRef}>
           <button
             type="button"
             onClick={() => setDropdownOpen((prev) => !prev)}
             aria-expanded={dropdownOpen}
-            className="inline-flex items-center gap-2 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-gray-800 dark:text-slate-200 text-xs font-bold px-4 py-2.5 rounded-xl transition border border-slate-300 dark:border-zinc-700 shadow-xs cursor-pointer"
+            className="inline-flex items-center gap-2 bg-white dark:bg-[#121215] hover:bg-slate-50 dark:hover:bg-zinc-800/80 text-slate-700 dark:text-zinc-200 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-3.5 py-2 rounded-xl transition border border-slate-300 dark:border-zinc-700/80 shadow-2xs cursor-pointer font-mono"
           >
-            <span>⚙️ {t("manageProfile")}</span>
-            <span className={`text-[10px] transition-transform duration-200 ${dropdownOpen ? "rotate-180" : ""}`}>
-              ▼
-            </span>
+            <Settings className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-400 shrink-0" />
+            <span>{t("manageProfile")}</span>
+            <ChevronDown
+              className={`w-3 h-3 text-slate-400 transition-transform duration-200 ${
+                dropdownOpen ? "rotate-180" : ""
+              }`}
+            />
           </button>
 
           {dropdownOpen && (
@@ -111,9 +118,9 @@ export function ProfileHeader({
                   setDropdownOpen(false);
                   onEditClick();
                 }}
-                className="w-full text-left px-4 py-2.5 text-xs font-semibold text-gray-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-800/80 flex items-center gap-2.5 cursor-pointer"
+                className="w-full text-left px-4 py-2.5 text-xs font-semibold text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-800/80 flex items-center gap-2.5 cursor-pointer"
               >
-                <span>✏️</span>
+                <FileText className="w-4 h-4 text-slate-500" />
                 <span>{t("editResume")}</span>
               </button>
 
@@ -125,9 +132,9 @@ export function ProfileHeader({
                     onReformatClick();
                   }}
                   disabled={isReformatting}
-                  className="w-full text-left px-4 py-2.5 text-xs font-semibold text-gray-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-800/80 flex items-center gap-2.5 cursor-pointer disabled:opacity-50"
+                  className="w-full text-left px-4 py-2.5 text-xs font-semibold text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-800/80 flex items-center gap-2.5 cursor-pointer disabled:opacity-50"
                 >
-                  <span>✨</span>
+                  <Sparkles className="w-4 h-4 text-indigo-500" />
                   <span>{isReformatting ? "..." : t("reExtract")}</span>
                 </button>
               )}
@@ -140,9 +147,9 @@ export function ProfileHeader({
                     navigator.clipboard.writeText(window.location.href);
                   }
                 }}
-                className="w-full text-left px-4 py-2.5 text-xs font-semibold text-gray-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-800/80 flex items-center gap-2.5 cursor-pointer"
+                className="w-full text-left px-4 py-2.5 text-xs font-semibold text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-800/80 flex items-center gap-2.5 cursor-pointer"
               >
-                <span>🔗</span>
+                <Link2 className="w-4 h-4 text-slate-500" />
                 <span>{t("copyLink")}</span>
               </button>
 
@@ -157,7 +164,7 @@ export function ProfileHeader({
                     }}
                     className="w-full text-left px-4 py-2.5 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-2.5 cursor-pointer"
                   >
-                    <span>🗑️</span>
+                    <Trash2 className="w-4 h-4 text-rose-500" />
                     <span>{t("clearResume")}</span>
                   </button>
                 </>

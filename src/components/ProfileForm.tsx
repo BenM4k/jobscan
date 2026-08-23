@@ -141,8 +141,8 @@ export function ProfileForm({
 
   if (!isEditing && resumeText.trim()) {
     return (
-      <div className="space-y-6 max-w-5xl mx-auto">
-        <div className="flex flex-col lg:flex-row items-start gap-12 pt-4">
+      <div className="space-y-8 max-w-5xl mx-auto py-2">
+        <div className="flex flex-col lg:flex-row items-start gap-12 lg:gap-16 pt-2">
           <ProfileOverview
             name={userName || (userEmail ? userEmail.split("@")[0] : "Candidate")}
             headline={
@@ -178,14 +178,14 @@ export function ProfileForm({
   }
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto">
+    <div className="space-y-8 max-w-5xl mx-auto py-2">
       {/* Header bar */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5 bg-white dark:bg-[#121215] border border-slate-300 dark:border-zinc-800 p-6 rounded-3xl shadow-xs">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-slate-100">
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-zinc-100 tracking-tight">
             {t("title")}
           </h2>
-          <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
             {t("subtitle")}
           </p>
         </div>
@@ -195,7 +195,7 @@ export function ProfileForm({
             <button
               type="button"
               onClick={() => setIsEditing(false)}
-              className="bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-800 text-gray-800 dark:text-zinc-300 font-bold text-xs px-4 py-2.5 rounded-xl hover:border-slate-400 dark:hover:border-zinc-700 cursor-pointer"
+              className="bg-white dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 text-slate-700 dark:text-zinc-200 font-semibold text-xs px-4 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-zinc-700 transition cursor-pointer shadow-2xs"
             >
               {t("cancel")}
             </button>
@@ -205,7 +205,7 @@ export function ProfileForm({
             type="button"
             onClick={handleSave}
             disabled={isSaving}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition shadow-md shadow-blue-500/20 disabled:opacity-50 cursor-pointer"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-lg transition shadow-xs disabled:opacity-50 cursor-pointer"
           >
             {isSaving ? t("saving") : t("saveAsMaster")}
           </button>
@@ -215,29 +215,31 @@ export function ProfileForm({
       {/* Upload Dropzone */}
       <MasterResumeUpload onExtracted={handleExtracted} disabled={isSaving} />
 
-      {/* AI Provider Select */}
-      <div className="bg-white dark:bg-[#121215] border border-slate-300 dark:border-zinc-800 p-6 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+      {/* AI Provider Select Row */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-2">
         <div>
-          <h3 className="text-sm font-bold text-gray-900 dark:text-slate-100">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-zinc-100">
             {t("defaultAiEngine")}
           </h3>
-          <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
             {t("defaultAiSubtitle")}
           </p>
         </div>
 
-        <CardGridSelect
-          title="AI Engine"
-          value={aiProvider}
-          options={[
-            { id: "gemini", label: "Gemini 3.6 Flash" },
-            { id: "gateway", label: "Gateway" },
-            { id: "openai", label: "OpenAI" },
-            { id: "claude", label: "Claude" },
-          ]}
-          onChange={(val) => setAiProvider(val)}
-          accentColor="indigo"
-        />
+        <div className="self-start sm:self-auto">
+          <CardGridSelect
+            title="AI ENGINE"
+            value={aiProvider}
+            options={[
+              { id: "gemini", label: "GEMINI 3.6 FLASH" },
+              { id: "gateway", label: "GATEWAY" },
+              { id: "openai", label: "OPENAI" },
+              { id: "claude", label: "CLAUDE" },
+            ]}
+            onChange={(val) => setAiProvider(val)}
+            accentColor="indigo"
+          />
+        </div>
       </div>
 
       {/* Structured / Raw Master Resume Editor */}
