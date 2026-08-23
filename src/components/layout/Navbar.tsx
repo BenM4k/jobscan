@@ -38,7 +38,7 @@ export function Navbar({ userEmail }: NavbarProps) {
     >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         <Link href="/" aria-label="JobPilot Home" className="flex items-center gap-3 group">
-          <Logo size={36} showText badgeText="PRO" priority />
+          <Logo size={36} showText badgeText="PRO" />
         </Link>
 
         {/* Desktop Navigation */}

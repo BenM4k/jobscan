@@ -21,17 +21,22 @@ export function SignInForm() {
     setIsLoading(true);
     setErrorMsg("");
 
-    const res = await signIn.email({
-      email,
-      password,
-    });
+    try {
+      const res = await signIn.email({
+        email,
+        password,
+      });
 
-    if (res.error) {
-      setErrorMsg(res.error.message || "Sign in failed");
+      if (res.error) {
+        setErrorMsg(res.error.message || t("signInError"));
+      } else {
+        router.push("/dashboard");
+        router.refresh();
+      }
+    } catch {
+      setErrorMsg(t("unexpectedError"));
+    } finally {
       setIsLoading(false);
-    } else {
-      router.push("/dashboard");
-      router.refresh();
     }
   };
 

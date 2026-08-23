@@ -79,7 +79,12 @@
     "showPassword": "Show password",
     "hidePassword": "Hide password",
     "invalidResetToken": "Invalid or missing reset token. Please request a new link.",
-    "resendEmail": "Send another link"
+    "resendEmail": "Send another link",
+    "signInError": "Failed to sign in. Please check your credentials.",
+    "signUpError": "Failed to create account. Please try again.",
+    "forgotPasswordError": "Failed to send reset link. Please try again.",
+    "resetPasswordError": "Failed to reset password. Please try again.",
+    "unexpectedError": "An unexpected error occurred. Please try again."
   },
   "dashboard": {
     "title": "Job Pilot Pipeline",

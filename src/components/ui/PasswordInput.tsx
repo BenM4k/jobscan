@@ -43,12 +43,11 @@ export function PasswordInput({
         />
         <button
           type="button"
-          tabIndex={-1}
           disabled={disabled}
           onClick={() => setShowPassword((prev) => !prev)}
           aria-label={showPassword ? t("hidePassword") : t("showPassword")}
           title={showPassword ? t("hidePassword") : t("showPassword")}
-          className="absolute right-3 text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 focus:outline-none transition cursor-pointer p-1 rounded-md"
+          className="absolute right-3 text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:text-gray-700 dark:focus-visible:text-slate-100 transition cursor-pointer p-1 rounded-md"
         >
           {showPassword ? (
             <EyeOff className="w-4 h-4" aria-hidden="true" />

@@ -27,12 +27,12 @@ export function ForgotPasswordForm() {
       });
 
       if (res?.error) {
-        setErrorMsg(res.error.message || "Failed to send reset link");
+        setErrorMsg(res.error.message || t("forgotPasswordError"));
       } else {
         setIsSubmitted(true);
       }
     } catch {
-      setErrorMsg("An unexpected error occurred. Please try again.");
+      setErrorMsg(t("unexpectedError"));
     } finally {
       setIsLoading(false);
     }

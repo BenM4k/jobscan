@@ -79,7 +79,12 @@
     "showPassword": "Afficher le mot de passe",
     "hidePassword": "Masquer le mot de passe",
     "invalidResetToken": "Lien de réinitialisation invalide ou manquant. Veuillez en demander un nouveau.",
-    "resendEmail": "Renvoyer un autre lien"
+    "resendEmail": "Renvoyer un autre lien",
+    "signInError": "Échec de la connexion. Veuillez vérifier vos identifiants.",
+    "signUpError": "Échec de la création du compte. Veuillez réessayer.",
+    "forgotPasswordError": "Échec de l'envoi du lien de réinitialisation. Veuillez réessayer.",
+    "resetPasswordError": "Échec de la réinitialisation du mot de passe. Veuillez réessayer.",
+    "unexpectedError": "Une erreur inattendue est survenue. Veuillez réessayer."
   },
   "dashboard": {
     "title": "Pipeline Job Pilot",

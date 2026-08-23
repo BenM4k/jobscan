@@ -62,7 +62,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
       {/* Central Brand Badge */}
       <div className="mb-6 z-10 text-center space-y-3">
         <Link href="/" className="inline-flex items-center group">
-          <Logo size={44} showText textClassName="text-2xl" priority />
+          <Logo size={44} showText textClassName="text-2xl" />
         </Link>
       </div>
 

@@ -37,7 +37,7 @@ export default function RouteError({
           </h1>
           <p className="text-xs text-gray-500 dark:text-zinc-400 leading-relaxed">
             An unexpected application error occurred. You can retry the action
-            or return to the main dashboard.
+            or return to the home page.
           </p>
         </div>
 

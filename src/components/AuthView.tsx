@@ -4,6 +4,7 @@ import { SignInForm } from "@/components/auth/SignInForm";
 import { SignUpForm } from "@/components/auth/SignUpForm";
 import { ForgotPasswordForm } from "@/components/auth/ForgotPasswordForm";
 import { ResetPasswordForm } from "@/components/auth/ResetPasswordForm";
+import { AuthLoadingFallback } from "@/components/auth/AuthLoadingFallback";
 
 interface AuthViewProps {
   mode: "sign-in" | "sign-up" | "forgot-password" | "reset-password";
@@ -16,13 +17,7 @@ export function AuthView({ mode }: AuthViewProps) {
       {mode === "sign-up" && <SignUpForm />}
       {mode === "forgot-password" && <ForgotPasswordForm />}
       {mode === "reset-password" && (
-        <Suspense
-          fallback={
-            <div className="py-8 text-center text-xs text-gray-500">
-              Loading...
-            </div>
-          }
-        >
+        <Suspense fallback={<AuthLoadingFallback />}>
           <ResetPasswordForm />
         </Suspense>
       )}

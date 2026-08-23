@@ -22,18 +22,23 @@ export function SignUpForm() {
     setIsLoading(true);
     setErrorMsg("");
 
-    const res = await signUp.email({
-      email,
-      password,
-      name: name || "User",
-    });
+    try {
+      const res = await signUp.email({
+        email,
+        password,
+        name: name || "User",
+      });
 
-    if (res.error) {
-      setErrorMsg(res.error.message || "Sign up failed");
+      if (res.error) {
+        setErrorMsg(res.error.message || t("signUpError"));
+      } else {
+        router.push("/dashboard");
+        router.refresh();
+      }
+    } catch {
+      setErrorMsg(t("unexpectedError"));
+    } finally {
       setIsLoading(false);
-    } else {
-      router.push("/dashboard");
-      router.refresh();
     }
   };
 

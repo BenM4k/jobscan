@@ -8,7 +8,7 @@ interface LogoProps {
   showText?: boolean;
   textClassName?: string;
   badgeText?: string;
-  priority?: boolean;
+  preload?: boolean;
 }
 
 export function Logo({
@@ -17,7 +17,7 @@ export function Logo({
   showText = false,
   textClassName,
   badgeText,
-  priority = false,
+  preload = false,
 }: LogoProps) {
   return (
     <div className={cn("inline-flex items-center gap-2.5 select-none", className)}>
@@ -27,10 +27,10 @@ export function Logo({
       >
         <Image
           src="/logo.png"
-          alt="JobPilot Logo"
+          alt={showText ? "" : "JobPilot Logo"}
           width={size}
           height={size}
-          priority={priority}
+          preload={preload}
           className="w-full h-full object-contain drop-shadow-xs"
         />
       </div>

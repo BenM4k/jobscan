@@ -102,7 +102,7 @@ export default async function LandingPage() {
           aria-hidden="true"
           className="w-18 h-18 rounded-2xl bg-white dark:bg-slate-900 border border-gray-200/80 dark:border-slate-800 shadow-xl flex items-center justify-center mb-6 relative group p-2 hover:scale-105 transition duration-300"
         >
-          <Logo size={48} priority />
+          <Logo size={48} preload />
         </div>
 
         {/* Hero Title & Subtitle */}
