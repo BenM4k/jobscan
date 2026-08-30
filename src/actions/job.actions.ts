@@ -108,6 +108,7 @@ export async function fetchMoreJobsAction(
   limit: number = 20,
   startDate?: string,
   endDate?: string,
+  queryFilter?: string,
 ) {
   const sessionResult = await requireSession();
   if (!sessionResult.ok)
@@ -115,7 +116,15 @@ export async function fetchMoreJobsAction(
 
   const dalListResult = await (
     await import("@/dal/jobs.dal")
-  ).listJobs(statusFilter, sourceFilter, limit, offset, startDate, endDate);
+  ).listJobs(
+    statusFilter,
+    sourceFilter,
+    limit,
+    offset,
+    startDate,
+    endDate,
+    queryFilter,
+  );
   if (!dalListResult.ok) {
     return { success: false, error: dalListResult.error.message };
   }

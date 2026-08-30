@@ -1,4 +1,4 @@
-import { CrawlResult, CrawlSourceResult, CrawledJob } from "./types";
+import { CrawlResult, CrawlSourceResult } from "./types";
 import { fetchReliefWebJobs } from "./sources/reliefweb";
 import { fetchRemoteOKJobs } from "./sources/remoteok";
 import { fetchGreenhouseJobs } from "./sources/greenhouse";
@@ -11,8 +11,29 @@ import { fetchFecRdcJobs } from "./sources/fecrdc";
 import * as jobsDal from "@/dal/jobs.dal";
 import { isOlderThanOneMonth } from "@/lib/date-utils";
 
+import * as profileDal from "@/dal/profile.dal";
+
 export async function runDrcCrawler(keyword?: string): Promise<CrawlResult> {
   const startTime = Date.now();
+
+  let targetKeyword = keyword?.trim() || undefined;
+  if (!targetKeyword) {
+    try {
+      const prof = await profileDal.getProfile();
+      if (prof.ok && prof.value) {
+        const expTitle = prof.value.experience?.[0]?.title?.trim();
+        const skill = prof.value.skills?.[0]?.trim();
+        if (expTitle) {
+          targetKeyword = expTitle;
+        } else if (skill) {
+          targetKeyword = skill;
+        }
+      }
+    } catch {
+      // Graceful fallback to broad crawl
+    }
+  }
+
   const sourceFetchers = [
     { name: "reliefweb", fetcher: fetchReliefWebJobs },
     { name: "remoteok", fetcher: fetchRemoteOKJobs },
@@ -27,11 +48,12 @@ export async function runDrcCrawler(keyword?: string): Promise<CrawlResult> {
 
   const sourceResults: CrawlSourceResult[] = [];
   let totalUpserted = 0;
-  const filterKw = keyword?.trim().toLowerCase();
+  const filterKw = targetKeyword?.trim() ? targetKeyword.trim().toLowerCase() : undefined;
 
   for (const { name, fetcher } of sourceFetchers) {
     try {
-      let { jobs, result } = await fetcher();
+      const { result, jobs: rawJobs } = await fetcher(targetKeyword);
+      let jobs = rawJobs;
 
       if (filterKw) {
         jobs = jobs.filter(

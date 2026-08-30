@@ -2,9 +2,10 @@ import { CrawledJob, CrawlSourceResult } from "../types";
 import { GREENHOUSE_COMPANIES } from "../config";
 import { isDrcJob } from "../drc-filter";
 
-export async function fetchGreenhouseJobs(): Promise<{ jobs: CrawledJob[]; result: CrawlSourceResult }> {
+export async function fetchGreenhouseJobs(keyword?: string): Promise<{ jobs: CrawledJob[]; result: CrawlSourceResult }> {
   let totalFetched = 0;
   const matchedJobs: CrawledJob[] = [];
+  const kw = keyword?.trim().toLowerCase();
 
   for (const companyConfig of GREENHOUSE_COMPANIES) {
     try {
@@ -55,7 +56,14 @@ export async function fetchGreenhouseJobs(): Promise<{ jobs: CrawledJob[]; resul
         };
 
         if (isDrcJob(candidate)) {
-          matchedJobs.push(candidate);
+          if (
+            !kw ||
+            candidate.title.toLowerCase().includes(kw) ||
+            candidate.company.toLowerCase().includes(kw) ||
+            candidate.description?.toLowerCase().includes(kw)
+          ) {
+            matchedJobs.push(candidate);
+          }
         }
       }
     } catch {

@@ -243,6 +243,35 @@ export function FetchJobsPopover({
               }
               className="w-full bg-transparent border-b border-slate-300 dark:border-zinc-700 text-gray-900 dark:text-slate-100 text-sm py-1.5 focus:outline-none focus:border-blue-500 transition placeholder:text-gray-400 dark:placeholder:text-zinc-500 font-medium"
             />
+            {isKeywordSource && (
+              <div className="pt-2 flex flex-wrap gap-1.5 items-center">
+                <span className="text-[10px] font-medium text-gray-500 dark:text-zinc-400">
+                  Quick Fields:
+                </span>
+                {[
+                  "Software",
+                  "Finance",
+                  "NGO",
+                  "Santé",
+                  "Logistique",
+                  "Mines",
+                  "RH",
+                ].map((field) => (
+                  <button
+                    key={field}
+                    type="button"
+                    onClick={() => setQueryInput(field)}
+                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border transition cursor-pointer ${
+                      queryInput.toLowerCase() === field.toLowerCase()
+                        ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                        : "bg-white dark:bg-zinc-800 text-gray-600 dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:border-blue-400 dark:hover:border-blue-500"
+                    }`}
+                  >
+                    {field}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Footer Action Buttons */}

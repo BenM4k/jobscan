@@ -31,5 +31,6 @@ export const searchParamsCache = createSearchParamsCache({
   ]).withDefault("all"),
   startDate: parseAsString.withDefault(""),
   endDate: parseAsString.withDefault(""),
+  q: parseAsString.withDefault(""),
 });
 

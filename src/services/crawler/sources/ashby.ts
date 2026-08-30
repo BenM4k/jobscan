@@ -2,9 +2,10 @@ import { CrawledJob, CrawlSourceResult } from "../types";
 import { ASHBY_COMPANIES } from "../config";
 import { isDrcJob } from "../drc-filter";
 
-export async function fetchAshbyJobs(): Promise<{ jobs: CrawledJob[]; result: CrawlSourceResult }> {
+export async function fetchAshbyJobs(keyword?: string): Promise<{ jobs: CrawledJob[]; result: CrawlSourceResult }> {
   let totalFetched = 0;
   const matchedJobs: CrawledJob[] = [];
+  const kw = keyword?.trim().toLowerCase();
 
   for (const companyConfig of ASHBY_COMPANIES) {
     try {
@@ -39,7 +40,14 @@ export async function fetchAshbyJobs(): Promise<{ jobs: CrawledJob[]; result: Cr
         };
 
         if (isDrcJob(candidate)) {
-          matchedJobs.push(candidate);
+          if (
+            !kw ||
+            candidate.title.toLowerCase().includes(kw) ||
+            candidate.company.toLowerCase().includes(kw) ||
+            candidate.description?.toLowerCase().includes(kw)
+          ) {
+            matchedJobs.push(candidate);
+          }
         }
       }
     } catch {

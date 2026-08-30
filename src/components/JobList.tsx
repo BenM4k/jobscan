@@ -31,6 +31,7 @@ interface JobListProps {
   sourceFilter?: string;
   startDate?: string;
   endDate?: string;
+  queryFilter?: string;
 }
 
 type AIProvider = "claude" | "gemini" | "openai" | "gateway";
@@ -42,6 +43,7 @@ export function JobList({
   sourceFilter,
   startDate,
   endDate,
+  queryFilter,
 }: JobListProps) {
   const router = useRouter();
   const [jobsList, setJobsList] = useState<JobSelect[]>(initialJobs);
@@ -77,6 +79,7 @@ export function JobList({
       20,
       startDate,
       endDate,
+      queryFilter,
     );
     setIsLoadingMore(false);
 
@@ -88,24 +91,16 @@ export function JobList({
     } else {
       setHasMore(false);
     }
-  }, [isLoadingMore, hasMore, statusFilter, sourceFilter, jobsList.length, startDate, endDate]);
-
-  const filteredJobs = jobsList.filter((job) => {
-    const jobDateRaw = job.postedAt || job.createdAt;
-    if (!jobDateRaw) return true;
-    const jobTime = new Date(jobDateRaw).getTime();
-
-    if (startDate) {
-      const startTime = new Date(startDate).getTime();
-      if (!isNaN(startTime) && jobTime < startTime) return false;
-    }
-    if (endDate) {
-      const endTime = new Date(endDate);
-      endTime.setHours(23, 59, 59, 999);
-      if (!isNaN(endTime.getTime()) && jobTime > endTime.getTime()) return false;
-    }
-    return true;
-  });
+  }, [
+    isLoadingMore,
+    hasMore,
+    statusFilter,
+    sourceFilter,
+    jobsList.length,
+    startDate,
+    endDate,
+    queryFilter,
+  ]);
 
   const handleStatusChange = async (jobId: string, newStatus: JobStatus) => {
     await transitionJobStatusAction(jobId, newStatus);
@@ -156,7 +151,7 @@ export function JobList({
     }
   };
 
-  if (filteredJobs.length === 0) {
+  if (jobsList.length === 0) {
     return (
       <div className="text-center py-16 px-6 border-2 border-dashed border-gray-200 dark:border-slate-800 rounded-3xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl shadow-xl shadow-gray-200/40 dark:shadow-none transition-all duration-300">
         <div className="w-14 h-14 rounded-2xl bg-linear-to-tr from-blue-500 to-indigo-600 text-white flex items-center justify-center mx-auto mb-4 text-2xl font-black shadow-lg shadow-blue-500/25">
@@ -195,7 +190,7 @@ export function JobList({
       <div className="flex justify-between items-center text-xs text-gray-500 dark:text-zinc-400 font-sans pt-2 pb-2">
         <span>
           <strong className="text-gray-900 dark:text-slate-200 font-semibold">
-            {totalJobs ?? filteredJobs.length}
+            {totalJobs ?? jobsList.length}
           </strong>{" "}
           {t("opportunitiesMatching")}
         </span>
@@ -210,15 +205,12 @@ export function JobList({
         aria-label="Available job opportunities"
         className="divide-y divide-slate-200/70 dark:divide-zinc-800/80"
       >
-        {filteredJobs.map((job) => (
+        {jobsList.map((job) => (
           <li key={job.id}>
             <JobCardItem
               job={job}
               aiProvider={aiProvider}
               isScoring={isScoring === job.id}
-              onSelect={(selectedJob) =>
-                router.push(`/dashboard/jobs/${selectedJob.id}`)
-              }
               onStatusChange={handleStatusChange}
               onScoreJob={handleScoreJob}
               onAiProviderChange={setAiProvider}

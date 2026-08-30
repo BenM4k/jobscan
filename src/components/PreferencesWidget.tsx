@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useTransition, useEffect, useState } from "react";
+import React, { useTransition, useSyncExternalStore } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -12,17 +12,19 @@ interface PreferencesWidgetProps {
   className?: string;
 }
 
+const emptySubscribe = () => () => {};
+
 export function PreferencesWidget({ className = "" }: PreferencesWidgetProps) {
   const currentLocale = useLocale() as Locale;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
   const t = useTranslations("common");
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const handleLocaleChange = (newLocale: Locale) => {
     if (newLocale === currentLocale || isPending) return;

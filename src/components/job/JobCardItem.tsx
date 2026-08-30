@@ -1,6 +1,5 @@
-"use client";
-
 import React, { useState } from "react";
+import Link from "next/link";
 import { JobSelect } from "@/dal/jobs.dal";
 import { JobStatus } from "@/services/db/schema";
 import { getScoreBadgeStyle } from "@/lib/score-style";
@@ -13,7 +12,7 @@ interface JobCardItemProps {
   job: JobSelect;
   aiProvider: AIProvider;
   isScoring: boolean;
-  onSelect: (job: JobSelect) => void;
+  onSelect?: (job: JobSelect) => void;
   onStatusChange: (jobId: string, status: JobStatus) => void;
   onScoreJob: (jobId: string) => void;
   onAiProviderChange: (provider: AIProvider) => void;
@@ -33,7 +32,6 @@ export function JobCardItem({
   job,
   aiProvider,
   isScoring,
-  onSelect,
   onStatusChange,
   onScoreJob,
   onAiProviderChange,
@@ -74,9 +72,8 @@ export function JobCardItem({
 
   return (
     <article
-      onClick={() => onSelect(job)}
       aria-labelledby={`job-title-${job.id}`}
-      className="py-8 sm:py-9 transition duration-150 cursor-pointer group"
+      className="py-8 sm:py-9 transition duration-150 group"
     >
       {/* Top Header: Company Avatar + Job Info + Actions */}
       <div className="flex items-start gap-4 sm:gap-5">
@@ -97,7 +94,12 @@ export function JobCardItem({
                 id={`job-title-${job.id}`}
                 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-slate-100 leading-snug tracking-tight font-sans"
               >
-                {job.title}
+                <Link
+                  href={`/dashboard/jobs/${job.id}`}
+                  className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors inline-block"
+                >
+                  {job.title}
+                </Link>
               </h3>
               <p className="text-sm text-gray-500 dark:text-zinc-400 font-normal mt-0.5">
                 {job.company}
@@ -105,10 +107,7 @@ export function JobCardItem({
             </div>
 
             {/* Bookmark & Delete action buttons */}
-            <div
-              className="flex items-center gap-2 shrink-0 pt-0.5"
-              onClick={(e) => e.stopPropagation()}
-            >
+            <div className="flex items-center gap-2 shrink-0 pt-0.5">
               <button
                 onClick={() => setIsBookmarked(!isBookmarked)}
                 aria-label={isBookmarked ? "Remove bookmark" : "Bookmark opportunity"}
@@ -164,10 +163,7 @@ export function JobCardItem({
       </div>
 
       {/* Bottom Bar: Status / AI Engine + Score Job CTA */}
-      <div
-        className="mt-5 pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="mt-5 pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         {/* Status and AI Engine selectors */}
         <div className="flex flex-wrap items-center gap-4 text-xs">
           <CardGridSelect
