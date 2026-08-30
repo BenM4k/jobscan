@@ -40,7 +40,12 @@ export async function fetchAshbyJobs(keyword?: string): Promise<{ jobs: CrawledJ
         };
 
         if (isDrcJob(candidate)) {
-          if (!kw || candidate.title.toLowerCase().includes(kw) || candidate.description?.toLowerCase().includes(kw)) {
+          if (
+            !kw ||
+            candidate.title.toLowerCase().includes(kw) ||
+            candidate.company.toLowerCase().includes(kw) ||
+            candidate.description?.toLowerCase().includes(kw)
+          ) {
             matchedJobs.push(candidate);
           }
         }

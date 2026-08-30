@@ -6,7 +6,7 @@ import { jobs, JobStatus } from "@/services/db/schema";
 import { ok, err, Result } from "@/lib/result";
 
 import { AppError } from "@/lib/errors";
-import { eq, desc, gte, lte, sql } from "drizzle-orm";
+import { eq, desc, gte, lte, sql, or, and, ilike, count } from "drizzle-orm";
 import { isOlderThanOneMonth } from "@/lib/date-utils";
 import type { TailoredResumeData } from "@/lib/ai";
 
@@ -74,6 +74,7 @@ export async function listJobs(
   offset: number = 0,
   startDate?: string,
   endDate?: string,
+  queryFilter?: string,
 ): Promise<Result<JobSelect[], AppError>> {
   try {
     const conditions = [];
@@ -100,6 +101,21 @@ export async function listJobs(
         );
       }
     }
+    if (queryFilter && queryFilter.trim()) {
+      const q = `%${queryFilter.trim()}%`;
+      conditions.push(
+        or(
+          ilike(jobs.title, q),
+          ilike(jobs.company, q),
+          ilike(jobs.description, q),
+          ilike(jobs.city, q),
+          sql`EXISTS (
+            SELECT 1 FROM jsonb_array_elements_text(COALESCE(${jobs.matchedSkills}, '[]'::jsonb)) AS elem
+            WHERE elem ILIKE ${q}
+          )`,
+        ),
+      );
+    }
 
     const query = db.select().from(jobs);
     const resultList =
@@ -108,7 +124,7 @@ export async function listJobs(
             .where(
               conditions.length === 1
                 ? conditions[0]
-                : (await import("drizzle-orm")).and(...conditions),
+                : and(...conditions),
             )
             .orderBy(desc(jobs.postedAt), desc(jobs.createdAt))
             .limit(limit)
@@ -129,6 +145,7 @@ export async function countJobs(
   sourceFilter?: string,
   startDate?: string,
   endDate?: string,
+  queryFilter?: string,
 ): Promise<Result<number, AppError>> {
   try {
     const conditions = [];
@@ -155,15 +172,29 @@ export async function countJobs(
         );
       }
     }
+    if (queryFilter && queryFilter.trim()) {
+      const q = `%${queryFilter.trim()}%`;
+      conditions.push(
+        or(
+          ilike(jobs.title, q),
+          ilike(jobs.company, q),
+          ilike(jobs.description, q),
+          ilike(jobs.city, q),
+          sql`EXISTS (
+            SELECT 1 FROM jsonb_array_elements_text(COALESCE(${jobs.matchedSkills}, '[]'::jsonb)) AS elem
+            WHERE elem ILIKE ${q}
+          )`,
+        ),
+      );
+    }
 
-    const { count } = await import("drizzle-orm");
     const query = db.select({ value: count() }).from(jobs);
     const [res] =
       conditions.length > 0
         ? await query.where(
             conditions.length === 1
               ? conditions[0]
-              : (await import("drizzle-orm")).and(...conditions),
+              : and(...conditions),
           )
         : await query;
 

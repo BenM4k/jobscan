@@ -16,15 +16,17 @@ import * as profileDal from "@/dal/profile.dal";
 export async function runDrcCrawler(keyword?: string): Promise<CrawlResult> {
   const startTime = Date.now();
 
-  let targetKeyword = keyword?.trim();
+  let targetKeyword = keyword?.trim() || undefined;
   if (!targetKeyword) {
     try {
       const prof = await profileDal.getProfile();
       if (prof.ok && prof.value) {
-        if (prof.value.experience && prof.value.experience.length > 0 && prof.value.experience[0].title) {
-          targetKeyword = prof.value.experience[0].title;
-        } else if (prof.value.skills && prof.value.skills.length > 0) {
-          targetKeyword = prof.value.skills[0];
+        const expTitle = prof.value.experience?.[0]?.title?.trim();
+        const skill = prof.value.skills?.[0]?.trim();
+        if (expTitle) {
+          targetKeyword = expTitle;
+        } else if (skill) {
+          targetKeyword = skill;
         }
       }
     } catch {
@@ -46,7 +48,7 @@ export async function runDrcCrawler(keyword?: string): Promise<CrawlResult> {
 
   const sourceResults: CrawlSourceResult[] = [];
   let totalUpserted = 0;
-  const filterKw = targetKeyword?.toLowerCase();
+  const filterKw = targetKeyword?.trim() ? targetKeyword.trim().toLowerCase() : undefined;
 
   for (const { name, fetcher } of sourceFetchers) {
     try {

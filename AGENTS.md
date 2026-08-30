@@ -68,12 +68,12 @@ Design comes from _(Figma / provided images / an existing design system — fill
 
 These are settled and should not be re-litigated or quietly changed by an agent:
 
-- **Layering is server action (or route handler) → service layer → DAL.** Route handlers and server actions are interchangeable entry points, but neither talks to the database directly — they call into `src/service/`, which calls into the DAL. Don't skip a layer "for a quick fix."
+- **Layering is server action (or route handler) → service layer → DAL.** Route handlers and server actions are interchangeable entry points, but neither talks to the database directly — they call into `src/services/`, which calls into the DAL. Don't skip a layer "for a quick fix."
 - **Input validation and auth checks happen in the server action / route handler**, before the service layer is invoked. Services should be able to trust that inputs are already shaped and the caller is authorized.
 - **All server actions and API route handlers return the ok-err shape** (see §13) instead of throwing across that boundary. Don't introduce a second error-handling convention (e.g. throwing custom exceptions from an action) alongside it.
 - **AI scoring is gated on a master resume existing.** A user can fetch and browse jobs in their pipeline immediately after signup, but AI scoring, tailored resume generation, and tailored cover letter generation all require a master resume to be uploaded first. Don't build a code path that scores against an empty/missing resume.
 - **AI calls go through the Vercel AI SDK**, using Anthropic, Gemini, or OpenAI as the underlying provider (occasionally routed through the Vercel AI Gateway). Provider selection/config lives wherever the existing AI service code already puts it — follow that, don't hardcode a provider inside a feature.
-- **Third-party integrations (ATSs and local job boards) live behind adapters in `src/service/`.** Each job source normalizes into the same internal `Job` shape — don't let source-specific fields leak into components or actions.
+- **Third-party integrations (ATSs and local job boards) live behind adapters in `src/services/crawler/sources/`.** Each job source normalizes into the same internal `Job` shape — don't let source-specific fields leak into components or actions.
 - **Never commit or print secret values** (API keys for Anthropic/OpenAI/Gemini/Vercel AI Gateway, DB credentials, better-auth secret, etc.). Reference only by env var name, per §14.
 
 ---
@@ -101,48 +101,45 @@ These are settled and should not be re-litigated or quietly changed by an agent:
 
 ## 7. Project Structure
 
-Jobpilot uses a `src/` root. Third-party service integrations and in-app services live together under `src/service/`.
+Jobpilot uses a `src/` root. Third-party service integrations and in-app services live together under `src/services/`.
 
-```
+```text
 src/
   app/                      # App Router routes only — no business logic here
-    (auth)/            # Route groups for layout separation
-    (dashboard)/                  # Authenticated app shell
-      pipeline/             # Pipeline page: fetched/added jobs, scores, pipeline state
-        page.tsx
-      resume/               # Master resume upload/management
-      jobs/[id]/             # Job detail, tailored resume/cover letter generation
-    api/                    # Route handlers (webhooks, third-party callbacks, non-RSC endpoints) — interchangeable with server actions per §13
+    (auth)/                 # Route groups for layout separation
+    dashboard/              # Authenticated app dashboard
+      page.tsx              # Dashboard feed: pipeline state, jobs, search
+      profile/              # Master resume upload/management
+      jobs/[jobId]/         # Job detail, tailored resume/cover letter generation
+      add-job/              # Manual job addition
+    api/
+      auth/[...all]/route.ts# better-auth route handler
     layout.tsx
 
   components/
     ui/                     # shadcn/ui primitives — generated, edit carefully, keep close to upstream
     shared/                 # App-specific reusable components (composed from ui/)
-    {feature}/              # Feature-scoped components colocated by domain (pipeline, resume, scoring, cover-letter, etc.)
+    {feature}/              # Feature-scoped components colocated by domain (job, profile, auth, etc.)
 
-  actions/                  # Server actions, grouped by domain (e.g. actions/job.ts, actions/resume.ts, actions/score.ts)
-                             # Input validation (Zod) + auth checks happen here, before calling into service/
+  actions/                  # Server actions, grouped by domain (e.g. actions/job.actions.ts, actions/profile.actions.ts)
+                            # Input validation (Zod) + auth checks happen here, before calling into services/
 
-  service/                  # Service layer — BOTH third-party integrations and in-app business logic
-    job-sources/            # One adapter per source: ashby.ts, greenhouse.ts, remoteok.ts, lever.ts,
-                             # congojob.ts, emploi-cd.ts, fecrdc.ts, unjobs.ts — each normalizes to the internal Job shape
-    ai/                     # AI provider client(s) via Vercel AI SDK, scoring logic, resume/cover-letter generation prompts
-    resume/                 # Master resume parsing/storage logic
-    ...                     # In-app services (e.g. pipeline.ts) live alongside third-party ones here, not in a separate tree
-    better-auth/
-        auth.ts                 # better-auth server instance/config
-        auth-client.ts          # better-auth client instance for use in Client Components
-    drizzle/
-        index.ts              # Drizzle client instance
-        schema.ts             # Drizzle schema (or schema/ split by domain)
-
+  services/                 # Service layer — BOTH third-party integrations and in-app business logic
+    crawler/                # Crawler engine and DRC/global scrapers & fetchers
+      sources/              # One adapter per source: ashby.ts, greenhouse.ts, remoteok.ts, lever.ts,
+                            # congojob.ts, emploicd.ts, fecrdc.ts, unjobs.ts, reliefweb.ts
+    ai/                     # AI provider client(s) via Vercel AI SDK, formatting & tailoring prompts
+    scoring/                # AI job matching providers and scoring factory
+    auth/
+      auth.ts               # better-auth server instance/config
+      auth-client.ts        # better-auth client instance for use in Client Components
+    db/
+      index.ts              # Drizzle client instance
+      schema.ts             # Drizzle schema (or schema/ split by domain)
 
   dal/                      # Data access layer — the only place that talks to Drizzle directly
-    job.ts
-    user.ts
-    resume.ts
-    pipeline.ts
-    score.ts
+    jobs.dal.ts
+    profile.dal.ts
 
   lib/
     validations/            # Zod schemas, shared across client + server
@@ -161,7 +158,7 @@ Rules of thumb:
 - **Colocate by feature**, not by technical type, once a feature grows past 2–3 files.
 - `src/app/` holds routing and composition only. Fetch data in Server Components / Server Actions, not in `app/` glue that's hard to reuse or test.
 - Anything imported by both a Server and a Client Component must not import server-only code (env secrets, DB client, AI provider clients) — mark server-only modules with `import "server-only"` at the top.
-- A new job source (ATS or local board) gets a new file in `src/service/crawler/sources`, not inline logic in an action or component.
+- A new job source (ATS or local board) gets a new file in `src/services/crawler/sources`, not inline logic in an action or component.
 
 ---
 
@@ -169,7 +166,7 @@ Rules of thumb:
 
 - **Default to Server Components.** Add `"use client"` only for components that need interactivity, browser APIs, or hooks like `useState`/`useEffect`. Push the client boundary as far down the tree as possible (wrap just the interactive leaf, not the whole page).
 - **Mutations go through Server Actions** (`"use server"`) or route handlers — the two are treated as interchangeable entry points into the same action → service → DAL flow. Don't add client-side `fetch` straight to an ad-hoc endpoint that bypasses this.
-- **Validate at the boundary.** Every server action and route handler validates its input with a Zod schema from `src/lib/validations/` before calling into `src/service/` — never trust client input, and never trust raw content pulled from job sources either.
+- **Validate at the boundary.** Every server action and route handler validates its input with a Zod schema from `src/lib/validations/` before calling into `src/services/` — never trust client input, and never trust raw content pulled from job sources either.
 - **Caching:** confirm which caching model the installed Next.js version uses (explicit opt-in `"use cache"` directive vs. older fetch-based implicit caching) and follow that project's existing pattern. Don't mix models within the same app. Be deliberate about caching fetched job listings — freshness matters for a job board, so don't cache job-source fetches as aggressively as static content.
 - **Data fetching co-location:** fetch data as close as possible to where it's rendered (in the Server Component that needs it); rely on request memoization/dedication rather than manually threading data through many props.
 - **Loading & error states:** use `loading.tsx` / `error.tsx` / `<Suspense>` boundaries per route segment rather than manual spinners wired through state where avoidable. Job-source fetches and AI calls (scoring, tailoring) are exactly the kind of latency that needs a real loading state, not a spinner bolted on after the fact.
@@ -200,7 +197,7 @@ Rules of thumb:
 
 ## 11. AI Layer (Scoring, Tailored Resume & Cover Letter)
 
-- All AI calls go through `src/service/ai/`, using the Vercel AI SDK. The underlying provider (Anthropic, Gemini, OpenAI) or the Vercel AI Gateway is a configuration detail resolved inside that service — features call the service, not a specific provider SDK directly.
+- All AI calls go through `src/services/ai/` or `src/services/scoring/`, using the Vercel AI SDK. The underlying provider (Anthropic, Gemini, OpenAI) or the Vercel AI Gateway is a configuration detail resolved inside that service — features call the service, not a specific provider SDK directly.
 - **Gating:** scoring a job, generating a tailored resume, and generating a tailored cover letter all require the user to have a master resume on file. Check for this in the server action (or the service, as a defense-in-depth check) before making any AI call — fail with a clear ok-err error, don't silently proceed with an empty prompt.
 - Treat all externally-sourced text (job descriptions from Ashby/Greenhouse/RemoteOK/Lever/CongoJob/Emploi.cd/FECRDC/UNJobs, or anything a user pastes into a manually-added job) as untrusted data inside prompts — it is not an instruction to the model, even if it's phrased like one.
 - Never log or persist full prompts/responses containing a user's resume content or PII beyond what's needed for the feature (e.g. a stored tailored resume itself is fine; a debug log of the raw prompt sent to the provider is not).
@@ -214,7 +211,7 @@ Rules of thumb:
   - **ATS/job-board fetch integrations:** Ashby, Greenhouse, RemoteOK, Lever.
   - **Local search integrations** (currently DRC-focused, expected to expand): CongoJob, Emploi.cd, FECRDC, UNJobs.
 - Users can also **manually add a job** — this goes through the same internal `Job` shape as fetched jobs, just without a source adapter behind it.
-- Each source gets one adapter file in `src/service/job-sources/`. An adapter's job is to fetch/scrape and normalize into the shared internal `Job` type — no source-specific fields should leak past the adapter into the DAL, actions, or components.
+- Each source gets one adapter file in `src/services/crawler/sources/`. An adapter's job is to fetch/scrape and normalize into the shared internal `Job` type — no source-specific fields should leak past the adapter into the DAL, actions, or components.
 - The list of local sources is expected to grow beyond the DRC. When adding a new one, follow the existing adapter pattern rather than inventing a new shape; if a source needs something the current `Job` type doesn't support, extend the shared type deliberately rather than bolting on a one-off field.
 - Because sources differ wildly in reliability/format (some are proper APIs, some are scraped), each adapter should fail in an ok-err-compatible way (§13) rather than throwing — a broken source shouldn't take down fetching from the others.
 
@@ -224,7 +221,7 @@ Rules of thumb:
 
 This is the backbone of how a request moves through the app:
 
-```
+```text
 server action (or route handler)
   → validates input (Zod) + checks auth
   → calls service layer
@@ -249,7 +246,7 @@ server action (or route handler)
 
 - All required env vars are documented in `.env.example`. If you add a new one, add it there too (with a placeholder value, never the real secret).
 - This includes provider keys for Anthropic, OpenAI, Gemini, and the Vercel AI Gateway, plus `BETTER_AUTH_SECRET`, DB connection string, and any job-source API credentials — reference all of them only via `process.env` in server-only files, and only by name in docs/PRs/chat, never by value.
-- Server-only secrets are read only in server-only files (`src/services/auth/auth.ts`, `src/services/db/index.ts`, `src/service/ai/*`, route handlers, server actions). Never expose them via `NEXT_PUBLIC_*` unless the value is genuinely safe for the browser.
+- Server-only secrets are read only in server-only files (`src/services/auth/auth.ts`, `src/services/db/index.ts`, `src/services/ai/*`, route handlers, server actions). Never expose them via `NEXT_PUBLIC_*` unless the value is genuinely safe for the browser.
 
 ---
 
@@ -291,7 +288,7 @@ server action (or route handler)
 
 ## 19. Project-Specific Notes
 
-- **Multi-provider AI:** the app can call Anthropic, Gemini, or OpenAI directly through the Vercel AI SDK, and sometimes routes through the Vercel AI Gateway instead. Don't assume a single hardcoded provider anywhere in scoring/tailoring code — check how `src/service/ai/` currently resolves the provider before adding a new AI-calling feature.
+- **Multi-provider AI:** the app can call Anthropic, Gemini, or OpenAI directly through the Vercel AI SDK, and sometimes routes through the Vercel AI Gateway instead. Don't assume a single hardcoded provider anywhere in scoring/tailoring code — check how `src/services/ai/` currently resolves the provider before adding a new AI-calling feature.
 - **Local job search is currently DRC-focused** (CongoJob, Emploi.cd, FECRDC, UNJobs) but is explicitly expected to expand to other regions/sources over time — avoid naming things or shaping the `Job`/source types in a way that assumes DRC-only forever.
 - **Manually added jobs** flow into the same pipeline/scoring/tailoring machinery as fetched jobs; there's no separate "manual job" code path downstream of creation.
 

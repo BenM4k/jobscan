@@ -56,7 +56,12 @@ export async function fetchGreenhouseJobs(keyword?: string): Promise<{ jobs: Cra
         };
 
         if (isDrcJob(candidate)) {
-          if (!kw || candidate.title.toLowerCase().includes(kw) || candidate.description?.toLowerCase().includes(kw)) {
+          if (
+            !kw ||
+            candidate.title.toLowerCase().includes(kw) ||
+            candidate.company.toLowerCase().includes(kw) ||
+            candidate.description?.toLowerCase().includes(kw)
+          ) {
             matchedJobs.push(candidate);
           }
         }

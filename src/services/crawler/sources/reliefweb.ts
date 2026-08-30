@@ -1,5 +1,12 @@
 import { CrawledJob, CrawlSourceResult } from "../types";
 
+export function escapeLuceneQuery(query: string): string {
+  if (!query) return "";
+  let escaped = query.replace(/([+\-!(){}\[\]^"~*?:\\\/]|&&|\|\|)/g, "\\$1");
+  escaped = escaped.replace(/\b(AND|OR|NOT)\b/g, "\\$1");
+  return escaped;
+}
+
 export async function fetchReliefWebJobs(keyword?: string): Promise<{ jobs: CrawledJob[]; result: CrawlSourceResult }> {
   const appName = process.env.RELIEFWEB_APP_NAME || "jobpilot";
   const url = `https://api.reliefweb.int/v2/jobs?appname=${encodeURIComponent(appName)}&limit=100`;
@@ -26,7 +33,7 @@ export async function fetchReliefWebJobs(keyword?: string): Promise<{ jobs: Craw
   };
 
   if (keyword?.trim()) {
-    payload.query = { value: keyword.trim() };
+    payload.query = { value: escapeLuceneQuery(keyword.trim()) };
   }
 
   try {
