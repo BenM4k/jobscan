@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, Suspense } from "react";
-import { useQueryState, parseAsStringEnum } from "nuqs";
+import { useQueryState, parseAsString, parseAsStringEnum } from "nuqs";
 import { JobStatus, jobStatusEnum } from "@/services/db/schema";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { FetchJobsPopover } from "@/components/FetchJobsPopover";
@@ -152,7 +152,10 @@ function FilterBar() {
 }
 
 export function ClientShell({ children }: ClientShellProps) {
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useQueryState(
+    "q",
+    parseAsString.withDefault("").withOptions({ shallow: false, throttleMs: 300 }),
+  );
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const t = useTranslations("dashboard");

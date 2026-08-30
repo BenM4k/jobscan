@@ -16,10 +16,11 @@ function deriveExternalId(url: string): string {
   }
 }
 
-export async function fetchUnJobsJobs(): Promise<{ jobs: CrawledJob[]; result: CrawlSourceResult }> {
+export async function fetchUnJobsJobs(keyword?: string): Promise<{ jobs: CrawledJob[]; result: CrawlSourceResult }> {
   const url = "https://unjobs.org/duty_stations/fih";
   const matchedJobs: CrawledJob[] = [];
   let totalFetched = 0;
+  const kw = keyword?.trim().toLowerCase();
 
   try {
     const res = await fetch(url, {
@@ -81,7 +82,9 @@ export async function fetchUnJobsJobs(): Promise<{ jobs: CrawledJob[]; result: C
       };
 
       if (isDrcJob(candidate)) {
-        matchedJobs.push(candidate);
+        if (!kw || fullTitle.toLowerCase().includes(kw) || company.toLowerCase().includes(kw)) {
+          matchedJobs.push(candidate);
+        }
       }
     });
 

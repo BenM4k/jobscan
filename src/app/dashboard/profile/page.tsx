@@ -2,20 +2,9 @@ import { Suspense } from "react";
 import * as profileService from "@/services/profile.service";
 import { requireSession } from "@/lib/auth-guard";
 import { redirect } from "next/navigation";
-import { Navbar } from "@/components/layout/Navbar";
 import { ProfileForm } from "@/components/ProfileForm";
 
 export const instant = false;
-
-async function ProfileNavbar() {
-  const sessionResult = await requireSession();
-
-  if (!sessionResult.ok || !sessionResult.value) {
-    redirect("/sign-in");
-  }
-
-  return <Navbar userEmail={sessionResult.value.user.email} />;
-}
 
 async function ProfileFormContent() {
   const sessionResult = await requireSession();
@@ -153,27 +142,17 @@ function ProfileSkeleton() {
   );
 }
 
-export default function ProfilePage() {
+export default async function ProfilePage() {
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok || !sessionResult.value) {
+    redirect("/sign-in");
+  }
+
   return (
-    <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0A0A0C] text-gray-900 dark:text-zinc-100 font-sans flex flex-col relative overflow-hidden transition-colors duration-300">
-      {/* Subtle Dot Grid Background Pattern */}
-      <div
-        className="absolute inset-0 pointer-events-none opacity-40 dark:opacity-20"
-        style={{
-          backgroundImage: `radial-gradient(#CBD5E1 1px, transparent 1px)`,
-          backgroundSize: `24px 24px`,
-        }}
-      />
-
-      <Suspense fallback={<div className="h-16 border-b border-slate-300 dark:border-zinc-800 bg-white/80 dark:bg-[#0A0A0C]/90" />}>
-        <ProfileNavbar />
+    <main className="flex-1 max-w-6xl w-full mx-auto p-6 space-y-8 z-10">
+      <Suspense fallback={<ProfileSkeleton />}>
+        <ProfileFormContent />
       </Suspense>
-
-      <main className="flex-1 max-w-6xl w-full mx-auto p-6 space-y-8 z-10">
-        <Suspense fallback={<ProfileSkeleton />}>
-          <ProfileFormContent />
-        </Suspense>
-      </main>
-    </div>
+    </main>
   );
 }

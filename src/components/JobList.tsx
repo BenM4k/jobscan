@@ -31,6 +31,7 @@ interface JobListProps {
   sourceFilter?: string;
   startDate?: string;
   endDate?: string;
+  queryFilter?: string;
 }
 
 type AIProvider = "claude" | "gemini" | "openai" | "gateway";
@@ -42,6 +43,7 @@ export function JobList({
   sourceFilter,
   startDate,
   endDate,
+  queryFilter,
 }: JobListProps) {
   const router = useRouter();
   const [jobsList, setJobsList] = useState<JobSelect[]>(initialJobs);
@@ -90,7 +92,20 @@ export function JobList({
     }
   }, [isLoadingMore, hasMore, statusFilter, sourceFilter, jobsList.length, startDate, endDate]);
 
+  const lowerQ = queryFilter?.trim().toLowerCase();
+
   const filteredJobs = jobsList.filter((job) => {
+    if (lowerQ) {
+      const matchTitle = job.title.toLowerCase().includes(lowerQ);
+      const matchCompany = job.company.toLowerCase().includes(lowerQ);
+      const matchDesc = job.description?.toLowerCase().includes(lowerQ);
+      const matchCity = job.city?.toLowerCase().includes(lowerQ);
+      const matchSkills = job.matchedSkills?.some((s) => s.toLowerCase().includes(lowerQ));
+      if (!matchTitle && !matchCompany && !matchDesc && !matchCity && !matchSkills) {
+        return false;
+      }
+    }
+
     const jobDateRaw = job.postedAt || job.createdAt;
     if (!jobDateRaw) return true;
     const jobTime = new Date(jobDateRaw).getTime();
@@ -216,9 +231,6 @@ export function JobList({
               job={job}
               aiProvider={aiProvider}
               isScoring={isScoring === job.id}
-              onSelect={(selectedJob) =>
-                router.push(`/dashboard/jobs/${selectedJob.id}`)
-              }
               onStatusChange={handleStatusChange}
               onScoreJob={handleScoreJob}
               onAiProviderChange={setAiProvider}

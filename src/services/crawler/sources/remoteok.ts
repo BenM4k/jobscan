@@ -1,8 +1,10 @@
 import { CrawledJob, CrawlSourceResult } from "../types";
 import { isDrcJob } from "../drc-filter";
 
-export async function fetchRemoteOKJobs(): Promise<{ jobs: CrawledJob[]; result: CrawlSourceResult }> {
-  const url = "https://remoteok.com/api";
+export async function fetchRemoteOKJobs(keyword?: string): Promise<{ jobs: CrawledJob[]; result: CrawlSourceResult }> {
+  const url = keyword?.trim()
+    ? `https://remoteok.com/api?tag=${encodeURIComponent(keyword.trim().toLowerCase().replace(/\s+/g, "-"))}`
+    : "https://remoteok.com/api";
 
   try {
     const res = await fetch(url, {

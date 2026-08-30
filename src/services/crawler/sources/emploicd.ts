@@ -21,18 +21,27 @@ function deriveExternalId(url: string): string {
   }
 }
 
-export async function fetchEmploiCdJobs(): Promise<{ jobs: CrawledJob[]; result: CrawlSourceResult }> {
+export async function fetchEmploiCdJobs(keyword?: string): Promise<{ jobs: CrawledJob[]; result: CrawlSourceResult }> {
   let totalFetched = 0;
   const jobs: CrawledJob[] = [];
+  const encodedKw = keyword?.trim() ? encodeURIComponent(keyword.trim()) : "";
 
   for (let page = 0; page < MAX_PAGES; page++) {
     if (page > 0) {
       await delay(PAGE_DELAY_MS);
     }
 
-    const pageUrl = page === 0
-      ? "https://www.emploi.cd/recherche-jobs-congo-rdc"
-      : `https://www.emploi.cd/recherche-jobs-congo-rdc?page=${page}`;
+    let pageUrl = "https://www.emploi.cd/recherche-jobs-congo-rdc";
+    const queryParams: string[] = [];
+    if (encodedKw) {
+      queryParams.push(`motcle=${encodedKw}`);
+    }
+    if (page > 0) {
+      queryParams.push(`page=${page}`);
+    }
+    if (queryParams.length > 0) {
+      pageUrl += `?${queryParams.join("&")}`;
+    }
 
     try {
       const res = await fetch(pageUrl, {

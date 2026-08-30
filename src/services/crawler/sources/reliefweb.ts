@@ -1,27 +1,33 @@
 import { CrawledJob, CrawlSourceResult } from "../types";
 
-export async function fetchReliefWebJobs(): Promise<{ jobs: CrawledJob[]; result: CrawlSourceResult }> {
+export async function fetchReliefWebJobs(keyword?: string): Promise<{ jobs: CrawledJob[]; result: CrawlSourceResult }> {
   const appName = process.env.RELIEFWEB_APP_NAME || "jobpilot";
   const url = `https://api.reliefweb.int/v2/jobs?appname=${encodeURIComponent(appName)}&limit=100`;
 
-  const payload = {
+  const conditions: Array<{ field: string; value: string }> = [
+    {
+      field: "country",
+      value: "Democratic Republic of the Congo",
+    },
+    {
+      field: "status",
+      value: "published",
+    },
+  ];
+
+  const payload: Record<string, unknown> = {
     filter: {
       operator: "AND",
-      conditions: [
-        {
-          field: "country",
-          value: "Democratic Republic of the Congo",
-        },
-        {
-          field: "status",
-          value: "published",
-        },
-      ],
+      conditions,
     },
     fields: {
       include: ["title", "body", "url", "date", "source", "country", "city"],
     },
   };
+
+  if (keyword?.trim()) {
+    payload.query = { value: keyword.trim() };
+  }
 
   try {
     const res = await fetch(url, {
