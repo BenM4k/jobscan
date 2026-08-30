@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { generateObject } from "ai";
+import { generateText, Output } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
@@ -65,6 +65,27 @@ const profileFormatterSchema = z.object({
     ),
 });
 
+/**
+ * Static system instructions for the profile formatter — passed via `instructions`
+ * (AI SDK v7 replacement for the deprecated `system` field).
+ */
+const PROFILE_FORMATTER_INSTRUCTIONS = `You are an expert executive resume reviewer and ATS profile parser.
+
+Analyze the candidate's raw resume text and reorganize it strictly into the requested structure.
+
+CRITICAL SUMMARY INSTRUCTION:
+- "summary": A concise 2-3 sentence executive summary of the candidate's core background, title, and key expertise. MUST BE SHORT (under 50 words). DO NOT copy the whole resume into summary!
+
+CRITICAL INCLUSION & EXCLUSION RULES:
+- INCLUDE ONLY: Professional Summary (About), Paid Work Experience, and Technical Skills.
+- EXCLUDE ENTIRELY: Education (degrees, schools, GPAs), Personal / Side Projects, Certifications, Hobbies, References, Contact details (email, phone, address), or non-work experience.
+
+SECTION RULES:
+1. "summary" — A concise 2-3 sentence (max 50 words) executive summary. Prose only.
+2. "experiences" — Array of PAID WORK roles only, ordered most recent first.
+3. "extractedSkills" — Array of ALL technical skills, tools, frameworks, programming languages, and domain competencies mentioned.
+4. "cleanFormattedResume" — A clean markdown text containing STRICTLY THREE SECTIONS: Summary, Work Experience, and Skills. DO NOT include Education or Projects.`;
+
 function getFormatterModel(preferredProvider?: string) {
   const provider = (
     preferredProvider ||
@@ -103,34 +124,18 @@ export async function formatResumeWithGemini(
   providerOverride?: string
 ): Promise<Result<FormattedProfileData, AppError>> {
   try {
-    const prompt = `You are an expert executive resume reviewer and ATS profile parser.
-
-Analyze the candidate's raw resume text below and reorganize it strictly into the requested structure.
-
-CRITICAL SUMMARY INSTRUCTION:
-- "summary": A concise 2-3 sentence executive summary of the candidate's core background, title, and key expertise. MUST BE SHORT (under 50 words). DO NOT copy the whole resume into summary!
-
-CRITICAL INCLUSION & EXCLUSION RULES:
-- INCLUDE ONLY: Professional Summary (About), Paid Work Experience, and Technical Skills.
-- EXCLUDE ENTIRELY: Education (degrees, schools, GPAs), Personal / Side Projects, Certifications, Hobbies, References, Contact details (email, phone, address), or non-work experience.
-
-SECTION RULES:
-1. "summary" — A concise 2-3 sentence (max 50 words) executive summary. Prose only.
-2. "experiences" — Array of PAID WORK roles only, ordered most recent first.
-3. "extractedSkills" — Array of ALL technical skills, tools, frameworks, programming languages, and domain competencies mentioned.
-4. "cleanFormattedResume" — A clean markdown text containing STRICTLY THREE SECTIONS: Summary, Work Experience, and Skills. DO NOT include Education or Projects.
-
-Candidate Resume Text:
+    const userPrompt = `Candidate Resume Text:
 """
 ${resumeText}
 """`;
 
     const model = getFormatterModel(providerOverride);
 
-    const { object } = await generateObject({
+    const { output: object } = await generateText({
       model,
-      schema: profileFormatterSchema,
-      prompt,
+      output: Output.object({ schema: profileFormatterSchema }),
+      system: PROFILE_FORMATTER_INSTRUCTIONS,
+      prompt: userPrompt,
     });
 
     let summaryStr = object.summary ? object.summary.trim() : "";
