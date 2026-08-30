@@ -4,11 +4,12 @@ import {
   ScoreResult,
   AIProviderName,
   scoreResultSchema,
-  buildScoringPrompt,
+  SCORING_INSTRUCTIONS,
+  buildScoringUserPrompt,
 } from "./types";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
-import { generateObject } from "ai";
+import { generateText, Output } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 
 export class OpenAIProvider implements ScoringProvider {
@@ -32,17 +33,18 @@ export class OpenAIProvider implements ScoringProvider {
       }
 
       const openai = createOpenAI({ apiKey });
-      const prompt = buildScoringPrompt(
+      const userPrompt = buildScoringUserPrompt(
         jobTitle,
         jobDescription,
         resumeText,
         skills
       );
 
-      const { object } = await generateObject({
+      const { output: object } = await generateText({
         model: openai("gpt-4o"),
-        schema: scoreResultSchema,
-        prompt,
+        output: Output.object({ schema: scoreResultSchema }),
+        system: SCORING_INSTRUCTIONS,
+        prompt: userPrompt,
       });
 
       return ok(object);

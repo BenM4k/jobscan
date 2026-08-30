@@ -4,11 +4,12 @@ import {
   ScoreResult,
   AIProviderName,
   scoreResultSchema,
-  buildScoringPrompt,
+  SCORING_INSTRUCTIONS,
+  buildScoringUserPrompt,
 } from "./types";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
-import { generateObject } from "ai";
+import { generateText, Output } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { AI_MODEL } from "@/lib/ai";
 
@@ -34,17 +35,18 @@ export class GeminiProvider implements ScoringProvider {
       }
 
       const google = createGoogleGenerativeAI({ apiKey });
-      const prompt = buildScoringPrompt(
+      const userPrompt = buildScoringUserPrompt(
         jobTitle,
         jobDescription,
         resumeText,
         skills,
       );
 
-      const { object } = await generateObject({
+      const { output: object } = await generateText({
         model: google(AI_MODEL),
-        schema: scoreResultSchema,
-        prompt,
+        output: Output.object({ schema: scoreResultSchema }),
+        system: SCORING_INSTRUCTIONS,
+        prompt: userPrompt,
       });
 
       return ok(object);

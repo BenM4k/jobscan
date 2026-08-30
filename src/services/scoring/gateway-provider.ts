@@ -4,11 +4,12 @@ import {
   ScoreResult,
   AIProviderName,
   scoreResultSchema,
-  buildScoringPrompt,
+  SCORING_INSTRUCTIONS,
+  buildScoringUserPrompt,
 } from "./types";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
-import { generateObject } from "ai";
+import { generateText, Output } from "ai";
 import { gateway } from "@ai-sdk/gateway";
 
 export class GatewayProvider implements ScoringProvider {
@@ -24,17 +25,18 @@ export class GatewayProvider implements ScoringProvider {
       const modelName = process.env.AI_GATEWAY_MODEL || "openai/gpt-4o";
       const model = gateway(modelName);
 
-      const prompt = buildScoringPrompt(
+      const userPrompt = buildScoringUserPrompt(
         jobTitle,
         jobDescription,
         resumeText,
         skills
       );
 
-      const { object } = await generateObject({
+      const { output: object } = await generateText({
         model,
-        schema: scoreResultSchema,
-        prompt,
+        output: Output.object({ schema: scoreResultSchema }),
+        system: SCORING_INSTRUCTIONS,
+        prompt: userPrompt,
       });
 
       return ok(object);
