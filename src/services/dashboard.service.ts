@@ -11,6 +11,7 @@ export interface DashboardFilters {
   queryFilter?: string;
   limit?: number;
   offset?: number;
+  userId?: string;
 }
 
 export interface DashboardFeedResult {
@@ -29,6 +30,7 @@ export async function getDashboardFeedData(
     queryFilter,
     limit = 20,
     offset = 0,
+    userId,
   } = filters;
 
   const [dalListResult, countResult] = await Promise.all([
@@ -40,6 +42,7 @@ export async function getDashboardFeedData(
       startDate,
       endDate,
       queryFilter,
+      userId,
     ),
     jobsDal.countJobs(
       statusFilter,
@@ -47,6 +50,7 @@ export async function getDashboardFeedData(
       startDate,
       endDate,
       queryFilter,
+      userId,
     ),
   ]);
 
@@ -64,7 +68,7 @@ export async function getDashboardFeedData(
     !queryFilter
   ) {
     try {
-      await runDrcCrawler();
+      await runDrcCrawler(undefined, userId);
       const [reFetched, reCount] = await Promise.all([
         jobsDal.listJobs(
           statusFilter,
@@ -74,6 +78,7 @@ export async function getDashboardFeedData(
           startDate,
           endDate,
           queryFilter,
+          userId,
         ),
         jobsDal.countJobs(
           statusFilter,
@@ -81,6 +86,7 @@ export async function getDashboardFeedData(
           startDate,
           endDate,
           queryFilter,
+          userId,
         ),
       ]);
       if (reFetched.ok) {

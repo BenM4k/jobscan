@@ -13,7 +13,7 @@ async function ProfileFormContent() {
     redirect("/sign-in");
   }
 
-  const profileResult = await profileService.getUserProfile();
+  const profileResult = await profileService.getUserProfile(sessionResult.value.user.id);
   const userProfile = profileResult.ok ? profileResult.value : null;
 
   return (

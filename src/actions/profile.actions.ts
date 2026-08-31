@@ -12,7 +12,7 @@ const updateProfileSchema = z.object({
 
 export async function saveProfileTextAction(formData: FormData) {
   const sessionResult = await requireSession();
-  if (!sessionResult.ok) return { success: false, error: sessionResult.error.message };
+  if (!sessionResult.ok || !sessionResult.value) return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
 
   const resumeText = (formData.get("resumeText") as string) || "";
   const skillsRaw = (formData.get("skills") as string) || "";
@@ -28,11 +28,13 @@ export async function saveProfileTextAction(formData: FormData) {
     return { success: false, error: parsed.error.issues[0]?.message || "Invalid input" };
   }
 
+  const userId = sessionResult.value.user.id;
+
   // Automatically format profile text with Gemini to extract short summary and work experience
-  const reformatResult = await profileService.reformatProfileWithGemini(parsed.data.resumeText);
+  const reformatResult = await profileService.reformatProfileWithGemini(userId, parsed.data.resumeText);
   if (!reformatResult.ok) {
     // Fallback to updating details directly if Gemini is unavailable
-    const result = await profileService.updateProfileDetails(parsed.data);
+    const result = await profileService.updateProfileDetails(userId, parsed.data);
     if (!result.ok) {
       return { success: false, error: result.error.message };
     }
@@ -52,7 +54,7 @@ export async function saveMasterResumeAction(data: {
   aiProvider?: string;
 }) {
   const sessionResult = await requireSession();
-  if (!sessionResult.ok) return { success: false, error: sessionResult.error.message };
+  if (!sessionResult.ok || !sessionResult.value) return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
 
   const profileDal = await import("@/dal/profile.dal");
   
@@ -84,7 +86,9 @@ export async function saveMasterResumeAction(data: {
     formattedResume = [summaryBlock, skillsBlock, expBlock, eduBlock].filter(Boolean).join("\n\n");
   }
 
-  const result = await profileDal.upsertProfile({
+  const userId = sessionResult.value.user.id;
+
+  const result = await profileDal.upsertProfile(userId, {
     summary: data.summary,
     skills: data.skills,
     education: data.education || [],
@@ -103,7 +107,7 @@ export async function saveMasterResumeAction(data: {
 
 export async function uploadResumeFileAction(formData: FormData) {
   const sessionResult = await requireSession();
-  if (!sessionResult.ok) return { success: false, error: sessionResult.error.message };
+  if (!sessionResult.ok || !sessionResult.value) return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
 
   const file = formData.get("file") as File | null;
   if (!file) {
@@ -116,11 +120,13 @@ export async function uploadResumeFileAction(formData: FormData) {
     return { success: false, error: parseResult.error.message };
   }
 
+  const userId = sessionResult.value.user.id;
+
   // Automatically use Gemini to reformat resume and extract profile skills data
-  const reformatResult = await profileService.reformatProfileWithGemini(parseResult.value);
+  const reformatResult = await profileService.reformatProfileWithGemini(userId, parseResult.value);
   if (!reformatResult.ok) {
     // Fallback: save raw text if Gemini formatting fails
-    const fallbackResult = await profileService.updateProfileDetails({
+    const fallbackResult = await profileService.updateProfileDetails(userId, {
       resumeText: parseResult.value,
     });
     if (!fallbackResult.ok) return { success: false, error: fallbackResult.error.message };
@@ -132,9 +138,10 @@ export async function uploadResumeFileAction(formData: FormData) {
 
 export async function reformatProfileWithGeminiAction() {
   const sessionResult = await requireSession();
-  if (!sessionResult.ok) return { success: false, error: sessionResult.error.message };
+  if (!sessionResult.ok || !sessionResult.value) return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
 
-  const result = await profileService.reformatProfileWithGemini();
+  const userId = sessionResult.value.user.id;
+  const result = await profileService.reformatProfileWithGemini(userId);
   if (!result.ok) {
     return { success: false, error: result.error.message };
   }
@@ -144,9 +151,10 @@ export async function reformatProfileWithGeminiAction() {
 
 export async function deleteResumeAction() {
   const sessionResult = await requireSession();
-  if (!sessionResult.ok) return { success: false, error: sessionResult.error.message };
+  if (!sessionResult.ok || !sessionResult.value) return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
 
-  const result = await profileService.updateProfileDetails({
+  const userId = sessionResult.value.user.id;
+  const result = await profileService.updateProfileDetails(userId, {
     resumeText: "",
     skills: [],
   });

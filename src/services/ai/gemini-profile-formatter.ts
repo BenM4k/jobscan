@@ -28,7 +28,7 @@ const profileFormatterSchema = z.object({
   summary: z
     .string()
     .describe(
-      "A concise 2-3 sentence executive summary of the candidate's core background, under 50 words"
+      "A concise 2-3 sentence executive summary of the candidate's core background, under 50 words",
     ),
   experiences: z
     .array(
@@ -38,7 +38,7 @@ const profileFormatterSchema = z.object({
         period: z
           .string()
           .describe(
-            "normalized date range (e.g. 'Jan 2021 — Present' or '2018 — 2021')"
+            "normalized date range (e.g. 'Jan 2021 — Present' or '2018 — 2021')",
           ),
         location: z
           .string()
@@ -47,21 +47,23 @@ const profileFormatterSchema = z.object({
           .describe("<City>, <Country> or Remote"),
         description: z
           .string()
-          .describe("responsibilities & key achievements in candidate's own words"),
-      })
+          .describe(
+            "responsibilities & key achievements in candidate's own words",
+          ),
+      }),
     )
     .describe(
-      "Array of PAID WORK roles only, ordered most recent first. EXCLUDE education, projects, certifications, hobbies."
+      "Array of PAID WORK roles only, ordered most recent first. EXCLUDE education, projects, certifications, hobbies.",
     ),
   extractedSkills: z
     .array(z.string())
     .describe(
-      "Array of ALL technical skills, tools, frameworks, programming languages, and competencies"
+      "Array of ALL technical skills, tools, frameworks, programming languages, and competencies",
     ),
   cleanFormattedResume: z
     .string()
     .describe(
-      "A clean markdown text containing STRICTLY THREE SECTIONS: Summary, Work Experience, and Skills"
+      "A clean markdown text containing STRICTLY THREE SECTIONS: Summary, Work Experience, and Skills",
     ),
 });
 
@@ -104,7 +106,9 @@ function getFormatterModel(preferredProvider?: string) {
   }
 
   if (provider === "claude" && process.env.ANTHROPIC_API_KEY) {
-    const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const anthropic = createAnthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+    });
     return anthropic("claude-3-5-sonnet-latest");
   }
 
@@ -121,7 +125,7 @@ function getFormatterModel(preferredProvider?: string) {
 
 export async function formatResumeWithGemini(
   resumeText: string,
-  providerOverride?: string
+  providerOverride?: string,
 ): Promise<Result<FormattedProfileData, AppError>> {
   try {
     const userPrompt = `Candidate Resume Text:
@@ -144,7 +148,9 @@ ${resumeText}
       summaryStr = sentences.slice(0, 3).join(" ");
     }
 
-    const expsList = Array.isArray(object.experiences) ? object.experiences : [];
+    const expsList = Array.isArray(object.experiences)
+      ? object.experiences
+      : [];
     const skillsList = Array.isArray(object.extractedSkills)
       ? object.extractedSkills
       : [];
@@ -158,7 +164,7 @@ ${resumeText}
             expsList
               .map(
                 (exp) =>
-                  `### ${exp.role}${exp.company ? ` — ${exp.company}` : ""}\n_${exp.period}${exp.location ? ` | ${exp.location}` : ""}_\n${exp.description}`
+                  `### ${exp.role}${exp.company ? ` — ${exp.company}` : ""}\n_${exp.period}${exp.location ? ` | ${exp.location}` : ""}_\n${exp.description}`,
               )
               .join("\n\n")
           : "";
@@ -182,8 +188,8 @@ ${resumeText}
     return err(
       new AppError(
         "EXTERNAL_API_ERROR",
-        `AI profile formatting failed: ${message}`
-      )
+        `AI profile formatting failed: ${message}`,
+      ),
     );
   }
 }

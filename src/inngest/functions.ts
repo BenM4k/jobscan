@@ -33,10 +33,11 @@ export const scoreJobOnCreation = inngest.createFunction(
   },
   async ({ event, step }) => {
     const jobId = event.data.jobId as string;
+    const userId = event.data.userId as string;
     const provider = event.data.provider as string | undefined;
 
     await step.run("score-job", async () => {
-      const res = await scoreJobWithAI(jobId, provider);
+      const res = await scoreJobWithAI(jobId, userId, provider);
       if (!res.ok) {
         throw new Error(`Failed scoring job ${jobId}: ${res.error.message}`);
       }

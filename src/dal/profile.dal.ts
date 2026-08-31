@@ -2,15 +2,21 @@ import "server-only";
 import { db } from "@/services/db";
 import { profile } from "@/services/db/schema";
 import { ok, err, Result } from "@/lib/result";
-
 import { AppError } from "@/lib/errors";
+import { eq } from "drizzle-orm";
 
 export type ProfileInsert = typeof profile.$inferInsert;
 export type ProfileSelect = typeof profile.$inferSelect;
 
-export async function getProfile(): Promise<Result<ProfileSelect | null, AppError>> {
+export async function getProfile(
+  userId: string
+): Promise<Result<ProfileSelect | null, AppError>> {
   try {
-    const [existing] = await db.select().from(profile).limit(1);
+    const [existing] = await db
+      .select()
+      .from(profile)
+      .where(eq(profile.userId, userId))
+      .limit(1);
     return ok(existing || null);
   } catch (error) {
     return err(new AppError("DB_ERROR", "Failed to fetch profile", error));
@@ -18,16 +24,16 @@ export async function getProfile(): Promise<Result<ProfileSelect | null, AppErro
 }
 
 export async function upsertProfile(
-  data: Partial<ProfileInsert> & { resumeText: string }
+  userId: string,
+  data: Partial<Omit<ProfileInsert, "id" | "userId">> & { resumeText: string }
 ): Promise<Result<ProfileSelect, AppError>> {
   try {
-    const existingResult = await getProfile();
+    const existingResult = await getProfile(userId);
     if (!existingResult.ok) {
       return existingResult;
     }
 
     if (existingResult.value) {
-      const { eq } = await import("drizzle-orm");
       const [updated] = await db
         .update(profile)
         .set({
@@ -48,6 +54,7 @@ export async function upsertProfile(
       const [created] = await db
         .insert(profile)
         .values({
+          userId,
           resumeText: data.resumeText,
           rawText: data.rawText,
           summary: data.summary,
@@ -64,3 +71,4 @@ export async function upsertProfile(
     return err(new AppError("DB_ERROR", "Failed to upsert profile", error));
   }
 }
+

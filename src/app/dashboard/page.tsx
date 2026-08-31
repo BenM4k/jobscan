@@ -7,6 +7,8 @@ import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { JobCardSkeleton } from "@/components/JobCardSkeleton";
 import { getDashboardFeedData } from "@/services/dashboard.service";
 
+import { requireSession } from "@/lib/auth-guard";
+
 export const instant = false;
 
 interface DashboardPageProps {
@@ -18,6 +20,9 @@ async function DashboardFeed({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  const sessionResult = await requireSession();
+  const userId = sessionResult.ok ? sessionResult.value?.user?.id : undefined;
+
   const { status, source, startDate, endDate, q } =
     await searchParamsCache.parse(searchParams);
   const statusFilter = status === "all" ? undefined : (status as JobStatus);
@@ -32,6 +37,7 @@ async function DashboardFeed({
     queryFilter,
     limit: 20,
     offset: 0,
+    userId,
   });
 
   return (

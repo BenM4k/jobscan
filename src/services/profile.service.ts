@@ -36,24 +36,32 @@ export async function parseResumeFile(
   }
 }
 
-export async function updateProfileDetails(data: {
-  resumeText: string;
-  skills?: string[];
-  aiProvider?: string;
-}): Promise<Result<profileDal.ProfileSelect, AppError>> {
-  return await profileDal.upsertProfile(data);
+export async function updateProfileDetails(
+  userId: string,
+  data: {
+    resumeText: string;
+    skills?: string[];
+    aiProvider?: string;
+    rawText?: string;
+    summary?: string;
+    education?: Array<{ institution: string; degree: string; field?: string; startDate?: string; endDate?: string }>;
+    experience?: Array<{ company: string; title: string; startDate?: string; endDate?: string; bullets: string[] }>;
+  }
+): Promise<Result<profileDal.ProfileSelect, AppError>> {
+  return await profileDal.upsertProfile(userId, data);
 }
 
-export async function getUserProfile(): Promise<
-  Result<profileDal.ProfileSelect | null, AppError>
-> {
-  return await profileDal.getProfile();
+export async function getUserProfile(
+  userId: string
+): Promise<Result<profileDal.ProfileSelect | null, AppError>> {
+  return await profileDal.getProfile(userId);
 }
 
 export async function reformatProfileWithGemini(
+  userId: string,
   targetResumeText?: string
 ): Promise<Result<profileDal.ProfileSelect, AppError>> {
-  const currentProfileResult = await profileDal.getProfile();
+  const currentProfileResult = await profileDal.getProfile(userId);
   const textToFormat =
     targetResumeText ||
     (currentProfileResult.ok ? currentProfileResult.value?.resumeText : "") ||
@@ -86,7 +94,7 @@ export async function reformatProfileWithGemini(
     new Set([...existingSkills, ...formattedData.extractedSkills])
   );
 
-  return await profileDal.upsertProfile({
+  return await profileDal.upsertProfile(userId, {
     resumeText: formattedData.cleanFormattedResume,
     skills: combinedSkills,
     aiProvider: "gemini",
