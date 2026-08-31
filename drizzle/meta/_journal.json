@@ -57,6 +57,13 @@
       "when": 1788195000000,
       "tag": "0007_enforce_user_id_not_null",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788193803097,
+      "tag": "0008_add_indexes",
+      "breakpoints": true
     }
   ]
 }
