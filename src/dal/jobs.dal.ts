@@ -55,17 +55,13 @@ export async function upsertJob(
 
 export async function getJobById(
   id: string,
-  userId?: string,
+  userId: string,
 ): Promise<Result<JobSelect, AppError>> {
   try {
-    const conditions = [eq(jobs.id, id)];
-    if (userId) {
-      conditions.push(eq(jobs.userId, userId));
-    }
     const [job] = await db
       .select()
       .from(jobs)
-      .where(conditions.length === 1 ? conditions[0] : and(...conditions));
+      .where(and(eq(jobs.id, id), eq(jobs.userId, userId)));
     if (!job) {
       return err(new AppError("NOT_FOUND", `Job with ID ${id} not found`));
     }
@@ -343,6 +339,7 @@ export async function updateJobTailoredResume(
 
 export async function updateJobCoverLetter(
   id: string,
+  userId: string,
   coverLetterText: string,
 ): Promise<Result<JobSelect, AppError>> {
   try {
@@ -351,7 +348,7 @@ export async function updateJobCoverLetter(
       .set({
         coverLetterDraft: coverLetterText,
       })
-      .where(eq(jobs.id, id))
+      .where(and(eq(jobs.id, id), eq(jobs.userId, userId)))
       .returning();
 
     if (!updated) {
@@ -367,7 +364,7 @@ export async function updateJobCoverLetter(
 
 export async function deleteJob(
   id: string,
-  userId?: string,
+  userId: string,
 ): Promise<Result<boolean, AppError>> {
   try {
     const jobRes = await getJobById(id, userId);
@@ -378,13 +375,13 @@ export async function deleteJob(
     await db
       .insert(deletedJobs)
       .values({
-        userId: job.userId || userId,
+        userId: job.userId,
         source: job.source,
         externalId: job.externalId,
       })
       .onConflictDoNothing();
 
-    await db.delete(jobs).where(eq(jobs.id, id));
+    await db.delete(jobs).where(and(eq(jobs.id, id), eq(jobs.userId, userId)));
     return ok(true);
   } catch (error) {
     return err(new AppError("DB_ERROR", `Failed to delete job ${id}`, error));
@@ -394,22 +391,21 @@ export async function deleteJob(
 export async function isJobDeleted(
   source: string,
   externalId: string,
-  userId?: string,
+  userId: string,
 ): Promise<boolean> {
   try {
     const { deletedJobs } = await import("@/services/db/schema");
     const { and, eq } = await import("drizzle-orm");
-    const conditions = [
-      eq(deletedJobs.source, source),
-      eq(deletedJobs.externalId, externalId),
-    ];
-    if (userId) {
-      conditions.push(eq(deletedJobs.userId, userId));
-    }
     const [found] = await db
       .select()
       .from(deletedJobs)
-      .where(and(...conditions));
+      .where(
+        and(
+          eq(deletedJobs.source, source),
+          eq(deletedJobs.externalId, externalId),
+          eq(deletedJobs.userId, userId),
+        )
+      );
     return !!found;
   } catch {
     return false;
@@ -422,16 +418,15 @@ export async function restoreJob(
   try {
     const { deletedJobs } = await import("@/services/db/schema");
     const { and, eq } = await import("drizzle-orm");
-    const conditions = [
-      eq(deletedJobs.source, data.source),
-      eq(deletedJobs.externalId, data.externalId),
-    ];
-    if (data.userId) {
-      conditions.push(eq(deletedJobs.userId, data.userId));
-    }
     await db
       .delete(deletedJobs)
-      .where(and(...conditions));
+      .where(
+        and(
+          eq(deletedJobs.source, data.source),
+          eq(deletedJobs.externalId, data.externalId),
+          eq(deletedJobs.userId, data.userId),
+        )
+      );
     return await upsertJob(data);
   } catch (E) {
     console.error(E);

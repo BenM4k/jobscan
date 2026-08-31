@@ -1,6 +1,8 @@
+import "dotenv/config";
 import { defineConfig } from "drizzle-kit";
 
 const connectionString =
+  process.env.DIRECT_URL ||
   process.env.DATABASE_URL ||
   "postgres://postgres:postgres@localhost:5432/jobpilot";
 

@@ -74,11 +74,17 @@ SCORING GUIDELINES:
       [job.city, job.countryCode || job.country].filter(Boolean).join(", ") ||
       "Unspecified";
     const sanitizedResume = sanitizeResumeForScoring(userProfile.resumeText);
+    const sanitizedSummary = userProfile.summary
+      ? sanitizeResumeForScoring(userProfile.summary)
+      : null;
+    const sanitizedSkills = userProfile.skills?.length
+      ? userProfile.skills.map(sanitizeResumeForScoring)
+      : null;
 
     const prompt = `CANDIDATE MASTER RESUME:
 """
-${userProfile.summary ? `Summary: ${userProfile.summary}\n` : ""}
-${userProfile.skills?.length ? `Skills: ${userProfile.skills.join(", ")}\n` : ""}
+${sanitizedSummary ? `Summary: ${sanitizedSummary}\n` : ""}
+${sanitizedSkills ? `Skills: ${sanitizedSkills.join(", ")}\n` : ""}
 ${sanitizedResume}
 """
 

@@ -71,11 +71,17 @@ TAILORING INSTRUCTIONS:
 - For each role in "experience", reorder and refine bullets with active verbs, keeping any metrics/impact exactly as stated in the source resume (do not invent or round up numbers).`;
 
     const sanitizedResume = sanitizeResumeForScoring(userProfile.resumeText);
+    const sanitizedSummary = userProfile.summary
+      ? sanitizeResumeForScoring(userProfile.summary)
+      : null;
+    const sanitizedSkills = userProfile.skills?.length
+      ? userProfile.skills.map(sanitizeResumeForScoring)
+      : null;
 
     const prompt = `CANDIDATE MASTER RESUME:
 """
-${userProfile.summary ? `Summary: ${userProfile.summary}\n` : ""}
-${userProfile.skills?.length ? `Skills: ${userProfile.skills.join(", ")}\n` : ""}
+${sanitizedSummary ? `Summary: ${sanitizedSummary}\n` : ""}
+${sanitizedSkills ? `Skills: ${sanitizedSkills.join(", ")}\n` : ""}
 ${sanitizedResume}
 """
 

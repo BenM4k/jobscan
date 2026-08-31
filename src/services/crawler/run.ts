@@ -78,13 +78,21 @@ export async function runDrcCrawler(
             continue;
           }
 
-          // Skip job if candidate previously deleted it
-          const deleted = await jobsDal.isJobDeleted(
-            job.source,
-            job.externalId,
-            userId,
-          );
-          if (deleted) {
+          // Skip job if candidate previously deleted it.
+          // Omit when there is no userId — deletion records are user-scoped.
+          if (userId) {
+            const deleted = await jobsDal.isJobDeleted(
+              job.source,
+              job.externalId,
+              userId,
+            );
+            if (deleted) {
+              continue;
+            }
+          }
+
+          // Skip upsert when there is no userId — jobs.user_id is NOT NULL.
+          if (!userId) {
             continue;
           }
 

@@ -1,5 +1,5 @@
 {
-  "id": "dd3096f0-75e7-400a-8172-d6c698189d58",
+  "id": "7791d929-a3b5-47e6-9f82-37be5674a39d",
   "prevId": "c43d6fd7-3917-4bde-81d3-2a6747b1aa0a",
   "version": "7",
   "dialect": "postgresql",
@@ -129,6 +129,12 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "source": {
           "name": "source",
           "type": "text",
@@ -150,13 +156,28 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "deleted_jobs_user_id_user_id_fk": {
+          "name": "deleted_jobs_user_id_user_id_fk",
+          "tableFrom": "deleted_jobs",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "uniq_deleted_source_external": {
-          "name": "uniq_deleted_source_external",
+        "uniq_deleted_user_source_external": {
+          "name": "uniq_deleted_user_source_external",
           "nullsNotDistinct": false,
           "columns": [
+            "user_id",
             "source",
             "external_id"
           ]
@@ -176,6 +197,12 @@
           "primaryKey": true,
           "notNull": true,
           "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         },
         "source": {
           "name": "source",
@@ -316,13 +343,28 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "jobs_user_id_user_id_fk": {
+          "name": "jobs_user_id_user_id_fk",
+          "tableFrom": "jobs",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "uniq_source_external": {
-          "name": "uniq_source_external",
+        "uniq_user_source_external": {
+          "name": "uniq_user_source_external",
           "nullsNotDistinct": false,
           "columns": [
+            "user_id",
             "source",
             "external_id"
           ]

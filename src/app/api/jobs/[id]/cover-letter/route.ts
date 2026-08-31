@@ -26,9 +26,10 @@ export async function POST(
       return NextResponse.json({ error: "Missing job ID" }, { status: 400 });
     }
 
+    const userId = sessionResult.value.user.id;
     const [jobResult, profileResult] = await Promise.all([
-      jobsDal.getJobById(id, sessionResult.value.user.id),
-      profileDal.getProfile(sessionResult.value.user.id),
+      jobsDal.getJobById(id, userId),
+      profileDal.getProfile(userId),
     ]);
 
     if (!jobResult.ok || !jobResult.value) {
@@ -76,11 +77,17 @@ HARD CONSTRAINTS:
       [job.city, job.countryCode || job.country].filter(Boolean).join(", ") ||
       "Unspecified";
     const sanitizedResume = sanitizeResumeForScoring(userProfile.resumeText);
+    const sanitizedSummary = userProfile.summary
+      ? sanitizeResumeForScoring(userProfile.summary)
+      : null;
+    const sanitizedSkills = userProfile.skills?.length
+      ? userProfile.skills.map(sanitizeResumeForScoring)
+      : null;
 
     const prompt = `CANDIDATE BACKGROUND:
 """
-${userProfile.summary ? `Summary: ${userProfile.summary}\n` : ""}
-${userProfile.skills?.length ? `Skills: ${userProfile.skills.join(", ")}\n` : ""}
+${sanitizedSummary ? `Summary: ${sanitizedSummary}\n` : ""}
+${sanitizedSkills ? `Skills: ${sanitizedSkills.join(", ")}\n` : ""}
 ${sanitizedResume}
 """
 
@@ -103,7 +110,7 @@ ${job.description || "No description provided."}
       onFinish: async ({ text }) => {
         try {
           if (text && text.trim().length > 0) {
-            await jobsDal.updateJobCoverLetter(job.id, text.trim());
+            await jobsDal.updateJobCoverLetter(job.id, userId, text.trim());
           }
         } catch (saveError) {
           console.error("Failed to save streamed cover letter in background:", {
@@ -142,6 +149,11 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const sessionResult = await requireSession();
+    if (!sessionResult.ok || !sessionResult.value) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
     const body = await req.json();
     const coverLetter = body.coverLetter;
@@ -153,7 +165,7 @@ export async function PUT(
       );
     }
 
-    const updateRes = await jobsDal.updateJobCoverLetter(id, coverLetter);
+    const updateRes = await jobsDal.updateJobCoverLetter(id, sessionResult.value.user.id, coverLetter);
     if (!updateRes.ok) {
       console.error("Failed to save cover letter:", { jobId: id });
       return NextResponse.json(

@@ -40,9 +40,17 @@ export async function fetchAndUpsertJobs(
         continue;
       }
 
-      // Check if candidate previously deleted this job listing
-      const deleted = await jobsDal.isJobDeleted(normalized.source, normalized.externalId, userId);
-      if (deleted) {
+      // Check if candidate previously deleted this job listing.
+      // Skip when there is no userId (system-level cron fetch with no owner).
+      if (userId) {
+        const deleted = await jobsDal.isJobDeleted(normalized.source, normalized.externalId, userId);
+        if (deleted) {
+          continue;
+        }
+      }
+
+      // Skip upsert when there is no userId — the jobs.user_id column is NOT NULL.
+      if (!userId) {
         continue;
       }
 
@@ -126,7 +134,7 @@ export async function scoreJobWithAI(
 export async function transitionJobStatus(
   jobId: string,
   targetStatus: JobStatus,
-  userId?: string
+  userId: string,
 ): Promise<Result<jobsDal.JobSelect, AppError>> {
   const currentResult = await jobsDal.getJobById(jobId, userId);
   if (!currentResult.ok) return currentResult;
