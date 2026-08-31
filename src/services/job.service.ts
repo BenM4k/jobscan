@@ -23,7 +23,8 @@ import { isOlderThanOneMonth } from "@/lib/date-utils";
 
 export async function fetchAndUpsertJobs(
   sourceId: "greenhouse" | "remoteok" | "lever" | "ashby",
-  target?: string
+  target?: string,
+  userId?: string
 ): Promise<Result<{ fetched: number; upserted: number }, AppError>> {
   try {
     const adapter = getJobSourceAdapter(sourceId);
@@ -39,13 +40,22 @@ export async function fetchAndUpsertJobs(
         continue;
       }
 
-      // Check if candidate previously deleted this job listing
-      const deleted = await jobsDal.isJobDeleted(normalized.source, normalized.externalId);
-      if (deleted) {
+      // Check if candidate previously deleted this job listing.
+      // Skip when there is no userId (system-level cron fetch with no owner).
+      if (userId) {
+        const deleted = await jobsDal.isJobDeleted(normalized.source, normalized.externalId, userId);
+        if (deleted) {
+          continue;
+        }
+      }
+
+      // Skip upsert when there is no userId — the jobs.user_id column is NOT NULL.
+      if (!userId) {
         continue;
       }
 
       const res = await jobsDal.upsertJob({
+        userId,
         source: normalized.source,
         externalId: normalized.externalId,
         title: normalized.title,
@@ -81,13 +91,14 @@ export async function fetchAndUpsertJobs(
 
 export async function scoreJobWithAI(
   jobId: string,
+  userId: string,
   preferredProvider?: string
 ): Promise<Result<jobsDal.JobSelect, AppError>> {
-  const jobResult = await jobsDal.getJobById(jobId);
+  const jobResult = await jobsDal.getJobById(jobId, userId);
   if (!jobResult.ok) return jobResult;
   const job = jobResult.value;
 
-  const profileResult = await profileDal.getProfile();
+  const profileResult = await profileDal.getProfile(userId);
   if (!profileResult.ok) return profileResult;
   const userProfile = profileResult.value;
 
@@ -122,9 +133,10 @@ export async function scoreJobWithAI(
 
 export async function transitionJobStatus(
   jobId: string,
-  targetStatus: JobStatus
+  targetStatus: JobStatus,
+  userId: string,
 ): Promise<Result<jobsDal.JobSelect, AppError>> {
-  const currentResult = await jobsDal.getJobById(jobId);
+  const currentResult = await jobsDal.getJobById(jobId, userId);
   if (!currentResult.ok) return currentResult;
   const currentJob = currentResult.value;
 

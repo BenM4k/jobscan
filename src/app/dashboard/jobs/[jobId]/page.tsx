@@ -24,7 +24,7 @@ async function JobDetailContent({
   }
 
   const { jobId } = await params;
-  const jobResult = await jobsDal.getJobById(jobId);
+  const jobResult = await jobsDal.getJobById(jobId, sessionResult.value.user.id);
 
   if (!jobResult.ok || !jobResult.value) {
     return (

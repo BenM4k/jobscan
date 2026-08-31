@@ -13,13 +13,16 @@ import { isOlderThanOneMonth } from "@/lib/date-utils";
 
 import * as profileDal from "@/dal/profile.dal";
 
-export async function runDrcCrawler(keyword?: string): Promise<CrawlResult> {
+export async function runDrcCrawler(
+  keyword?: string,
+  userId?: string,
+): Promise<CrawlResult> {
   const startTime = Date.now();
 
   let targetKeyword = keyword?.trim() || undefined;
-  if (!targetKeyword) {
+  if (!targetKeyword && userId) {
     try {
-      const prof = await profileDal.getProfile();
+      const prof = await profileDal.getProfile(userId);
       if (prof.ok && prof.value) {
         const expTitle = prof.value.experience?.[0]?.title?.trim();
         const skill = prof.value.skills?.[0]?.trim();
@@ -48,7 +51,9 @@ export async function runDrcCrawler(keyword?: string): Promise<CrawlResult> {
 
   const sourceResults: CrawlSourceResult[] = [];
   let totalUpserted = 0;
-  const filterKw = targetKeyword?.trim() ? targetKeyword.trim().toLowerCase() : undefined;
+  const filterKw = targetKeyword?.trim()
+    ? targetKeyword.trim().toLowerCase()
+    : undefined;
 
   for (const { name, fetcher } of sourceFetchers) {
     try {
@@ -73,13 +78,26 @@ export async function runDrcCrawler(keyword?: string): Promise<CrawlResult> {
             continue;
           }
 
-          // Skip job if candidate previously deleted it
-          const deleted = await jobsDal.isJobDeleted(job.source, job.externalId);
-          if (deleted) {
+          // Skip job if candidate previously deleted it.
+          // Omit when there is no userId — deletion records are user-scoped.
+          if (userId) {
+            const deleted = await jobsDal.isJobDeleted(
+              job.source,
+              job.externalId,
+              userId,
+            );
+            if (deleted) {
+              continue;
+            }
+          }
+
+          // Skip upsert when there is no userId — jobs.user_id is NOT NULL.
+          if (!userId) {
             continue;
           }
 
           const res = await jobsDal.upsertJob({
+            userId,
             source: job.source,
             externalId: job.externalId,
             title: job.title,
@@ -99,7 +117,10 @@ export async function runDrcCrawler(keyword?: string): Promise<CrawlResult> {
             sourceUpserted++;
           }
         } catch (jobErr) {
-          console.error(`[Crawler ${name}] Failed to upsert job ${job.externalId}:`, jobErr);
+          console.error(
+            `[Crawler ${name}] Failed to upsert job ${job.externalId}:`,
+            jobErr,
+          );
         }
       }
 

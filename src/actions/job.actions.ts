@@ -31,8 +31,8 @@ const scoreJobSchema = z.object({
 
 export async function triggerJobFetchAction(formData: FormData) {
   const sessionResult = await requireSession();
-  if (!sessionResult.ok)
-    return { success: false, error: sessionResult.error.message };
+  if (!sessionResult.ok || !sessionResult.value)
+    return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
 
   const parsed = triggerFetchSchema.safeParse({
     sourceId: formData.get("sourceId"),
@@ -45,6 +45,7 @@ export async function triggerJobFetchAction(formData: FormData) {
   const result = await jobService.fetchAndUpsertJobs(
     parsed.data.sourceId,
     parsed.data.target,
+    sessionResult.value.user.id,
   );
   if (!result.ok) {
     return { success: false, error: result.error.message };
@@ -58,8 +59,8 @@ export async function transitionJobStatusAction(
   status: JobStatus,
 ) {
   const sessionResult = await requireSession();
-  if (!sessionResult.ok)
-    return { success: false, error: sessionResult.error.message };
+  if (!sessionResult.ok || !sessionResult.value)
+    return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
 
   const parsed = transitionStatusSchema.safeParse({ jobId, status });
   if (!parsed.success) {
@@ -69,6 +70,7 @@ export async function transitionJobStatusAction(
   const result = await jobService.transitionJobStatus(
     parsed.data.jobId,
     parsed.data.status,
+    sessionResult.value.user.id,
   );
   if (!result.ok) {
     return { success: false, error: result.error.message };
@@ -82,8 +84,8 @@ export async function scoreJobAction(
   provider?: "claude" | "gemini" | "openai" | "gateway",
 ) {
   const sessionResult = await requireSession();
-  if (!sessionResult.ok)
-    return { success: false, error: sessionResult.error.message };
+  if (!sessionResult.ok || !sessionResult.value)
+    return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
 
   const parsed = scoreJobSchema.safeParse({ jobId, provider });
   if (!parsed.success) {
@@ -92,6 +94,7 @@ export async function scoreJobAction(
 
   const result = await jobService.scoreJobWithAI(
     parsed.data.jobId,
+    sessionResult.value.user.id,
     parsed.data.provider,
   );
   if (!result.ok) {
@@ -111,8 +114,8 @@ export async function fetchMoreJobsAction(
   queryFilter?: string,
 ) {
   const sessionResult = await requireSession();
-  if (!sessionResult.ok)
-    return { success: false, error: sessionResult.error.message };
+  if (!sessionResult.ok || !sessionResult.value)
+    return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
 
   const dalListResult = await (
     await import("@/dal/jobs.dal")
@@ -124,6 +127,7 @@ export async function fetchMoreJobsAction(
     startDate,
     endDate,
     queryFilter,
+    sessionResult.value.user.id,
   );
   if (!dalListResult.ok) {
     return { success: false, error: dalListResult.error.message };
@@ -143,8 +147,8 @@ const addManualJobSchema = z.object({
 
 export async function addManualJobAction(formData: FormData) {
   const sessionResult = await requireSession();
-  if (!sessionResult.ok)
-    return { success: false, error: sessionResult.error.message };
+  if (!sessionResult.ok || !sessionResult.value)
+    return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
 
   const parsed = addManualJobSchema.safeParse({
     title: formData.get("title")?.toString() || "",
@@ -163,6 +167,7 @@ export async function addManualJobAction(formData: FormData) {
   const externalId = `manual-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
   const result = await jobsDal.upsertJob({
+    userId: sessionResult.value.user.id,
     source: "manual",
     externalId,
     title: parsed.data.title,
@@ -182,11 +187,11 @@ export async function addManualJobAction(formData: FormData) {
 
 export async function deleteJobAction(jobId: string) {
   const sessionResult = await requireSession();
-  if (!sessionResult.ok)
-    return { success: false, error: sessionResult.error.message };
+  if (!sessionResult.ok || !sessionResult.value)
+    return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
 
   const jobsDal = await import("@/dal/jobs.dal");
-  const result = await jobsDal.deleteJob(jobId);
+  const result = await jobsDal.deleteJob(jobId, sessionResult.value.user.id);
   if (!result.ok) {
     return { success: false, error: result.error.message };
   }
@@ -198,11 +203,14 @@ import { JobSelect } from "@/dal/jobs.dal";
 
 export async function restoreJobAction(jobData: JobSelect) {
   const sessionResult = await requireSession();
-  if (!sessionResult.ok)
-    return { success: false, error: sessionResult.error.message };
+  if (!sessionResult.ok || !sessionResult.value)
+    return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
 
   const jobsDal = await import("@/dal/jobs.dal");
-  const result = await jobsDal.restoreJob(jobData);
+  const result = await jobsDal.restoreJob({
+    ...jobData,
+    userId: sessionResult.value.user.id,
+  });
   if (!result.ok) {
     return { success: false, error: result.error.message };
   }
@@ -214,12 +222,12 @@ import { revalidatePath } from "next/cache";
 
 export async function triggerDrcCrawlAction(keyword?: string) {
   const sessionResult = await requireSession();
-  if (!sessionResult.ok)
-    return { success: false, error: sessionResult.error.message };
+  if (!sessionResult.ok || !sessionResult.value)
+    return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
 
   try {
     const { runDrcCrawler } = await import("@/services/crawler/run");
-    const crawlResult = await runDrcCrawler(keyword);
+    const crawlResult = await runDrcCrawler(keyword, sessionResult.value.user.id);
     revalidatePath("/dashboard");
     return { success: true, data: crawlResult };
   } catch (E) {

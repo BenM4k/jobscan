@@ -85,6 +85,7 @@ export const jobs = pgTable(
   "jobs",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
     source: text("source").notNull(), // 'greenhouse' | 'remoteok' | 'lever' | 'ashby' | 'manual'
     externalId: text("external_id").notNull(),
     title: text("title").notNull(),
@@ -112,12 +113,15 @@ export const jobs = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
-    unique("uniq_source_external").on(table.source, table.externalId),
+    unique("uniq_user_source_external").on(table.userId, table.source, table.externalId),
   ]
 );
 
 export const profile = pgTable("profile", {
   id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .references(() => user.id, { onDelete: "cascade" })
+    .unique(),
   resumeText: text("resume_text").notNull(),
   rawText: text("raw_text"),
   summary: text("summary"),
@@ -132,12 +136,13 @@ export const deletedJobs = pgTable(
   "deleted_jobs",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
     source: text("source").notNull(),
     externalId: text("external_id").notNull(),
     deletedAt: timestamp("deleted_at").defaultNow().notNull(),
   },
   (table) => [
-    unique("uniq_deleted_source_external").on(table.source, table.externalId),
+    unique("uniq_deleted_user_source_external").on(table.userId, table.source, table.externalId),
   ]
 );
 
