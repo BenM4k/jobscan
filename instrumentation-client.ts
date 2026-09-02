@@ -24,11 +24,17 @@ if (!posthogKey || !posthogHost) {
     );
   }
 } else {
+  const uiHost = posthogHost.includes("eu.i.posthog.com")
+    ? "https://eu.posthog.com"
+    : "https://us.posthog.com";
+
   posthog.init(posthogKey, {
     api_host: posthogHost,
+    ui_host: uiHost,
     defaults: "2026-01-30",
-    capture_exceptions: true,
+    capture_exceptions: false,
     debug: isDev,
   });
 }
+
 
