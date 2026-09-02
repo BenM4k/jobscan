@@ -21,12 +21,28 @@ export function Navbar({ userId, userEmail, userName }: NavbarProps) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const identifiedUserId = React.useRef<string | null>(null);
+  const identifiedProps = React.useRef<{ email?: string | null; name?: string | null }>({});
   const t = useTranslations("nav");
 
   React.useEffect(() => {
-    if (!userId || identifiedUserId.current === userId) return;
+    if (!userId) {
+      if (identifiedUserId.current) {
+        posthog.reset();
+        identifiedUserId.current = null;
+        identifiedProps.current = {};
+      }
+      return;
+    }
 
-    if (identifiedUserId.current) {
+    const propsChanged =
+      identifiedProps.current.email !== userEmail ||
+      identifiedProps.current.name !== userName;
+
+    if (identifiedUserId.current === userId && !propsChanged) {
+      return;
+    }
+
+    if (identifiedUserId.current && identifiedUserId.current !== userId) {
       posthog.reset();
     }
 
@@ -35,6 +51,7 @@ export function Navbar({ userId, userEmail, userName }: NavbarProps) {
       name: userName ?? undefined,
     });
     identifiedUserId.current = userId;
+    identifiedProps.current = { email: userEmail, name: userName };
   }, [userId, userEmail, userName]);
 
   const handleSignOut = async () => {
