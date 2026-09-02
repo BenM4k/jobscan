@@ -17,14 +17,18 @@ if (!posthogKey || !posthogHost) {
       `${missingVariable} variable required by PostHog is missing or un-configured, this causes events to be silently missed. This error stops appearing once ${missingVariable} is configured`,
     );
   }
-} else if (!posthogHost.startsWith("https://") && (!isDev || !isLocalHost(posthogHost))) {
+} else if (
+  !posthogHost.startsWith("https://") &&
+  !posthogHost.startsWith("/") &&
+  (!isDev || !isLocalHost(posthogHost))
+) {
   if (isDev) {
     throw new Error(
-      "NEXT_PUBLIC_POSTHOG_HOST must use HTTPS in production (HTTP allowed only for localhost in development).",
+      "NEXT_PUBLIC_POSTHOG_HOST must use HTTPS in production, start with '/' for reverse proxy, or use HTTP on localhost in development.",
     );
   }
 } else {
-  const uiHost = posthogHost.includes("eu.i.posthog.com")
+  const uiHost = posthogHost.includes("eu")
     ? "https://eu.posthog.com"
     : "https://us.posthog.com";
 
@@ -34,7 +38,6 @@ if (!posthogKey || !posthogHost) {
     defaults: "2026-01-30",
     capture_exceptions: false,
     debug: isDev,
+    capture_pageview: true,
   });
 }
-
-
