@@ -5,6 +5,7 @@ import { ResumeProfileData } from "@/lib/ai";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { FileText } from "lucide-react";
+import posthog from "posthog-js";
 
 interface MasterResumeUploadProps {
   onExtracted: (data: ResumeProfileData, rawText: string) => void;
@@ -54,6 +55,7 @@ export function MasterResumeUpload({ onExtracted, disabled }: MasterResumeUpload
       }
 
       const { data: extractedProfile } = await extractRes.json();
+      posthog.capture("master_resume_uploaded", { file_type: file.type || "unknown" });
       toast.success("Resume parsed & structured with Gemini AI! Please review before saving.");
       onExtracted(extractedProfile, rawText);
     } catch (err) {

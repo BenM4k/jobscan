@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { signUp } from "@/services/auth/auth-client";
 import { PasswordInput } from "@/components/ui/PasswordInput";
+import posthog from "posthog-js";
 
 export function SignUpForm() {
   const router = useRouter();
@@ -32,6 +33,7 @@ export function SignUpForm() {
       if (res.error) {
         setErrorMsg(res.error.message || t("signUpError"));
       } else {
+        posthog.capture("user_signed_up");
         router.push("/dashboard");
         router.refresh();
       }

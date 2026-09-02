@@ -6,21 +6,40 @@ import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { signOut } from "@/services/auth/auth-client";
 import { PreferencesWidget } from "@/components/PreferencesWidget";
+import posthog from "posthog-js";
 
 import { Logo } from "@/components/Logo";
 
 interface NavbarProps {
+  userId?: string;
   userEmail?: string | null;
+  userName?: string | null;
 }
 
-export function Navbar({ userEmail }: NavbarProps) {
+export function Navbar({ userId, userEmail, userName }: NavbarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  const identifiedUserId = React.useRef<string | null>(null);
   const t = useTranslations("nav");
+
+  React.useEffect(() => {
+    if (!userId || identifiedUserId.current === userId) return;
+
+    if (identifiedUserId.current) {
+      posthog.reset();
+    }
+
+    posthog.identify(userId, {
+      email: userEmail ?? undefined,
+      name: userName ?? undefined,
+    });
+    identifiedUserId.current = userId;
+  }, [userId, userEmail, userName]);
 
   const handleSignOut = async () => {
     await signOut();
+    posthog.reset();
     router.push("/");
     router.refresh();
   };

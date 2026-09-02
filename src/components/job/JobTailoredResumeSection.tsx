@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { JobSelect } from "@/dal/jobs.dal";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
+import posthog from "posthog-js";
 
 interface JobTailoredResumeSectionProps {
   job: JobSelect;
@@ -31,6 +32,7 @@ export function JobTailoredResumeSection({ job, onJobUpdated }: JobTailoredResum
       }
 
       const { data, tailoredResume } = await res.json();
+      posthog.capture("tailored_resume_generated");
       setEditedResume(tailoredResume);
       onJobUpdated(data);
       toast.success("Tailored resume generated with Gemini 3.6 Flash!");

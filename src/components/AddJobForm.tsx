@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { addManualJobAction } from "@/actions/job.actions";
+import posthog from "posthog-js";
 
 export function AddJobForm() {
   const router = useRouter();
@@ -34,6 +35,7 @@ export function AddJobForm() {
     if (!res.success) {
       setErrorMsg(res.error || "Failed to add manual job posting.");
     } else {
+      posthog.capture("job_created", { source: "manual" });
       router.push("/dashboard?source=manual");
       router.refresh();
     }
