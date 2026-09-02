@@ -8,13 +8,14 @@ if (typeof process !== "undefined" && process.setMaxListeners) {
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
-const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST?.startsWith("http")
-  ? process.env.NEXT_PUBLIC_POSTHOG_HOST
-  : "https://us.i.posthog.com";
+import { getPostHogConfig } from "./src/lib/posthog-config";
 
-const posthogAssetHost = posthogHost.includes("eu.i.posthog.com")
-  ? "https://eu-assets.i.posthog.com"
-  : "https://us-assets.i.posthog.com";
+const { defaultApiHost, assetHost } = getPostHogConfig();
+const rawPosthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST;
+const posthogHost = rawPosthogHost?.startsWith("http")
+  ? rawPosthogHost
+  : defaultApiHost;
+const posthogAssetHost = assetHost;
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
@@ -27,12 +28,29 @@ const nextConfig: NextConfig = {
         destination: `${posthogAssetHost}/static/:path*`,
       },
       {
+        source: "/ingest/array/:path*",
+        destination: `${posthogAssetHost}/array/:path*`,
+      },
+      {
+        source: "/array/:path*",
+        destination: `${posthogAssetHost}/array/:path*`,
+      },
+      {
         source: "/ingest/:path*",
         destination: `${posthogHost}/:path*`,
       },
       {
         source: "/ingest/decide",
         destination: `${posthogHost}/decide`,
+      },
+    ];
+  },
+  async redirects() {
+    return [
+      {
+        source: "/:path((?!ingest|array).+)/",
+        destination: "/:path",
+        permanent: true,
       },
     ];
   },
