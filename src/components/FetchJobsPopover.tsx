@@ -11,6 +11,7 @@ import {
   triggerDrcCrawlAction,
 } from "@/actions/job.actions";
 import { useTranslations } from "next-intl";
+import posthog from "posthog-js";
 
 type FetchSource = "remoteok" | "drc" | "greenhouse" | "lever" | "ashby";
 
@@ -45,6 +46,7 @@ export function FetchJobsPopover({
           onError(res.error || "Failed to crawl DRC local job sources.");
         } else {
           const total = res.data?.totalUpserted || 0;
+          posthog.capture("jobs_fetched", { source: selectedSource, jobs_upserted: total });
           onSuccess(
             `DRC Job Crawl complete! ${total} job(s) updated in pipeline.`,
           );
@@ -67,6 +69,7 @@ export function FetchJobsPopover({
           );
         } else {
           const total = Array.isArray(res.data) ? res.data.length : 1;
+          posthog.capture("jobs_fetched", { source: selectedSource, jobs_upserted: total });
           onSuccess(
             `Successfully fetched jobs from ${selectedSource.toUpperCase()}! ${total} job(s) updated.`,
           );

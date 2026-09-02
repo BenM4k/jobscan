@@ -19,6 +19,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import posthog from "posthog-js";
 
 interface ProfileFormProps {
   userEmail?: string;
@@ -83,6 +84,12 @@ export function ProfileForm({
     setIsSaving(false);
 
     if (res.success && res.data) {
+      posthog.capture("master_resume_saved", {
+        ai_provider: aiProvider,
+        skills_count: parsedSkillsList.length,
+        experience_count: experience.length,
+        education_count: education.length,
+      });
       setResumeText(res.data.resumeText);
       setIsEditing(false);
       toast.success("Master resume saved successfully!");
@@ -95,6 +102,7 @@ export function ProfileForm({
     setDeleteConfirmOpen(false);
     const res = await deleteResumeAction();
     if (res.success) {
+      posthog.capture("master_resume_deleted");
       setResumeText("");
       setSummary("");
       setSkills("");

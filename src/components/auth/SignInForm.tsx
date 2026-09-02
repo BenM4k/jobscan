@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { signIn } from "@/services/auth/auth-client";
 import { PasswordInput } from "@/components/ui/PasswordInput";
+import posthog from "posthog-js";
 
 export function SignInForm() {
   const router = useRouter();
@@ -30,6 +31,7 @@ export function SignInForm() {
       if (res.error) {
         setErrorMsg(res.error.message || t("signInError"));
       } else {
+        posthog.capture("user_signed_in");
         router.push("/dashboard");
         router.refresh();
       }

@@ -23,6 +23,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import posthog from "posthog-js";
 
 interface JobListProps {
   initialJobs: JobSelect[];
@@ -103,7 +104,10 @@ export function JobList({
   ]);
 
   const handleStatusChange = async (jobId: string, newStatus: JobStatus) => {
-    await transitionJobStatusAction(jobId, newStatus);
+    const res = await transitionJobStatusAction(jobId, newStatus);
+    if (res.success) {
+      posthog.capture("job_status_updated", { status: newStatus, location: "list" });
+    }
     window.location.reload();
   };
 
@@ -116,7 +120,10 @@ export function JobList({
     setJobsList((prev) => prev.filter((j) => j.id !== targetJob.id));
 
     // Execute server deletion
-    await deleteJobAction(targetJob.id);
+    const deleteResult = await deleteJobAction(targetJob.id);
+    if (deleteResult.success) {
+      posthog.capture("job_deleted", { location: "list" });
+    }
 
     // Trigger 5-second Sonner Toast with Undo button
     toast.success(`Deleted "${targetJob.title}"`, {
@@ -126,7 +133,10 @@ export function JobList({
         label: "Undo",
         onClick: async () => {
           setJobsList((prev) => [targetJob, ...prev]);
-          await restoreJobAction(targetJob);
+          const restoreResult = await restoreJobAction(targetJob);
+          if (restoreResult.success) {
+            posthog.capture("job_restored", { location: "list" });
+          }
           toast.info(`Restored "${targetJob.title}"`);
         },
       },
@@ -147,6 +157,7 @@ export function JobList({
         setScoringError(err);
       }
     } else {
+      posthog.capture("job_scored", { ai_provider: aiProvider, location: "list" });
       window.location.reload();
     }
   };

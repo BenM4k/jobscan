@@ -6,21 +6,57 @@ import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { signOut } from "@/services/auth/auth-client";
 import { PreferencesWidget } from "@/components/PreferencesWidget";
+import posthog from "posthog-js";
 
 import { Logo } from "@/components/Logo";
 
 interface NavbarProps {
+  userId?: string;
   userEmail?: string | null;
+  userName?: string | null;
 }
 
-export function Navbar({ userEmail }: NavbarProps) {
+export function Navbar({ userId, userEmail, userName }: NavbarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  const identifiedUserId = React.useRef<string | null>(null);
+  const identifiedProps = React.useRef<{ email?: string | null; name?: string | null }>({});
   const t = useTranslations("nav");
+
+  React.useEffect(() => {
+    if (!userId) {
+      if (identifiedUserId.current) {
+        posthog.reset();
+        identifiedUserId.current = null;
+        identifiedProps.current = {};
+      }
+      return;
+    }
+
+    const propsChanged =
+      identifiedProps.current.email !== userEmail ||
+      identifiedProps.current.name !== userName;
+
+    if (identifiedUserId.current === userId && !propsChanged) {
+      return;
+    }
+
+    if (identifiedUserId.current && identifiedUserId.current !== userId) {
+      posthog.reset();
+    }
+
+    posthog.identify(userId, {
+      email: userEmail ?? undefined,
+      name: userName ?? undefined,
+    });
+    identifiedUserId.current = userId;
+    identifiedProps.current = { email: userEmail, name: userName };
+  }, [userId, userEmail, userName]);
 
   const handleSignOut = async () => {
     await signOut();
+    posthog.reset();
     router.push("/");
     router.refresh();
   };

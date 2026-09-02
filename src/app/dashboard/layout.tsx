@@ -25,7 +25,11 @@ export default async function DashboardLayout({
         }}
       />
 
-      <Navbar userEmail={sessionResult.value.user.email} />
+      <Navbar
+        userId={sessionResult.value.user.id}
+        userEmail={sessionResult.value.user.email}
+        userName={sessionResult.value.user.name}
+      />
 
       <div className="flex-1 flex flex-col z-10">{children}</div>
 

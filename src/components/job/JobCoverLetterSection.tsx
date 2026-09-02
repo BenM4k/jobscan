@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { JobSelect } from "@/dal/jobs.dal";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
+import posthog from "posthog-js";
 
 interface JobCoverLetterSectionProps {
   job: JobSelect;
@@ -46,6 +47,7 @@ export function JobCoverLetterSection({ job, onJobUpdated }: JobCoverLetterSecti
         setCoverLetter(accumulated);
       }
 
+      posthog.capture("cover_letter_generated");
       toast.success("Cover letter generated! Feel free to edit and save.");
       onJobUpdated({ ...job, coverLetterDraft: accumulated });
     } catch (err) {
@@ -71,6 +73,7 @@ export function JobCoverLetterSection({ job, onJobUpdated }: JobCoverLetterSecti
       }
 
       const { data } = await res.json();
+      posthog.capture("cover_letter_saved");
       onJobUpdated(data);
       toast.success("Cover letter saved successfully!");
     } catch (err) {

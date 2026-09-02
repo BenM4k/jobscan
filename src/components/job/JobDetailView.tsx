@@ -21,6 +21,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import posthog from "posthog-js";
 
 interface JobDetailViewProps {
   initialJob: JobSelect;
@@ -42,6 +43,7 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
       toast.error(res.error || "Failed to update status");
       setJob((prev) => ({ ...prev, status: job.status }));
     } else {
+      posthog.capture("job_status_updated", { status: newStatus, location: "detail" });
       toast.success(`Status updated to "${newStatus.toUpperCase()}"`);
     }
   };
@@ -66,6 +68,7 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
       }
 
       const { data } = await res.json();
+      posthog.capture("job_scored", { location: "detail" });
       setJob(data);
       toast.success("Job scored against Master Resume successfully!");
       router.refresh();
