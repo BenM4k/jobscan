@@ -29,22 +29,61 @@ export interface PipelineEntryWithDetails extends PipelineEntrySelect {
   tailoredCoverLetter?: typeof tailoredCoverLetter.$inferSelect | null;
 }
 
+function latestScoreSubquery() {
+  return db
+    .selectDistinctOn([score.pipelineEntryId], {
+      id: score.id,
+      pipelineEntryId: score.pipelineEntryId,
+      resumeVersion: score.resumeVersion,
+      modelUsed: score.modelUsed,
+      cosineSimilarity: score.cosineSimilarity,
+      bm25Rank: score.bm25Rank,
+      finalScore: score.finalScore,
+      matchedSkills: score.matchedSkills,
+      missingSkills: score.missingSkills,
+      explanation: score.explanation,
+      createdAt: score.createdAt,
+      updatedAt: score.updatedAt,
+    })
+    .from(score)
+    .orderBy(score.pipelineEntryId, desc(score.createdAt))
+    .as("latest_score");
+}
+
+function selectScoreFields(sub: ReturnType<typeof latestScoreSubquery>) {
+  return {
+    id: sub.id,
+    pipelineEntryId: sub.pipelineEntryId,
+    resumeVersion: sub.resumeVersion,
+    modelUsed: sub.modelUsed,
+    cosineSimilarity: sub.cosineSimilarity,
+    bm25Rank: sub.bm25Rank,
+    finalScore: sub.finalScore,
+    matchedSkills: sub.matchedSkills,
+    missingSkills: sub.missingSkills,
+    explanation: sub.explanation,
+    createdAt: sub.createdAt,
+    updatedAt: sub.updatedAt,
+  };
+}
+
 export async function getPipelineEntryById(
   id: string,
   userId: string
 ): Promise<Result<PipelineEntryWithDetails, AppError>> {
   try {
+    const latestScore = latestScoreSubquery();
     const rows = await db
       .select({
         entry: pipelineEntry,
         job: job,
-        score: score,
+        score: selectScoreFields(latestScore),
         tailoredResume: tailoredResume,
         tailoredCoverLetter: tailoredCoverLetter,
       })
       .from(pipelineEntry)
       .innerJoin(job, eq(pipelineEntry.jobId, job.id))
-      .leftJoin(score, eq(score.pipelineEntryId, pipelineEntry.id))
+      .leftJoin(latestScore, eq(latestScore.pipelineEntryId, pipelineEntry.id))
       .leftJoin(tailoredResume, eq(tailoredResume.pipelineEntryId, pipelineEntry.id))
       .leftJoin(tailoredCoverLetter, eq(tailoredCoverLetter.pipelineEntryId, pipelineEntry.id))
       .where(and(eq(pipelineEntry.id, id), eq(pipelineEntry.userId, userId)))
@@ -58,7 +97,7 @@ export async function getPipelineEntryById(
     return ok({
       ...row.entry,
       job: row.job,
-      score: row.score || null,
+      score: row.score?.id ? (row.score as typeof score.$inferSelect) : null,
       tailoredResume: row.tailoredResume || null,
       tailoredCoverLetter: row.tailoredCoverLetter || null,
     });
@@ -74,17 +113,18 @@ export async function getPipelineEntryByUserAndJob(
   jobId: string
 ): Promise<Result<PipelineEntryWithDetails | null, AppError>> {
   try {
+    const latestScore = latestScoreSubquery();
     const rows = await db
       .select({
         entry: pipelineEntry,
         job: job,
-        score: score,
+        score: selectScoreFields(latestScore),
         tailoredResume: tailoredResume,
         tailoredCoverLetter: tailoredCoverLetter,
       })
       .from(pipelineEntry)
       .innerJoin(job, eq(pipelineEntry.jobId, job.id))
-      .leftJoin(score, eq(score.pipelineEntryId, pipelineEntry.id))
+      .leftJoin(latestScore, eq(latestScore.pipelineEntryId, pipelineEntry.id))
       .leftJoin(tailoredResume, eq(tailoredResume.pipelineEntryId, pipelineEntry.id))
       .leftJoin(tailoredCoverLetter, eq(tailoredCoverLetter.pipelineEntryId, pipelineEntry.id))
       .where(and(eq(pipelineEntry.userId, userId), eq(pipelineEntry.jobId, jobId)))
@@ -98,7 +138,7 @@ export async function getPipelineEntryByUserAndJob(
     return ok({
       ...row.entry,
       job: row.job,
-      score: row.score || null,
+      score: row.score?.id ? (row.score as typeof score.$inferSelect) : null,
       tailoredResume: row.tailoredResume || null,
       tailoredCoverLetter: row.tailoredCoverLetter || null,
     });
@@ -168,17 +208,18 @@ export async function listPipelineEntries(
     const limit = filter?.limit ?? 20;
     const offset = filter?.offset ?? 0;
 
+    const latestScore = latestScoreSubquery();
     const rows = await db
       .select({
         entry: pipelineEntry,
         job: job,
-        score: score,
+        score: selectScoreFields(latestScore),
         tailoredResume: tailoredResume,
         tailoredCoverLetter: tailoredCoverLetter,
       })
       .from(pipelineEntry)
       .innerJoin(job, eq(pipelineEntry.jobId, job.id))
-      .leftJoin(score, eq(score.pipelineEntryId, pipelineEntry.id))
+      .leftJoin(latestScore, eq(latestScore.pipelineEntryId, pipelineEntry.id))
       .leftJoin(tailoredResume, eq(tailoredResume.pipelineEntryId, pipelineEntry.id))
       .leftJoin(tailoredCoverLetter, eq(tailoredCoverLetter.pipelineEntryId, pipelineEntry.id))
       .where(and(...conditions))
@@ -189,7 +230,7 @@ export async function listPipelineEntries(
     const mapped: PipelineEntryWithDetails[] = rows.map((r) => ({
       ...r.entry,
       job: r.job,
-      score: r.score || null,
+      score: r.score?.id ? (r.score as typeof score.$inferSelect) : null,
       tailoredResume: r.tailoredResume || null,
       tailoredCoverLetter: r.tailoredCoverLetter || null,
     }));

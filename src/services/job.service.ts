@@ -160,7 +160,8 @@ export async function scoreJobWithAI(
     score.missingSkills,
     undefined,
     _usage.modelId,
-    activeResume?.version
+    activeResume?.version,
+    userId
   );
 }
 

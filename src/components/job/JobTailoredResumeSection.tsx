@@ -5,6 +5,7 @@ import { JobSelect } from "@/dal/jobs.dal";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import posthog from "posthog-js";
+import { downloadTextAsPdf } from "@/lib/pdf-export";
 
 interface JobTailoredResumeSectionProps {
   job: JobSelect;
@@ -44,27 +45,15 @@ export function JobTailoredResumeSection({ job, onJobUpdated }: JobTailoredResum
     }
   };
 
-  const handleDownloadPdf = (content: string) => {
-    import("jspdf").then(({ jsPDF }) => {
-      const doc = new jsPDF();
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10.5);
-
-      const splitText = doc.splitTextToSize(content, 180);
-      let cursorY = 15;
-
-      splitText.forEach((line: string) => {
-        if (cursorY > 280) {
-          doc.addPage();
-          cursorY = 15;
-        }
-        doc.text(line, 15, cursorY);
-        cursorY += 5.5;
-      });
-
-      doc.save(`Tailored_Resume_${job.company.replace(/\s+/g, "_")}.pdf`);
+  const handleDownloadPdf = async (content: string) => {
+    try {
+      const filename = `Tailored_Resume_${job.company.replace(/\s+/g, "_")}.pdf`;
+      await downloadTextAsPdf(filename, content, 10.5, 5.5);
       toast.success("PDF downloaded!");
-    });
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to download PDF");
+    }
   };
 
   const handleCopy = () => {

@@ -130,11 +130,15 @@ ${job.description || "No description provided."}
       );
     }
 
-    const updateResult = await jobsDal.updateJobScoreBreakdown(job.id, {
-      ...score,
-      modelUsed: model.modelId ?? "gemini",
-      resumeVersion: activeResume.version,
-    });
+    const updateResult = await jobsDal.updateJobScoreBreakdown(
+      job.id,
+      {
+        ...score,
+        modelUsed: model.modelId ?? "gemini",
+        resumeVersion: activeResume.version,
+      },
+      userId
+    );
 
     if (!updateResult.ok) {
       console.error("Failed to persist job score:", { jobId: job.id });
