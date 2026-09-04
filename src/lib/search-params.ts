@@ -1,10 +1,10 @@
 import { createSearchParamsCache, parseAsString, parseAsStringEnum } from "nuqs/server";
-import { jobStatusEnum } from "@/services/db/schema";
+import { pipelineStatusEnum, type PipelineStatus } from "@/services/db/schema";
 
 export const searchParamsCache = createSearchParamsCache({
-  status: parseAsStringEnum<"all" | (typeof jobStatusEnum)[number]>([
+  status: parseAsStringEnum<"all" | PipelineStatus>([
     "all",
-    ...jobStatusEnum,
+    ...pipelineStatusEnum.enumValues,
   ]).withDefault("all"),
   source: parseAsStringEnum<
     | "all"

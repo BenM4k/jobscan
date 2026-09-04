@@ -8,119 +8,51 @@ import { fetchEmploiCdJobs } from "./sources/emploicd";
 import { fetchCongoJobJobs } from "./sources/congojob";
 import { fetchUnJobsJobs } from "./sources/unjobs";
 import { fetchFecRdcJobs } from "./sources/fecrdc";
-import * as jobsDal from "@/dal/jobs.dal";
-import { isOlderThanOneMonth } from "@/lib/date-utils";
+import {
+  resolveCrawlerKeyword,
+  ingestCrawledJob,
+} from "./crawler-utils";
 
-import * as profileDal from "@/dal/profile.dal";
+const SOURCE_FETCHERS = [
+  { name: "reliefweb", fetcher: fetchReliefWebJobs },
+  { name: "remoteok", fetcher: fetchRemoteOKJobs },
+  { name: "greenhouse", fetcher: fetchGreenhouseJobs },
+  { name: "lever", fetcher: fetchLeverJobs },
+  { name: "ashby", fetcher: fetchAshbyJobs },
+  { name: "emploicd", fetcher: fetchEmploiCdJobs },
+  { name: "congojob", fetcher: fetchCongoJobJobs },
+  { name: "unjobs", fetcher: fetchUnJobsJobs },
+  { name: "fecrdc", fetcher: fetchFecRdcJobs },
+];
 
 export async function runDrcCrawler(
   keyword?: string,
   userId?: string,
 ): Promise<CrawlResult> {
   const startTime = Date.now();
-
-  let targetKeyword = keyword?.trim() || undefined;
-  if (!targetKeyword && userId) {
-    try {
-      const prof = await profileDal.getProfile(userId);
-      if (prof.ok && prof.value) {
-        const expTitle = prof.value.experience?.[0]?.title?.trim();
-        const skill = prof.value.skills?.[0]?.trim();
-        if (expTitle) {
-          targetKeyword = expTitle;
-        } else if (skill) {
-          targetKeyword = skill;
-        }
-      }
-    } catch {
-      // Graceful fallback to broad crawl
-    }
-  }
-
-  const sourceFetchers = [
-    { name: "reliefweb", fetcher: fetchReliefWebJobs },
-    { name: "remoteok", fetcher: fetchRemoteOKJobs },
-    { name: "greenhouse", fetcher: fetchGreenhouseJobs },
-    { name: "lever", fetcher: fetchLeverJobs },
-    { name: "ashby", fetcher: fetchAshbyJobs },
-    { name: "emploicd", fetcher: fetchEmploiCdJobs },
-    { name: "congojob", fetcher: fetchCongoJobJobs },
-    { name: "unjobs", fetcher: fetchUnJobsJobs },
-    { name: "fecrdc", fetcher: fetchFecRdcJobs },
-  ];
+  const targetKeyword = await resolveCrawlerKeyword(keyword, userId);
 
   const sourceResults: CrawlSourceResult[] = [];
   let totalUpserted = 0;
-  const filterKw = targetKeyword?.trim()
-    ? targetKeyword.trim().toLowerCase()
-    : undefined;
+  const filterKw = targetKeyword?.toLowerCase();
 
-  for (const { name, fetcher } of sourceFetchers) {
+  for (const { name, fetcher } of SOURCE_FETCHERS) {
     try {
       const { result, jobs: rawJobs } = await fetcher(targetKeyword);
-      let jobs = rawJobs;
-
-      if (filterKw) {
-        jobs = jobs.filter(
-          (j) =>
-            j.title.toLowerCase().includes(filterKw) ||
-            j.description?.toLowerCase().includes(filterKw) ||
-            j.company.toLowerCase().includes(filterKw),
-        );
-      }
+      const jobs = filterKw
+        ? rawJobs.filter(
+            (j) =>
+              j.title.toLowerCase().includes(filterKw) ||
+              Boolean(j.description?.toLowerCase().includes(filterKw)) ||
+              j.company.toLowerCase().includes(filterKw),
+          )
+        : rawJobs;
 
       let sourceUpserted = 0;
-
       for (const job of jobs) {
-        try {
-          // Skip jobs posted longer than a month ago
-          if (job.postedAt && isOlderThanOneMonth(job.postedAt)) {
-            continue;
-          }
-
-          // Skip job if candidate previously deleted it.
-          // Omit when there is no userId — deletion records are user-scoped.
-          if (userId) {
-            const deleted = await jobsDal.isJobDeleted(
-              job.source,
-              job.externalId,
-              userId,
-            );
-            if (deleted) {
-              continue;
-            }
-          }
-
-          // Skip upsert when there is no userId — jobs.user_id is NOT NULL.
-          if (!userId) {
-            continue;
-          }
-
-          const res = await jobsDal.upsertJob({
-            userId,
-            source: job.source,
-            externalId: job.externalId,
-            title: job.title,
-            company: job.company,
-            url: job.url,
-            description: job.description,
-            postedAt: job.postedAt,
-            country: job.country,
-            countryCode: job.countryCode,
-            city: job.city,
-            workplaceType: job.workplaceType,
-            remoteRegions: job.remoteRegions,
-            status: "new",
-          });
-
-          if (res.ok) {
-            sourceUpserted++;
-          }
-        } catch (jobErr) {
-          console.error(
-            `[Crawler ${name}] Failed to upsert job ${job.externalId}:`,
-            jobErr,
-          );
+        const success = await ingestCrawledJob(job, userId, name);
+        if (success) {
+          sourceUpserted++;
         }
       }
 
@@ -138,11 +70,10 @@ export async function runDrcCrawler(
     }
   }
 
-  const durationMs = Date.now() - startTime;
   return {
     success: true,
     totalUpserted,
     sources: sourceResults,
-    durationMs,
+    durationMs: Date.now() - startTime,
   };
 }

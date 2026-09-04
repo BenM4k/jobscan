@@ -1,9 +1,12 @@
-import "server-only";
+if (typeof window !== "undefined") {
+  throw new Error("This module can only be executed on the server.");
+}
 import { db } from "@/services/db";
-import { profile } from "@/services/db/schema";
+import { profile } from "@/services/db/schema/legacy";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 import { eq, sql } from "drizzle-orm";
+import * as resumeDal from "./resume.dal";
 
 export type ProfileInsert = typeof profile.$inferInsert;
 export type ProfileSelect = typeof profile.$inferSelect;
@@ -56,6 +59,39 @@ export async function upsertProfile(
         },
       })
       .returning();
+
+    if (upserted) {
+      const activeRes = await resumeDal.getActiveMasterResume(userId);
+      if (!activeRes.ok) {
+        return err(activeRes.error);
+      }
+
+      if (activeRes.value) {
+        const updateRes = await resumeDal.updateMasterResume(
+          activeRes.value.id,
+          userId,
+          { content: data.resumeText },
+          data.skills || undefined
+        );
+        if (!updateRes.ok) {
+          return err(updateRes.error);
+        }
+      } else {
+        const createRes = await resumeDal.createMasterResume(
+          {
+            userId,
+            content: data.resumeText,
+            label: "Default",
+            isActive: true,
+            version: 1,
+          },
+          data.skills || undefined
+        );
+        if (!createRes.ok) {
+          return err(createRes.error);
+        }
+      }
+    }
 
     return ok(upserted);
   } catch (error) {

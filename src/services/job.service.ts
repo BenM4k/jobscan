@@ -1,8 +1,9 @@
 import "server-only";
 import { JobStatus } from "@/services/db/schema";
 import * as jobsDal from "@/dal/jobs.dal";
+import * as resumeDal from "@/dal/resume.dal";
+import * as opsDal from "@/dal/ops.dal";
 
-import * as profileDal from "@/dal/profile.dal";
 import { getJobSourceAdapter } from "./adapters/factory";
 import { getScoringProvider } from "./scoring/factory";
 import { ok, err, Result } from "@/lib/result";
@@ -17,6 +18,7 @@ const VALID_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
   interviewing: ["offer", "rejected"],
   rejected: ["saved", "new", "applied"],
   offer: [],
+  withdrawn: ["saved"],
 };
 
 import { isOlderThanOneMonth } from "@/lib/date-utils";
@@ -41,7 +43,6 @@ export async function fetchAndUpsertJobs(
       }
 
       // Check if candidate previously deleted this job listing.
-      // Skip when there is no userId (system-level cron fetch with no owner).
       if (userId) {
         const deleted = await jobsDal.isJobDeleted(normalized.source, normalized.externalId, userId);
         if (deleted) {
@@ -49,13 +50,16 @@ export async function fetchAndUpsertJobs(
         }
       }
 
-      // Skip upsert when there is no userId — the jobs.user_id column is NOT NULL.
-      if (!userId) {
-        continue;
-      }
+      // 1. Ingest raw payload
+      await jobsDal.insertRawJobPayload(
+        normalized.source as jobsDal.JobSource,
+        normalized.externalId,
+        raw as Record<string, unknown>
+      );
 
+      // 2. Upsert canonical job
       const res = await jobsDal.upsertJob({
-        userId,
+        userId: userId || undefined,
         source: normalized.source,
         externalId: normalized.externalId,
         title: normalized.title,
@@ -68,14 +72,19 @@ export async function fetchAndUpsertJobs(
         city: normalized.city,
         workplaceType: normalized.workplaceType,
         remoteRegions: normalized.remoteRegions,
-        status: "new",
+        status: "active",
       });
 
       if (res.ok) {
+        await jobsDal.linkJobSourceRef(
+          res.value.id,
+          normalized.source as jobsDal.JobSource,
+          normalized.externalId,
+          normalized.url
+        );
         upsertedCount++;
       }
     }
-
 
     return ok({ fetched: rawItems.length, upserted: upsertedCount });
   } catch (error) {
@@ -98,11 +107,19 @@ export async function scoreJobWithAI(
   if (!jobResult.ok) return jobResult;
   const job = jobResult.value;
 
-  const profileResult = await profileDal.getProfile(userId);
-  if (!profileResult.ok) return profileResult;
-  const userProfile = profileResult.value;
+  // Gate on master_resume — AI scoring requires an active resume (per AGENTS.md §5)
+  const resumeRes = await resumeDal.getActiveMasterResume(userId);
+  if (!resumeRes.ok) return err(resumeRes.error);
+  const activeResume = resumeRes.value;
+  const resumeText = activeResume?.content || "";
+  let resumeSkills: string[] = [];
 
-  if (!userProfile || !userProfile.resumeText || !userProfile.resumeText.trim()) {
+  if (activeResume) {
+    const skillsRes = await resumeDal.getResumeSkills(activeResume.id);
+    if (skillsRes.ok) resumeSkills = skillsRes.value;
+  }
+
+  if (!resumeText || !resumeText.trim()) {
     return err(
       new AppError(
         "NO_MASTER_RESUME",
@@ -111,24 +128,41 @@ export async function scoreJobWithAI(
     );
   }
 
-  const provider = getScoringProvider(preferredProvider || userProfile.aiProvider);
+  const provider = getScoringProvider(preferredProvider);
   const scoreResult = await provider.scoreJob(
     job.title,
     job.description || "",
-    userProfile.resumeText,
-    userProfile.skills || []
+    resumeText,
+    resumeSkills
   );
 
   if (!scoreResult.ok) return scoreResult;
 
+  const { _usage, ...score } = scoreResult.value;
+
+  // Log AI ops metrics with real token counts from the provider
+  await opsDal.logAiCall({
+    userId,
+    feature: "scoring",
+    provider: provider.name,
+    model: _usage.modelId,
+    inputTokens: _usage.inputTokens,
+    outputTokens: _usage.outputTokens,
+  });
+
   return await jobsDal.updateJobScoreAndCoverLetter(
     job.id,
-    scoreResult.value.fitScore,
-    scoreResult.value.scoreReasoning,
-    scoreResult.value.coverLetterDraft,
-    scoreResult.value.tailoredResume
+    score.fitScore,
+    score.scoreReasoning,
+    score.coverLetterDraft,
+    score.tailoredResume,
+    score.matchedSkills,
+    score.missingSkills,
+    undefined,
+    _usage.modelId,
+    activeResume?.version,
+    userId
   );
-
 }
 
 export async function transitionJobStatus(

@@ -207,9 +207,12 @@ export async function restoreJobAction(jobData: JobSelect) {
     return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
 
   const jobsDal = await import("@/dal/jobs.dal");
+  const restoreStatus =
+    jobData.status && jobData.status !== "withdrawn" ? jobData.status : "saved";
   const result = await jobsDal.restoreJob({
     ...jobData,
     userId: sessionResult.value.user.id,
+    status: restoreStatus,
   });
   if (!result.ok) {
     return { success: false, error: result.error.message };

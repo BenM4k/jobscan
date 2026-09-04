@@ -106,6 +106,7 @@
     "statusInterviewing": "INTERVIEWING",
     "statusRejected": "REJECTED",
     "statusOffer": "OFFER",
+    "statusWithdrawn": "WITHDRAWN",
     "emptyTitle": "No job opportunities found",
     "emptySubtitle": "Try clearing your filters or fetching fresh job listings using the button above.",
     "scoreJob": "Score Job",

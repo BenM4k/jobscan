@@ -1,73 +1,63 @@
 import { CrawledJob, CrawlSourceResult } from "../types";
 import { GREENHOUSE_COMPANIES } from "../config";
-import { isDrcJob } from "../drc-filter";
+import { isEligibleCandidate, parseLocationFromText } from "../crawler-utils";
 
-export async function fetchGreenhouseJobs(keyword?: string): Promise<{ jobs: CrawledJob[]; result: CrawlSourceResult }> {
+function parseGreenhouseJob(raw: Record<string, unknown>, companyName: string): CrawledJob {
+  const content = typeof raw.content === "string" ? raw.content : "No description provided.";
+  const cleanDescription = content
+    .replace(/<[^>]*>?/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const locationObj = raw.location as Record<string, string> | undefined;
+  const locName = locationObj?.name?.trim();
+  const titleStr = typeof raw.title === "string" ? raw.title.trim() : "Untitled Position";
+
+  const isRemote = locName
+    ? /remote/i.test(locName) || /remote/i.test(titleStr)
+    : /remote/i.test(titleStr);
+  const workplaceType = isRemote ? "remote" : locName ? "on-site" : undefined;
+
+  const loc = parseLocationFromText(locName);
+
+  return {
+    source: "greenhouse",
+    externalId: String(raw.id || ""),
+    title: titleStr,
+    company: companyName,
+    url: String(raw.absolute_url || ""),
+    description: cleanDescription,
+    postedAt: raw.updated_at ? new Date(String(raw.updated_at)) : new Date(),
+    city: loc.city,
+    country: loc.country,
+    workplaceType,
+    remoteRegions: isRemote ? ["Worldwide"] : undefined,
+  };
+}
+
+export async function fetchGreenhouseJobs(
+  keyword?: string
+): Promise<{ jobs: CrawledJob[]; result: CrawlSourceResult }> {
   let totalFetched = 0;
   const matchedJobs: CrawledJob[] = [];
-  const kw = keyword?.trim().toLowerCase();
 
-  for (const companyConfig of GREENHOUSE_COMPANIES) {
+  for (const company of GREENHOUSE_COMPANIES) {
     try {
-      const url = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(companyConfig.boardToken)}/jobs?content=true`;
+      const url = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(company.boardToken)}/jobs?content=true`;
       const res = await fetch(url);
-      if (!res.ok) {
-        continue;
-      }
+      if (!res.ok) continue;
 
       const data = await res.json();
-      const rawList = data.jobs || [];
+      const rawList = Array.isArray(data.jobs) ? data.jobs : [];
       totalFetched += rawList.length;
 
       for (const raw of rawList) {
-        const cleanDescription = (raw.content || "No description provided.")
-          .replace(/<[^>]*>?/gm, "")
-          .replace(/\s+/g, " ")
-          .trim();
-
-        const locName = raw.location?.name?.trim();
-        const isRemote = locName ? /remote/i.test(locName) || /remote/i.test(raw.title) : /remote/i.test(raw.title);
-        const workplaceType = isRemote ? "remote" : locName ? "on-site" : undefined;
-
-        let city: string | undefined;
-        let country: string | undefined;
-        if (locName && !/remote/i.test(locName)) {
-          const parts = locName.split(",").map((s: string) => s.trim());
-          if (parts.length > 1) {
-            city = parts[0];
-            country = parts[parts.length - 1];
-          } else {
-            city = locName;
-          }
-        }
-
-        const candidate: CrawledJob = {
-          source: "greenhouse",
-          externalId: String(raw.id),
-          title: raw.title?.trim() || "Untitled Position",
-          company: companyConfig.companyName || "Greenhouse Company",
-          url: raw.absolute_url,
-          description: cleanDescription,
-          postedAt: raw.updated_at ? new Date(raw.updated_at) : new Date(),
-          city,
-          country,
-          workplaceType,
-          remoteRegions: isRemote ? ["Worldwide"] : undefined,
-        };
-
-        if (isDrcJob(candidate)) {
-          if (
-            !kw ||
-            candidate.title.toLowerCase().includes(kw) ||
-            candidate.company.toLowerCase().includes(kw) ||
-            candidate.description?.toLowerCase().includes(kw)
-          ) {
-            matchedJobs.push(candidate);
-          }
+        const candidate = parseGreenhouseJob(raw, company.companyName || "Greenhouse Company");
+        if (isEligibleCandidate(candidate, keyword)) {
+          matchedJobs.push(candidate);
         }
       }
     } catch {
-      // Continue next company even if one company fails
       continue;
     }
   }

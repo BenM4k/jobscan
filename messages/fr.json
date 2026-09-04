@@ -106,6 +106,7 @@
     "statusInterviewing": "ENTRETIEN",
     "statusRejected": "REFUSÉ",
     "statusOffer": "OFFRE REÇUE",
+    "statusWithdrawn": "RETIRÉ",
     "emptyTitle": "Aucune opportunité trouvée",
     "emptySubtitle": "Essayez de réinitialiser vos filtres ou de collecter de nouvelles offres via le bouton ci-dessus.",
     "scoreJob": "Évaluer l'offre",

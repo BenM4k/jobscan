@@ -1,71 +1,63 @@
 import { CrawledJob, CrawlSourceResult } from "../types";
 import { LEVER_COMPANIES } from "../config";
-import { isDrcJob } from "../drc-filter";
+import { isEligibleCandidate, parseLocationFromText } from "../crawler-utils";
 
-export async function fetchLeverJobs(keyword?: string): Promise<{ jobs: CrawledJob[]; result: CrawlSourceResult }> {
+function parseLeverJob(raw: Record<string, unknown>, companyName: string): CrawledJob {
+  const categories = raw.categories as Record<string, string> | undefined;
+  const locName = categories?.location;
+  const leverWp = categories?.workplaceType?.toLowerCase();
+
+  const titleStr = typeof raw.text === "string" ? raw.text : "";
+  const isRemote =
+    leverWp === "remote" ||
+    (locName ? /remote/i.test(locName) : false) ||
+    /remote/i.test(titleStr);
+
+  const workplaceType: "remote" | "on-site" | "hybrid" | undefined = isRemote
+    ? "remote"
+    : leverWp === "hybrid"
+    ? "hybrid"
+    : leverWp === "onsite" || leverWp === "on-site" || locName
+    ? "on-site"
+    : undefined;
+
+  const loc = parseLocationFromText(locName);
+
+  return {
+    source: "lever",
+    externalId: String(raw.id || ""),
+    title: titleStr,
+    company: companyName,
+    url: String(raw.hostedUrl || ""),
+    description: String(raw.descriptionPlain || ""),
+    postedAt: raw.createdAt ? new Date(Number(raw.createdAt)) : new Date(),
+    city: loc.city,
+    country: loc.country,
+    workplaceType,
+    remoteRegions: isRemote ? ["Worldwide"] : undefined,
+  };
+}
+
+export async function fetchLeverJobs(
+  keyword?: string
+): Promise<{ jobs: CrawledJob[]; result: CrawlSourceResult }> {
   let totalFetched = 0;
   const matchedJobs: CrawledJob[] = [];
-  const kw = keyword?.trim().toLowerCase();
 
-  for (const companyConfig of LEVER_COMPANIES) {
+  for (const company of LEVER_COMPANIES) {
     try {
-      const url = `https://api.lever.co/v0/postings/${encodeURIComponent(companyConfig.boardToken)}?mode=json`;
+      const url = `https://api.lever.co/v0/postings/${encodeURIComponent(company.boardToken)}?mode=json`;
       const res = await fetch(url);
-      if (!res.ok) {
-        continue;
-      }
+      if (!res.ok) continue;
 
       const data = await res.json();
       const rawList = Array.isArray(data) ? data : [];
       totalFetched += rawList.length;
 
       for (const raw of rawList) {
-        const locName = raw.categories?.location;
-        const leverWp = raw.categories?.workplaceType?.toLowerCase();
-        const isRemote = leverWp === "remote" || (locName ? /remote/i.test(locName) : false) || /remote/i.test(raw.text);
-        const workplaceType: "remote" | "on-site" | "hybrid" | undefined = isRemote
-          ? "remote"
-          : leverWp === "hybrid"
-          ? "hybrid"
-          : leverWp === "onsite" || leverWp === "on-site" || locName
-          ? "on-site"
-          : undefined;
-
-        let city: string | undefined;
-        let country: string | undefined;
-        if (locName && !/remote/i.test(locName)) {
-          const parts = locName.split(",").map((s: string) => s.trim());
-          if (parts.length > 1) {
-            city = parts[0];
-            country = parts[parts.length - 1];
-          } else {
-            city = locName;
-          }
-        }
-
-        const candidate: CrawledJob = {
-          source: "lever",
-          externalId: raw.id,
-          title: raw.text,
-          company: companyConfig.companyName || "Lever Posting",
-          url: raw.hostedUrl,
-          description: raw.descriptionPlain || "",
-          postedAt: raw.createdAt ? new Date(raw.createdAt) : new Date(),
-          city,
-          country,
-          workplaceType,
-          remoteRegions: isRemote ? ["Worldwide"] : undefined,
-        };
-
-        if (isDrcJob(candidate)) {
-          if (
-            !kw ||
-            candidate.title.toLowerCase().includes(kw) ||
-            candidate.company.toLowerCase().includes(kw) ||
-            candidate.description?.toLowerCase().includes(kw)
-          ) {
-            matchedJobs.push(candidate);
-          }
+        const candidate = parseLeverJob(raw, company.companyName || "Lever Posting");
+        if (isEligibleCandidate(candidate, keyword)) {
+          matchedJobs.push(candidate);
         }
       }
     } catch {

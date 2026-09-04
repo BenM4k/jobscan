@@ -5,6 +5,8 @@ import { JobSelect } from "@/dal/jobs.dal";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import posthog from "posthog-js";
+import { CoverLetterToolbar } from "@/components/job/CoverLetterToolbar";
+import { downloadTextAsPdf } from "@/lib/pdf-export";
 
 interface JobCoverLetterSectionProps {
   job: JobSelect;
@@ -84,27 +86,15 @@ export function JobCoverLetterSection({ job, onJobUpdated }: JobCoverLetterSecti
     }
   };
 
-  const handleDownloadPdf = (content: string) => {
-    import("jspdf").then(({ jsPDF }) => {
-      const doc = new jsPDF();
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(11);
-
-      const splitText = doc.splitTextToSize(content, 180);
-      let cursorY = 20;
-
-      splitText.forEach((line: string) => {
-        if (cursorY > 275) {
-          doc.addPage();
-          cursorY = 20;
-        }
-        doc.text(line, 15, cursorY);
-        cursorY += 6;
-      });
-
-      doc.save(`Cover_Letter_${job.company.replace(/\s+/g, "_")}.pdf`);
+  const handleDownloadPdf = async () => {
+    try {
+      const filename = `Cover_Letter_${job.company.replace(/\s+/g, "_")}.pdf`;
+      await downloadTextAsPdf(filename, coverLetter, 11, 6);
       toast.success("Cover letter PDF downloaded!");
-    });
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to generate PDF");
+    }
   };
 
   const handleCopy = () => {
@@ -116,7 +106,6 @@ export function JobCoverLetterSection({ job, onJobUpdated }: JobCoverLetterSecti
 
   return (
     <section aria-labelledby="cover-letter-heading" className="space-y-3">
-      {/* Main Row */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
@@ -132,71 +121,22 @@ export function JobCoverLetterSection({ job, onJobUpdated }: JobCoverLetterSecti
             {t("coverLetterSubtitle")}
           </p>
 
-          {/* AI Notice Banner right under description */}
           <div className="inline-flex items-center gap-1.5 p-1.5 px-3 rounded-md bg-[#fef2f2] dark:bg-rose-950/30 border border-[#fecaca] dark:border-rose-900/50 text-[#dc2626] dark:text-rose-300 font-mono text-[11px] mt-1.5">
             <span>⚠</span>
             <span>{tCommon("aiNotice")}</span>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
-          {coverLetter ? (
-            <>
-              <button
-                type="button"
-                onClick={handleCopy}
-                className="bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-gray-700 dark:text-slate-200 text-xs font-semibold px-3 py-1.5 rounded-xl transition border border-slate-200 dark:border-zinc-700 cursor-pointer"
-              >
-                {isCopied ? `✓ ${tCommon("copied")}` : `📋 ${tCommon("copy")}`}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleDownloadPdf(coverLetter)}
-                className="bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-xs font-semibold px-3.5 py-1.5 rounded-xl transition shadow-xs cursor-pointer"
-              >
-                📥 {tCommon("downloadPdf")}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={isSaving || isStreaming}
-                className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3.5 py-1.5 rounded-xl transition disabled:opacity-50 cursor-pointer"
-              >
-                {isSaving ? t("saving") : `💾 ${t("saveCoverLetter")}`}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleGenerateStream}
-                disabled={isStreaming}
-                className="bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-800 dark:text-zinc-200 text-xs font-semibold px-3.5 py-1.5 rounded-xl transition disabled:opacity-50 cursor-pointer"
-              >
-                {isStreaming ? "..." : t("reStream")}
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={handleGenerateStream}
-              disabled={isStreaming}
-              className="bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition shadow-xs disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer shrink-0"
-            >
-              {isStreaming ? (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-white animate-ping" />
-                  <span>{t("streamingCoverLetter")}</span>
-                </>
-              ) : (
-                <>
-                  <span>+</span>
-                  <span>Generate Cover Letter</span>
-                </>
-              )}
-            </button>
-          )}
-        </div>
+        <CoverLetterToolbar
+          hasContent={Boolean(coverLetter)}
+          isCopied={isCopied}
+          isSaving={isSaving}
+          isStreaming={isStreaming}
+          onCopy={handleCopy}
+          onDownloadPdf={handleDownloadPdf}
+          onSave={handleSave}
+          onGenerateStream={handleGenerateStream}
+        />
       </div>
 
       {(coverLetter || isStreaming) && (

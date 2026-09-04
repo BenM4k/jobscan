@@ -1,7 +1,8 @@
 import "server-only";
 import {
   ScoringProvider,
-  ScoreResult,
+  ScoreWithUsage,
+  ScoreUsage,
   AIProviderName,
   scoreResultSchema,
   SCORING_INSTRUCTIONS,
@@ -20,7 +21,7 @@ export class GatewayProvider implements ScoringProvider {
     jobDescription: string,
     resumeText: string,
     skills: string[]
-  ): Promise<Result<ScoreResult, AppError>> {
+  ): Promise<Result<ScoreWithUsage, AppError>> {
     try {
       const modelName = process.env.AI_GATEWAY_MODEL || "openai/gpt-4o";
       const model = gateway(modelName);
@@ -32,14 +33,20 @@ export class GatewayProvider implements ScoringProvider {
         skills
       );
 
-      const { output: object } = await generateText({
+      const result = await generateText({
         model,
         output: Output.object({ schema: scoreResultSchema }),
         system: SCORING_INSTRUCTIONS,
         prompt: userPrompt,
       });
 
-      return ok(object);
+      const usage: ScoreUsage = {
+        inputTokens: result.usage?.inputTokens,
+        outputTokens: result.usage?.outputTokens,
+        modelId: modelName,
+      };
+
+      return ok({ ...result.output, _usage: usage });
     } catch (E) {
       console.error(E);
       const message = E instanceof Error ? E.message : "Unknown error";

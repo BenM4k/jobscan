@@ -6,9 +6,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { signOut } from "@/services/auth/auth-client";
 import { PreferencesWidget } from "@/components/PreferencesWidget";
-import posthog from "posthog-js";
-
 import { Logo } from "@/components/Logo";
+import { NavbarMobileMenu } from "@/components/layout/NavbarMobileMenu";
+import { NavbarUserSection } from "@/components/layout/NavbarUserSection";
+import posthog from "posthog-js";
 
 interface NavbarProps {
   userId?: string;
@@ -106,42 +107,9 @@ export function Navbar({ userId, userEmail, userName }: NavbarProps) {
             </div>
           )}
 
-          {/* Unified Preferences Widget (Language + Light/Dark Mode) */}
           <PreferencesWidget />
 
-          {userEmail ? (
-            <div className="flex items-center gap-3 pl-2 border-l border-slate-300 dark:border-slate-800">
-              <div
-                aria-label={`Signed in as ${userEmail}`}
-                title={userEmail}
-                className="w-8 h-8 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 text-white font-bold text-xs flex items-center justify-center uppercase shadow-xs"
-              >
-                {userEmail.slice(0, 2)}
-              </div>
-              <button
-                onClick={handleSignOut}
-                aria-label={t("signOut")}
-                className="bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/60 hover:text-rose-600 dark:hover:text-rose-300 text-gray-800 dark:text-slate-300 px-3.5 py-1.5 rounded-xl text-xs font-bold transition border border-slate-300 dark:border-slate-700/80 cursor-pointer shadow-xs"
-              >
-                {t("signOut")}
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-3">
-              <Link
-                href="/sign-in"
-                className="text-xs font-bold text-gray-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-indigo-400 transition"
-              >
-                {t("signIn")}
-              </Link>
-              <Link
-                href="/sign-up"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl transition text-xs font-bold shadow-md shadow-blue-500/20"
-              >
-                {t("signUp")}
-              </Link>
-            </div>
-          )}
+          <NavbarUserSection userEmail={userEmail} onSignOut={handleSignOut} />
         </div>
 
         {/* Mobile Header Right: Unified Widget + Hamburger */}
@@ -160,72 +128,14 @@ export function Navbar({ userId, userEmail, userName }: NavbarProps) {
         </div>
       </div>
 
-      {/* Mobile Drawer Menu */}
-      {mobileMenuOpen && (
-        <div className="md:hidden border-t border-gray-200 dark:border-zinc-800 bg-white/95 dark:bg-[#0A0A0C]/95 backdrop-blur-2xl px-6 py-4 space-y-4 shadow-xl">
-          {userEmail ? (
-            <>
-              <div className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-zinc-900 rounded-xl border border-gray-200/60 dark:border-zinc-800">
-                <div className="w-8 h-8 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 text-white font-bold text-xs flex items-center justify-center uppercase">
-                  {userEmail.slice(0, 2)}
-                </div>
-                <div className="truncate text-xs font-semibold text-gray-800 dark:text-zinc-200">
-                  {userEmail}
-                </div>
-              </div>
-
-              <div className="flex flex-col space-y-1">
-                {navLinks.map((link) => {
-                  const isActive = pathname === link.href;
-                  return (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      onClick={() => setMobileMenuOpen(false)}
-                      aria-current={isActive ? "page" : undefined}
-                      className={`px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition ${
-                        isActive
-                          ? "bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800"
-                          : "text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-zinc-800"
-                      }`}
-                    >
-                      <span>{link.icon}</span>
-                      <span>{link.label}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  handleSignOut();
-                }}
-                className="w-full text-center bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer"
-              >
-                {t("signOut")}
-              </button>
-            </>
-          ) : (
-            <div className="flex flex-col space-y-2 pt-1">
-              <Link
-                href="/sign-in"
-                onClick={() => setMobileMenuOpen(false)}
-                className="w-full text-center border border-gray-200 dark:border-zinc-800 text-gray-800 dark:text-zinc-200 font-bold text-xs px-4 py-2.5 rounded-xl transition hover:bg-gray-50 dark:hover:bg-zinc-900"
-              >
-                {t("signIn")}
-              </Link>
-              <Link
-                href="/sign-up"
-                onClick={() => setMobileMenuOpen(false)}
-                className="w-full text-center bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-md shadow-blue-500/20"
-              >
-                {t("signUp")}
-              </Link>
-            </div>
-          )}
-        </div>
-      )}
+      <NavbarMobileMenu
+        open={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+        userEmail={userEmail}
+        pathname={pathname}
+        navLinks={navLinks}
+        onSignOut={handleSignOut}
+      />
     </nav>
   );
 }

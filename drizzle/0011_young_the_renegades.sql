@@ -1,0 +1,2 @@
+ALTER TABLE "job" ADD CONSTRAINT "job_added_by_user_id_user_id_fk" FOREIGN KEY ("added_by_user_id") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "skill_relation" ADD CONSTRAINT "skill_relation_no_self_link" CHECK ("skill_relation"."from_skill_id" != "skill_relation"."to_skill_id");

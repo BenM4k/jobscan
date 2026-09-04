@@ -1,12 +1,12 @@
+"use client";
+
 import React, { useState } from "react";
 import Link from "next/link";
 import { JobSelect } from "@/dal/jobs.dal";
 import { JobStatus } from "@/services/db/schema";
-import { getScoreBadgeStyle } from "@/lib/score-style";
-import { CardGridSelect } from "@/components/ui/card-grid-select";
+import { JobCardBadges } from "@/components/job/JobCardBadges";
+import { JobCardActions, AIProvider } from "@/components/job/JobCardActions";
 import { useTranslations } from "next-intl";
-
-type AIProvider = "claude" | "gemini" | "openai" | "gateway";
 
 interface JobCardItemProps {
   job: JobSelect;
@@ -77,7 +77,6 @@ export function JobCardItem({
     >
       {/* Top Header: Company Avatar + Job Info + Actions */}
       <div className="flex items-start gap-4 sm:gap-5">
-        {/* Company Initials Avatar Box */}
         <div
           aria-hidden="true"
           className="w-12 h-12 rounded-lg bg-[#E2E8F0] dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 font-bold flex items-center justify-center text-xs font-mono tracking-wider shrink-0"
@@ -85,9 +84,7 @@ export function JobCardItem({
           {companyInitials}
         </div>
 
-        {/* Info & Text Area */}
         <div className="flex-1 min-w-0">
-          {/* Title Row & Star/Close Buttons */}
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
               <h3
@@ -106,7 +103,6 @@ export function JobCardItem({
               </p>
             </div>
 
-            {/* Bookmark & Delete action buttons */}
             <div className="flex items-center gap-2 shrink-0 pt-0.5">
               <button
                 onClick={() => setIsBookmarked(!isBookmarked)}
@@ -127,99 +123,30 @@ export function JobCardItem({
             </div>
           </div>
 
-          {/* Job description summary */}
           <p className="mt-2 text-sm text-gray-600 dark:text-zinc-300 leading-relaxed line-clamp-2 max-w-4xl font-sans">
             {descriptionSnippet}{descriptionSnippet.length >= 240 ? "..." : ""}
           </p>
 
-          {/* Badges / Meta row */}
-          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-gray-400 dark:text-zinc-500 font-medium">
-            {locationText && (
-              <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400 font-semibold">
-                <span aria-hidden="true">📍</span>
-                <span>{locationText}</span>
-              </span>
-            )}
-
-            {workplaceLabel && (
-              <span className="bg-[#E0F2FE] dark:bg-cyan-950/50 text-[#0284C7] dark:text-cyan-400 border border-[#BAE6FD] dark:border-cyan-800 text-[11px] font-bold px-2 py-0.5 rounded tracking-wide uppercase">
-                {workplaceLabel}
-              </span>
-            )}
-
-            {job.source && (
-              <span className="font-mono text-[11px] uppercase tracking-wider text-gray-400 dark:text-zinc-500">
-                • VIA {job.source}
-              </span>
-            )}
-
-            {postedDate && (
-              <span className="font-mono text-[11px] uppercase tracking-wider text-gray-400 dark:text-zinc-500">
-                • {postedDate}
-              </span>
-            )}
-          </div>
+          <JobCardBadges
+            locationText={locationText}
+            workplaceLabel={workplaceLabel}
+            source={job.source}
+            postedDate={postedDate}
+          />
         </div>
       </div>
 
-      {/* Bottom Bar: Status / AI Engine + Score Job CTA */}
-      <div className="mt-5 pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        {/* Status and AI Engine selectors */}
-        <div className="flex flex-wrap items-center gap-4 text-xs">
-          <CardGridSelect
-            title="STATUS"
-            value={job.status}
-            options={[
-              { id: "new", label: t("statusNew") },
-              { id: "scored", label: t("statusScored") },
-              { id: "applied", label: t("statusApplied") },
-              { id: "interviewing", label: t("statusInterviewing") },
-              { id: "rejected", label: t("statusRejected") },
-              { id: "offer", label: t("statusOffer") },
-            ]}
-            onChange={(val) => onStatusChange(job.id, val as JobStatus)}
-            accentColor="blue"
-          />
-
-          <CardGridSelect
-            title="AI ENGINE"
-            value={aiProvider}
-            options={[
-              { id: "gateway", label: "Gateway" },
-              { id: "gemini", label: "Gemini" },
-              { id: "openai", label: "OpenAI" },
-              { id: "claude", label: "Claude" },
-            ]}
-            onChange={(val) => onAiProviderChange(val as AIProvider)}
-            accentColor="indigo"
-          />
-        </div>
-
-        {/* Score Badge and Score Job Button */}
-        <div className="flex items-center justify-between sm:justify-end gap-3">
-          {job.fitScore !== null &&
-            job.fitScore !== undefined &&
-            (() => {
-              const scoreStyle = getScoreBadgeStyle(job.fitScore);
-              return (
-                <span
-                  className={`text-xs font-extrabold px-3 py-1.5 rounded-xl border shrink-0 ${scoreStyle.bgColor} ${scoreStyle.borderColor} ${scoreStyle.textColor}`}
-                >
-                  {t("score")}: {job.fitScore}/100
-                </span>
-              );
-            })()}
-
-          <button
-            onClick={() => onScoreJob(job.id)}
-            disabled={isScoring}
-            aria-label={`Score ${job.title} with AI`}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold px-6 py-2 rounded-xl transition duration-150 disabled:opacity-50 shadow-sm cursor-pointer whitespace-nowrap"
-          >
-            {isScoring ? t("scoring") : t("scoreJob")}
-          </button>
-        </div>
-      </div>
+      <JobCardActions
+        jobId={job.id}
+        jobTitle={job.title}
+        status={job.status}
+        aiProvider={aiProvider}
+        fitScore={job.fitScore}
+        isScoring={isScoring}
+        onStatusChange={onStatusChange}
+        onScoreJob={onScoreJob}
+        onAiProviderChange={onAiProviderChange}
+      />
     </article>
   );
 }

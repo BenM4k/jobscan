@@ -12,20 +12,15 @@ import {
   restoreJobAction,
 } from "@/actions/job.actions";
 import { toast } from "sonner";
-import { useTranslations } from "next-intl";
 import { JobCardItem } from "@/components/job/JobCardItem";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { JobListEmptyState } from "@/components/job/JobListEmptyState";
+import { JobListSubbar } from "@/components/job/JobListSubbar";
+import { JobListPagination } from "@/components/job/JobListPagination";
+import { DeleteJobModal } from "@/components/job/DeleteJobModal";
+import { MissingResumeModal } from "@/components/job/MissingResumeModal";
 import posthog from "posthog-js";
 
-interface JobListProps {
+export interface JobListProps {
   initialJobs: JobSelect[];
   totalJobs?: number;
   statusFilter?: JobStatus;
@@ -35,7 +30,7 @@ interface JobListProps {
   queryFilter?: string;
 }
 
-type AIProvider = "claude" | "gemini" | "openai" | "gateway";
+export type AIProvider = "claude" | "gemini" | "openai" | "gateway";
 
 export function JobList({
   initialJobs,
@@ -55,14 +50,9 @@ export function JobList({
   const [aiProvider, setAiProvider] = useState<AIProvider>("gemini");
   const [scoringError, setScoringError] = useState<string | null>(null);
 
-  // Modal states
   const [jobToDelete, setJobToDelete] = useState<JobSelect | null>(null);
   const [missingResumeOpen, setMissingResumeOpen] = useState(false);
 
-  const t = useTranslations("dashboard");
-  const tCommon = useTranslations("common");
-
-  // Sync initialJobs when server params change
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setJobsList(initialJobs);
@@ -116,16 +106,13 @@ export function JobList({
     const targetJob = jobToDelete;
     setJobToDelete(null);
 
-    // Optimistically update local list state
     setJobsList((prev) => prev.filter((j) => j.id !== targetJob.id));
 
-    // Execute server deletion
     const deleteResult = await deleteJobAction(targetJob.id);
     if (deleteResult.success) {
       posthog.capture("job_deleted", { location: "list" });
     }
 
-    // Trigger 5-second Sonner Toast with Undo button
     toast.success(`Deleted "${targetJob.title}"`, {
       duration: 5000,
       description: `${targetJob.company} job removed from pipeline.`,
@@ -163,54 +150,17 @@ export function JobList({
   };
 
   if (jobsList.length === 0) {
-    return (
-      <div className="text-center py-16 px-6 border-2 border-dashed border-gray-200 dark:border-slate-800 rounded-3xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl shadow-xl shadow-gray-200/40 dark:shadow-none transition-all duration-300">
-        <div className="w-14 h-14 rounded-2xl bg-linear-to-tr from-blue-500 to-indigo-600 text-white flex items-center justify-center mx-auto mb-4 text-2xl font-black shadow-lg shadow-blue-500/25">
-          ✦
-        </div>
-        <h3 className="text-lg font-black text-gray-900 dark:text-slate-100">
-          {t("emptyTitle")}
-        </h3>
-        <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 max-w-md mx-auto leading-relaxed">
-          {t("emptySubtitle")}
-        </p>
-      </div>
-    );
+    return <JobListEmptyState />;
   }
 
   return (
     <section aria-label="Job postings pipeline" className="space-y-6">
-      {scoringError && (
-        <div
-          role="alert"
-          aria-live="polite"
-          className="p-4 bg-rose-50 dark:bg-rose-950/80 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-200 text-xs font-semibold rounded-2xl flex justify-between items-center shadow-sm"
-        >
-          <span>⚠️ {scoringError}</span>
-          <button
-            onClick={() => setScoringError(null)}
-            aria-label="Dismiss scoring error message"
-            className="text-rose-500 hover:text-rose-800 dark:hover:text-rose-100 text-xs font-bold cursor-pointer"
-          >
-            {tCommon("dismiss")}
-          </button>
-        </div>
-      )}
+      <JobListSubbar
+        scoringError={scoringError}
+        onDismissError={() => setScoringError(null)}
+        totalCount={totalJobs ?? jobsList.length}
+      />
 
-      {/* Header Subbar */}
-      <div className="flex justify-between items-center text-xs text-gray-500 dark:text-zinc-400 font-sans pt-2 pb-2">
-        <span>
-          <strong className="text-gray-900 dark:text-slate-200 font-semibold">
-            {totalJobs ?? jobsList.length}
-          </strong>{" "}
-          {t("opportunitiesMatching")}
-        </span>
-        <span className="text-xs text-gray-400 dark:text-zinc-500 font-sans">
-          {t("sortedRecent")}
-        </span>
-      </div>
-
-      {/* Flat Job Items List */}
       <ul
         role="list"
         aria-label="Available job opportunities"
@@ -231,111 +181,27 @@ export function JobList({
         ))}
       </ul>
 
-      {/* Pagination Load More Button */}
-      <div className="flex justify-center pt-8 pb-4">
-        {hasMore ? (
-          <button
-            onClick={loadMore}
-            disabled={isLoadingMore}
-            aria-label="Load more job postings"
-            className="w-full sm:w-auto bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-800 hover:border-slate-400 dark:hover:border-zinc-700 text-gray-900 dark:text-slate-100 font-bold text-xs sm:text-sm px-8 py-3.5 rounded-2xl shadow-xs transition duration-200 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-          >
-            {isLoadingMore ? (
-              <>
-                <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping" />
-                <span>{t("loadingMore")}</span>
-              </>
-            ) : (
-              t("loadMore")
-            )}
-          </button>
-        ) : jobsList.length >= 20 ? (
-          <p className="text-xs text-gray-400 dark:text-slate-500 font-mono">
-            {t("allLoaded")}
-          </p>
-        ) : null}
-      </div>
+      <JobListPagination
+        hasMore={hasMore}
+        isLoadingMore={isLoadingMore}
+        onLoadMore={loadMore}
+        currentCount={jobsList.length}
+      />
 
-      {/* Delete Job Confirmation Modal */}
-      <Dialog
-        open={Boolean(jobToDelete)}
-        onOpenChange={(open) => {
-          if (!open) setJobToDelete(null);
-        }}
-      >
-        <DialogContent className="sm:max-w-md bg-white dark:bg-[#121215] border border-slate-300 dark:border-zinc-800 rounded-3xl p-6 space-y-4">
-          <DialogHeader>
-            <div className="w-10 h-10 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center text-lg mb-1">
-              🗑️
-            </div>
-            <DialogTitle className="text-base font-bold text-gray-900 dark:text-slate-100">
-              {t("deleteJobModalTitle")}
-            </DialogTitle>
-            <DialogDescription className="text-xs text-gray-500 dark:text-zinc-400 leading-relaxed">
-              {t("deleteJobModalDescription")}
-              {jobToDelete && (
-                <span className="block font-semibold text-gray-800 dark:text-zinc-200 mt-2">
-                  &ldquo;{jobToDelete.title}&rdquo; at {jobToDelete.company}
-                </span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="flex flex-row justify-end gap-2 pt-2">
-            <Button
-              variant="outline"
-              onClick={() => setJobToDelete(null)}
-              className="text-xs font-bold rounded-xl cursor-pointer"
-            >
-              {tCommon("cancel")}
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={confirmDeleteJob}
-              className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl cursor-pointer"
-            >
-              {t("deleteJobConfirm")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteJobModal
+        job={jobToDelete}
+        onClose={() => setJobToDelete(null)}
+        onConfirm={confirmDeleteJob}
+      />
 
-      {/* Missing Master Resume Modal */}
-      <Dialog
+      <MissingResumeModal
         open={missingResumeOpen}
         onOpenChange={setMissingResumeOpen}
-      >
-        <DialogContent className="sm:max-w-md bg-white dark:bg-[#121215] border border-slate-300 dark:border-zinc-800 rounded-3xl p-6 space-y-4">
-          <DialogHeader>
-            <div className="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center text-lg mb-1">
-              📄
-            </div>
-            <DialogTitle className="text-base font-bold text-gray-900 dark:text-slate-100">
-              {t("missingResumeTitle")}
-            </DialogTitle>
-            <DialogDescription className="text-xs text-gray-500 dark:text-zinc-400 leading-relaxed">
-              {t("missingResumeDescription")}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="flex flex-row justify-end gap-2 pt-2">
-            <Button
-              variant="outline"
-              onClick={() => setMissingResumeOpen(false)}
-              className="text-xs font-bold rounded-xl cursor-pointer"
-            >
-              {tCommon("cancel")}
-            </Button>
-            <Button
-              onClick={() => {
-                setMissingResumeOpen(false);
-                router.push("/dashboard/profile");
-              }}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl cursor-pointer"
-            >
-              {t("goToProfile")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        onNavigateToProfile={() => {
+          setMissingResumeOpen(false);
+          router.push("/dashboard/profile");
+        }}
+      />
     </section>
   );
 }

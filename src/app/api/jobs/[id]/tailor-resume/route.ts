@@ -3,7 +3,8 @@ import { generateText, Output } from "ai";
 import { getGoogleModel, TailoredResumeSchema } from "@/lib/ai";
 import { requireSession } from "@/lib/auth-guard";
 import * as jobsDal from "@/dal/jobs.dal";
-import * as profileDal from "@/dal/profile.dal";
+import * as resumeDal from "@/dal/resume.dal";
+import * as opsDal from "@/dal/ops.dal";
 
 function sanitizeResumeForScoring(resumeText: string): string {
   return resumeText
@@ -26,10 +27,14 @@ export async function POST(
       return NextResponse.json({ error: "Missing job ID" }, { status: 400 });
     }
 
-    const [jobResult, profileResult] = await Promise.all([
+    const [jobResult, resumeResult] = await Promise.all([
       jobsDal.getJobById(id, sessionResult.value.user.id),
-      profileDal.getProfile(sessionResult.value.user.id),
+      resumeDal.getActiveMasterResume(sessionResult.value.user.id),
     ]);
+    const skillsResult =
+      resumeResult.ok && resumeResult.value
+        ? await resumeDal.getResumeSkills(resumeResult.value.id)
+        : { ok: true as const, value: [] as string[] };
 
     if (!jobResult.ok || !jobResult.value) {
       return NextResponse.json(
@@ -39,9 +44,9 @@ export async function POST(
     }
 
     const job = jobResult.value;
-    const userProfile = profileResult.ok ? profileResult.value : null;
+    const activeResume = resumeResult.ok ? resumeResult.value : null;
 
-    if (!userProfile || !userProfile.resumeText) {
+    if (!activeResume || !activeResume.content) {
       return NextResponse.json(
         {
           error:
@@ -51,6 +56,8 @@ export async function POST(
       );
     }
 
+    const resumeText = activeResume.content;
+    const resumeSkills: string[] = skillsResult.ok ? skillsResult.value : [];
     const model = getGoogleModel();
 
     const instructions = `You are a professional executive resume writer specializing in ATS optimization, trusted with a candidate's real resume. Your output will be used as an actual application document with no human review in between — factual accuracy is more important than persuasiveness.
@@ -70,18 +77,11 @@ TAILORING INSTRUCTIONS:
 - Reorder and emphasize "skills" that are most relevant to the target role, without adding skills not listed in the master resume.
 - For each role in "experience", reorder and refine bullets with active verbs, keeping any metrics/impact exactly as stated in the source resume (do not invent or round up numbers).`;
 
-    const sanitizedResume = sanitizeResumeForScoring(userProfile.resumeText);
-    const sanitizedSummary = userProfile.summary
-      ? sanitizeResumeForScoring(userProfile.summary)
-      : null;
-    const sanitizedSkills = userProfile.skills?.length
-      ? userProfile.skills.map(sanitizeResumeForScoring)
-      : null;
+    const sanitizedResume = sanitizeResumeForScoring(resumeText);
 
     const prompt = `CANDIDATE MASTER RESUME:
 """
-${sanitizedSummary ? `Summary: ${sanitizedSummary}\n` : ""}
-${sanitizedSkills ? `Skills: ${sanitizedSkills.join(", ")}\n` : ""}
+${resumeSkills.length ? `Skills: ${resumeSkills.map(sanitizeResumeForScoring).join(", ")}\n` : ""}
 ${sanitizedResume}
 """
 
@@ -107,6 +107,15 @@ ${job.gaps?.length ? `Identified Skills & Gaps from Evaluation:\n- Matched: ${jo
         telemetry: { isEnabled: false },
       });
       object = result.output;
+      await opsDal.logAiCall({
+        userId: sessionResult.value.user.id,
+        feature: "tailored_resume",
+        provider: "google",
+        model: model.modelId ?? "gemini",
+        inputTokens: result.usage?.inputTokens,
+        outputTokens: result.usage?.outputTokens,
+        costEstimateUsd: "0.002",
+      });
     } catch (aiError) {
       console.error("AI resume tailoring call failed:", {
         jobId: job.id,

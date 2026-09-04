@@ -1,53 +1,64 @@
 import { CrawledJob, CrawlSourceResult } from "../types";
 import { ASHBY_COMPANIES } from "../config";
-import { isDrcJob } from "../drc-filter";
+import { isEligibleCandidate } from "../crawler-utils";
 
-export async function fetchAshbyJobs(keyword?: string): Promise<{ jobs: CrawledJob[]; result: CrawlSourceResult }> {
+function parseAshbyJob(raw: Record<string, unknown>, companyName: string): CrawledJob {
+  const address = raw.address as Record<string, unknown> | undefined;
+  const postal = address?.postalAddress as Record<string, string> | undefined;
+  const locationName = typeof raw.locationName === "string" ? raw.locationName : undefined;
+
+  const isRemote =
+    Boolean(raw.isRemote) ||
+    (locationName ? /remote/i.test(locationName) : false) ||
+    (typeof raw.title === "string" && /remote/i.test(raw.title));
+
+  const workplaceType = isRemote ? "remote" : locationName ? "on-site" : undefined;
+  const city =
+    postal?.addressLocality ||
+    (locationName && !/remote/i.test(locationName)
+      ? locationName.split(",")[0]?.trim()
+      : undefined);
+  const country =
+    postal?.addressCountry ||
+    (locationName && locationName.includes(",")
+      ? locationName.split(",").pop()?.trim()
+      : undefined);
+
+  return {
+    source: "ashby",
+    externalId: String(raw.id || ""),
+    title: String(raw.title || ""),
+    company: companyName,
+    url: String(raw.jobUrl || ""),
+    description: String(raw.descriptionHtml || ""),
+    postedAt: raw.publishedAt ? new Date(String(raw.publishedAt)) : new Date(),
+    city,
+    country,
+    workplaceType,
+    remoteRegions: isRemote ? ["Worldwide"] : undefined,
+  };
+}
+
+export async function fetchAshbyJobs(
+  keyword?: string
+): Promise<{ jobs: CrawledJob[]; result: CrawlSourceResult }> {
   let totalFetched = 0;
   const matchedJobs: CrawledJob[] = [];
-  const kw = keyword?.trim().toLowerCase();
 
-  for (const companyConfig of ASHBY_COMPANIES) {
+  for (const company of ASHBY_COMPANIES) {
     try {
-      const url = `https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(companyConfig.boardToken)}`;
+      const url = `https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(company.boardToken)}`;
       const res = await fetch(url);
-      if (!res.ok) {
-        continue;
-      }
+      if (!res.ok) continue;
 
       const data = await res.json();
-      const rawList = data.jobs || [];
+      const rawList = Array.isArray(data.jobs) ? data.jobs : [];
       totalFetched += rawList.length;
 
       for (const raw of rawList) {
-        const isRemote = raw.isRemote || (raw.locationName ? /remote/i.test(raw.locationName) : false) || /remote/i.test(raw.title);
-        const workplaceType = isRemote ? "remote" : raw.locationName ? "on-site" : undefined;
-        const city = raw.address?.postalAddress?.addressLocality || (raw.locationName && !/remote/i.test(raw.locationName) ? raw.locationName.split(",")[0]?.trim() : undefined);
-        const country = raw.address?.postalAddress?.addressCountry || (raw.locationName && raw.locationName.includes(",") ? raw.locationName.split(",").pop()?.trim() : undefined);
-
-        const candidate: CrawledJob = {
-          source: "ashby",
-          externalId: raw.id,
-          title: raw.title,
-          company: companyConfig.companyName || "Ashby Board",
-          url: raw.jobUrl,
-          description: raw.descriptionHtml || "",
-          postedAt: raw.publishedAt ? new Date(raw.publishedAt) : new Date(),
-          city,
-          country,
-          workplaceType,
-          remoteRegions: isRemote ? ["Worldwide"] : undefined,
-        };
-
-        if (isDrcJob(candidate)) {
-          if (
-            !kw ||
-            candidate.title.toLowerCase().includes(kw) ||
-            candidate.company.toLowerCase().includes(kw) ||
-            candidate.description?.toLowerCase().includes(kw)
-          ) {
-            matchedJobs.push(candidate);
-          }
+        const candidate = parseAshbyJob(raw, company.companyName || "Ashby Board");
+        if (isEligibleCandidate(candidate, keyword)) {
+          matchedJobs.push(candidate);
         }
       }
     } catch {
