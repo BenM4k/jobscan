@@ -43,6 +43,7 @@ export async function fetchReliefWebJobs(keyword?: string): Promise<{ jobs: Craw
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(8000),
     });
 
     if (!res.ok) {

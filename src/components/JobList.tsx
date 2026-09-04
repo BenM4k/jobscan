@@ -1,12 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { JobSelect } from "@/dal/jobs.dal";
 import { JobStatus } from "@/services/db/schema";
 import {
   transitionJobStatusAction,
-  scoreJobAction,
   fetchMoreJobsAction,
   deleteJobAction,
   restoreJobAction,
@@ -17,7 +15,6 @@ import { JobListEmptyState } from "@/components/job/JobListEmptyState";
 import { JobListSubbar } from "@/components/job/JobListSubbar";
 import { JobListPagination } from "@/components/job/JobListPagination";
 import { DeleteJobModal } from "@/components/job/DeleteJobModal";
-import { MissingResumeModal } from "@/components/job/MissingResumeModal";
 import posthog from "posthog-js";
 
 export interface JobListProps {
@@ -30,8 +27,6 @@ export interface JobListProps {
   queryFilter?: string;
 }
 
-export type AIProvider = "claude" | "gemini" | "openai" | "gateway";
-
 export function JobList({
   initialJobs,
   totalJobs,
@@ -41,17 +36,11 @@ export function JobList({
   endDate,
   queryFilter,
 }: JobListProps) {
-  const router = useRouter();
   const [jobsList, setJobsList] = useState<JobSelect[]>(initialJobs);
   const [hasMore, setHasMore] = useState<boolean>(initialJobs.length >= 20);
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
 
-  const [isScoring, setIsScoring] = useState<string | null>(null);
-  const [aiProvider, setAiProvider] = useState<AIProvider>("gemini");
-  const [scoringError, setScoringError] = useState<string | null>(null);
-
   const [jobToDelete, setJobToDelete] = useState<JobSelect | null>(null);
-  const [missingResumeOpen, setMissingResumeOpen] = useState(false);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -130,36 +119,13 @@ export function JobList({
     });
   };
 
-  const handleScoreJob = async (jobId: string) => {
-    setIsScoring(jobId);
-    setScoringError(null);
-    const res = await scoreJobAction(jobId, aiProvider);
-    setIsScoring(null);
-
-    if (!res.success) {
-      const err = res.error || "Failed to score job with AI.";
-      if (err.includes("NO_MASTER_RESUME") || err.toLowerCase().includes("master resume")) {
-        setMissingResumeOpen(true);
-      } else {
-        setScoringError(err);
-      }
-    } else {
-      posthog.capture("job_scored", { ai_provider: aiProvider, location: "list" });
-      window.location.reload();
-    }
-  };
-
   if (jobsList.length === 0) {
     return <JobListEmptyState />;
   }
 
   return (
     <section aria-label="Job postings pipeline" className="space-y-6">
-      <JobListSubbar
-        scoringError={scoringError}
-        onDismissError={() => setScoringError(null)}
-        totalCount={totalJobs ?? jobsList.length}
-      />
+      <JobListSubbar totalCount={totalJobs ?? jobsList.length} />
 
       <ul
         role="list"
@@ -170,11 +136,7 @@ export function JobList({
           <li key={job.id}>
             <JobCardItem
               job={job}
-              aiProvider={aiProvider}
-              isScoring={isScoring === job.id}
               onStatusChange={handleStatusChange}
-              onScoreJob={handleScoreJob}
-              onAiProviderChange={setAiProvider}
               onDeleteJob={() => setJobToDelete(job)}
             />
           </li>
@@ -192,15 +154,6 @@ export function JobList({
         job={jobToDelete}
         onClose={() => setJobToDelete(null)}
         onConfirm={confirmDeleteJob}
-      />
-
-      <MissingResumeModal
-        open={missingResumeOpen}
-        onOpenChange={setMissingResumeOpen}
-        onNavigateToProfile={() => {
-          setMissingResumeOpen(false);
-          router.push("/dashboard/profile");
-        }}
       />
     </section>
   );

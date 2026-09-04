@@ -18,6 +18,7 @@ async function ProfileFormContent() {
 
   return (
     <ProfileForm
+      key={userProfile?.id || "empty"}
       userEmail={sessionResult.value.user.email}
       userName={sessionResult.value.user.name || sessionResult.value.user.email.split("@")[0]}
       initialResumeText={userProfile?.resumeText || ""}

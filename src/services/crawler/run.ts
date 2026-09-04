@@ -1,4 +1,4 @@
-import { CrawlResult, CrawlSourceResult } from "./types";
+import { CrawlResult, CrawlSourceResult, CrawledJob } from "./types";
 import { fetchReliefWebJobs } from "./sources/reliefweb";
 import { fetchRemoteOKJobs } from "./sources/remoteok";
 import { fetchGreenhouseJobs } from "./sources/greenhouse";
@@ -25,55 +25,138 @@ const SOURCE_FETCHERS = [
   { name: "fecrdc", fetcher: fetchFecRdcJobs },
 ];
 
+async function ingestJobsConcurrently(
+  jobs: CrawledJob[],
+  userId?: string,
+  sourceName?: string,
+  concurrency = 8,
+): Promise<number> {
+  let upsertedCount = 0;
+  const executing = new Set<Promise<void>>();
+
+  for (const job of jobs) {
+    const p: Promise<void> = (async () => {
+      try {
+        const success = await ingestCrawledJob(job, userId, sourceName);
+        if (success) {
+          upsertedCount++;
+        }
+      } catch (jobErr) {
+        console.error(
+          `[Crawler ${sourceName || "unknown"}] Failed to ingest job ${job?.externalId || "unknown"}:`,
+          jobErr
+        );
+      }
+    })().finally(() => executing.delete(p));
+
+    executing.add(p);
+    if (executing.size >= concurrency) {
+      await Promise.race(executing);
+    }
+  }
+
+  await Promise.all(executing);
+  return upsertedCount;
+}
+
 export async function runDrcCrawler(
   keyword?: string,
   userId?: string,
 ): Promise<CrawlResult> {
   const startTime = Date.now();
-  const targetKeyword = await resolveCrawlerKeyword(keyword, userId);
-
   const sourceResults: CrawlSourceResult[] = [];
   let totalUpserted = 0;
-  const filterKw = targetKeyword?.toLowerCase();
 
-  for (const { name, fetcher } of SOURCE_FETCHERS) {
-    try {
-      const { result, jobs: rawJobs } = await fetcher(targetKeyword);
-      const jobs = filterKw
-        ? rawJobs.filter(
-            (j) =>
-              j.title.toLowerCase().includes(filterKw) ||
-              Boolean(j.description?.toLowerCase().includes(filterKw)) ||
-              j.company.toLowerCase().includes(filterKw),
-          )
-        : rawJobs;
+  try {
+    const targetKeyword = await resolveCrawlerKeyword(keyword, userId);
+    const filterKw = targetKeyword?.toLowerCase();
 
-      let sourceUpserted = 0;
-      for (const job of jobs) {
-        const success = await ingestCrawledJob(job, userId, name);
-        if (success) {
-          sourceUpserted++;
-        }
+    const fetchSettled = await Promise.allSettled(
+      SOURCE_FETCHERS.map(async ({ name, fetcher }) => {
+        const { result, jobs: rawJobs } = await fetcher(targetKeyword);
+        return { name, result, rawJobs };
+      })
+    );
+
+    for (let i = 0; i < SOURCE_FETCHERS.length; i++) {
+      const sourceDef = SOURCE_FETCHERS[i];
+      const settled = fetchSettled[i];
+
+      if (settled.status === "rejected") {
+        sourceResults.push({
+          source: sourceDef.name,
+          fetched: 0,
+          matched: 0,
+          upserted: 0,
+          error:
+            settled.reason instanceof Error
+              ? settled.reason.message
+              : String(settled.reason),
+        });
+        continue;
       }
 
-      result.upserted = sourceUpserted;
-      totalUpserted += sourceUpserted;
-      sourceResults.push(result);
-    } catch (err: unknown) {
-      sourceResults.push({
-        source: name,
-        fetched: 0,
-        matched: 0,
-        upserted: 0,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }
+      try {
+        const { name, result, rawJobs } = settled.value;
+        const safeRawJobs = Array.isArray(rawJobs) ? rawJobs : [];
+        const jobs = filterKw
+          ? safeRawJobs.filter(
+              (j) =>
+                Boolean(j?.title?.toLowerCase().includes(filterKw)) ||
+                Boolean(j?.description?.toLowerCase().includes(filterKw)) ||
+                Boolean(j?.company?.toLowerCase().includes(filterKw)),
+            )
+          : safeRawJobs;
 
-  return {
-    success: true,
-    totalUpserted,
-    sources: sourceResults,
-    durationMs: Date.now() - startTime,
-  };
+        const sourceUpserted = await ingestJobsConcurrently(jobs, userId, name, 8);
+        const finalResult: CrawlSourceResult = result ?? {
+          source: sourceDef.name,
+          fetched: safeRawJobs.length,
+          matched: jobs.length,
+          upserted: 0,
+        };
+        finalResult.upserted = sourceUpserted;
+        totalUpserted += sourceUpserted;
+        sourceResults.push(finalResult);
+      } catch (sourceErr: unknown) {
+        const msg =
+          sourceErr instanceof Error ? sourceErr.message : String(sourceErr);
+        console.error(
+          `[Crawler] Error ingesting source ${sourceDef.name}:`,
+          sourceErr
+        );
+        sourceResults.push({
+          source: sourceDef.name,
+          fetched: 0,
+          matched: 0,
+          upserted: 0,
+          error: msg,
+        });
+      }
+    }
+
+    const allFailed =
+      sourceResults.length > 0 &&
+      sourceResults.every((s) => Boolean(s.error));
+
+    return {
+      success: !allFailed,
+      totalUpserted,
+      sources: sourceResults,
+      durationMs: Date.now() - startTime,
+      ...(allFailed ? { error: "All crawl sources failed to fetch or parse." } : {}),
+    };
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Failed to run DRC crawler";
+    console.error("[Crawler] runDrcCrawler caught top-level error:", error);
+
+    return {
+      success: false,
+      totalUpserted,
+      sources: sourceResults,
+      durationMs: Date.now() - startTime,
+      error: message,
+    };
+  }
 }

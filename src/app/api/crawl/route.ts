@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const result = await runDrcCrawler();
-    return NextResponse.json(result, { status: 200 });
+    return NextResponse.json(result, { status: result.success ? 200 : 500 });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to execute DRC crawl process";
     return NextResponse.json(

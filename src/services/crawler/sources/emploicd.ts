@@ -2,8 +2,8 @@ import * as cheerio from "cheerio";
 import { CrawledJob, CrawlSourceResult } from "../types";
 
 const USER_AGENT = "Mozilla/5.0 (compatible; drc-job-crawler/1.0)";
-const MAX_PAGES = 5;
-const PAGE_DELAY_MS = 1000;
+const MAX_PAGES = 2;
+const PAGE_DELAY_MS = 250;
 
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -49,6 +49,7 @@ export async function fetchEmploiCdJobs(keyword?: string): Promise<{ jobs: Crawl
           "User-Agent": USER_AGENT,
           "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         },
+        signal: AbortSignal.timeout(8000),
       });
 
       if (!res.ok) {

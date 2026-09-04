@@ -2,6 +2,7 @@
 
 import { requireSession } from "@/lib/auth-guard";
 import * as profileService from "@/services/profile.service";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 const updateProfileSchema = z.object({
@@ -38,9 +39,11 @@ export async function saveProfileTextAction(formData: FormData) {
     if (!result.ok) {
       return { success: false, error: result.error.message };
     }
+    revalidatePath("/dashboard/profile");
     return { success: true, data: result.value };
   }
 
+  revalidatePath("/dashboard/profile");
   return { success: true, data: reformatResult.value };
 }
 
@@ -102,6 +105,7 @@ export async function saveMasterResumeAction(data: {
     return { success: false, error: result.error.message };
   }
 
+  revalidatePath("/dashboard/profile");
   return { success: true, data: result.value };
 }
 
@@ -130,9 +134,11 @@ export async function uploadResumeFileAction(formData: FormData) {
       resumeText: parseResult.value,
     });
     if (!fallbackResult.ok) return { success: false, error: fallbackResult.error.message };
+    revalidatePath("/dashboard/profile");
     return { success: true, data: fallbackResult.value };
   }
 
+  revalidatePath("/dashboard/profile");
   return { success: true, data: reformatResult.value };
 }
 
@@ -146,6 +152,7 @@ export async function reformatProfileWithGeminiAction() {
     return { success: false, error: result.error.message };
   }
 
+  revalidatePath("/dashboard/profile");
   return { success: true, data: result.value };
 }
 
@@ -163,5 +170,6 @@ export async function deleteResumeAction() {
     return { success: false, error: result.error.message };
   }
 
+  revalidatePath("/dashboard/profile");
   return { success: true, data: result.value };
 }

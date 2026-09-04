@@ -2,8 +2,8 @@ import * as cheerio from "cheerio";
 import { CrawledJob, CrawlSourceResult } from "../types";
 
 const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-const MAX_PAGES = 5;
-const PAGE_DELAY_MS = 1000;
+const MAX_PAGES = 3;
+const PAGE_DELAY_MS = 250;
 
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -40,7 +40,7 @@ export async function fetchCongoJobJobs(keyword?: string): Promise<{ jobs: Crawl
   let totalFetched = 0;
   const jobs: CrawledJob[] = [];
   const encodedKw = keyword?.trim() ? encodeURIComponent(keyword.trim()) : "";
-  const maxPages = encodedKw ? 100 : MAX_PAGES;
+  const maxPages = encodedKw ? 3 : MAX_PAGES;
 
   for (let page = 1; page <= maxPages; page++) {
     if (page > 1) {
@@ -61,6 +61,7 @@ export async function fetchCongoJobJobs(keyword?: string): Promise<{ jobs: Crawl
           "User-Agent": USER_AGENT,
           "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         },
+        signal: AbortSignal.timeout(8000),
       });
 
       if (!res.ok) {

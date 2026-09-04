@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { runDrcCrawler } from "../src/services/crawler/run";
 
 async function main() {

@@ -10,6 +10,7 @@ import { getDashboardFeedData } from "@/services/dashboard.service";
 import { requireSession } from "@/lib/auth-guard";
 
 export const instant = false;
+export const maxDuration = 60;
 
 interface DashboardPageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;

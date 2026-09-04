@@ -10,9 +10,10 @@ import posthog from "posthog-js";
 interface MasterResumeUploadProps {
   onExtracted: (data: ResumeProfileData, rawText: string) => void;
   disabled?: boolean;
+  isReplacing?: boolean;
 }
 
-export function MasterResumeUpload({ onExtracted, disabled }: MasterResumeUploadProps) {
+export function MasterResumeUpload({ onExtracted, disabled, isReplacing }: MasterResumeUploadProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [stepLabel, setStepLabel] = useState<string>("");
   const t = useTranslations("profile");
@@ -75,10 +76,10 @@ export function MasterResumeUpload({ onExtracted, disabled }: MasterResumeUpload
 
       <div className="space-y-0.5 max-w-md">
         <h4 className="text-sm font-bold text-slate-900 dark:text-zinc-100">
-          {t("uploadTitle")}
+          {isReplacing ? t("replaceTitle") : t("uploadTitle")}
         </h4>
         <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
-          {t("uploadSubtitle")}
+          {isReplacing ? t("replaceSubtitle") : t("uploadSubtitle")}
         </p>
       </div>
 

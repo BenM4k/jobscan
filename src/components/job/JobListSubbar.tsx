@@ -4,15 +4,15 @@ import React from "react";
 import { useTranslations } from "next-intl";
 
 interface JobListSubbarProps {
-  scoringError: string | null;
-  onDismissError: () => void;
   totalCount: number;
+  scoringError?: string | null;
+  onDismissError?: () => void;
 }
 
 export function JobListSubbar({
+  totalCount,
   scoringError,
   onDismissError,
-  totalCount,
 }: JobListSubbarProps) {
   const t = useTranslations("dashboard");
   const tCommon = useTranslations("common");

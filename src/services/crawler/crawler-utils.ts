@@ -2,7 +2,7 @@ import { CrawledJob } from "./types";
 import { isDrcJob } from "./drc-filter";
 import * as jobsDal from "@/dal/jobs.dal";
 import { isOlderThanOneMonth } from "@/lib/date-utils";
-import * as profileDal from "@/dal/profile.dal";
+import * as resumeDal from "@/dal/resume.dal";
 
 export function matchesKeyword(candidate: CrawledJob, keyword?: string): boolean {
   if (!keyword || !keyword.trim()) return true;
@@ -56,14 +56,15 @@ export async function resolveCrawlerKeyword(
   let targetKeyword = keyword?.trim() || undefined;
   if (!targetKeyword && userId) {
     try {
-      const prof = await profileDal.getProfile(userId);
-      if (prof.ok && prof.value) {
-        const expTitle = prof.value.experience?.[0]?.title?.trim();
-        const skill = prof.value.skills?.[0]?.trim();
-        if (expTitle) {
-          targetKeyword = expTitle;
-        } else if (skill) {
-          targetKeyword = skill;
+      const resumeRes = await resumeDal.getActiveMasterResume(userId);
+      if (resumeRes.ok && resumeRes.value) {
+        const skillsRes = await resumeDal.getResumeSkills(resumeRes.value.id);
+        const topSkill =
+          skillsRes.ok && skillsRes.value.length > 0
+            ? skillsRes.value[0]
+            : undefined;
+        if (topSkill) {
+          targetKeyword = topSkill;
         }
       }
     } catch {
@@ -94,35 +95,36 @@ export async function ingestCrawledJob(
       }
     }
 
-    const rawPayloadRes = await jobsDal.insertRawJobPayload(
-      job.source as jobsDal.JobSource,
-      job.externalId,
-      job as unknown as Record<string, unknown>
-    );
+    const [rawPayloadRes, res] = await Promise.all([
+      jobsDal.insertRawJobPayload(
+        job.source as jobsDal.JobSource,
+        job.externalId,
+        job as unknown as Record<string, unknown>
+      ),
+      jobsDal.upsertJob({
+        userId: userId || undefined,
+        source: job.source as jobsDal.JobSource,
+        externalId: job.externalId,
+        title: job.title,
+        company: job.company,
+        url: job.url,
+        description: job.description,
+        postedAt: job.postedAt,
+        country: job.country,
+        countryCode: job.countryCode,
+        city: job.city,
+        workplaceType: job.workplaceType,
+        remoteRegions: job.remoteRegions,
+        status: "active",
+      }),
+    ]);
+
     if (!rawPayloadRes.ok) {
       console.error(
         `[Crawler ${sourceName || job.source}] Failed to insert raw job payload for ${job.externalId}:`,
         rawPayloadRes.error
       );
-      return false;
     }
-
-    const res = await jobsDal.upsertJob({
-      userId: userId || undefined,
-      source: job.source as jobsDal.JobSource,
-      externalId: job.externalId,
-      title: job.title,
-      company: job.company,
-      url: job.url,
-      description: job.description,
-      postedAt: job.postedAt,
-      country: job.country,
-      countryCode: job.countryCode,
-      city: job.city,
-      workplaceType: job.workplaceType,
-      remoteRegions: job.remoteRegions,
-      status: "active",
-    });
 
     if (!res.ok) {
       console.error(

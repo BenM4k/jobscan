@@ -134,7 +134,11 @@ export function ProfileForm({
         onSave={handleSave}
       />
 
-      <MasterResumeUpload onExtracted={handleExtracted} disabled={isSaving} />
+      <MasterResumeUpload
+        onExtracted={handleExtracted}
+        disabled={isSaving}
+        isReplacing={Boolean(resumeText.trim())}
+      />
 
       <ProfileAiEngineSelect
         aiProvider={aiProvider}

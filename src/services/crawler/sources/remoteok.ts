@@ -33,6 +33,7 @@ export async function fetchRemoteOKJobs(keyword?: string): Promise<{ jobs: Crawl
         "User-Agent": "JobPilot/1.0",
         "Accept-Encoding": "identity",
       },
+      signal: AbortSignal.timeout(8000),
     });
 
     if (!res.ok) {

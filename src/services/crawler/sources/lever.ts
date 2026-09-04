@@ -47,7 +47,7 @@ export async function fetchLeverJobs(
   for (const company of LEVER_COMPANIES) {
     try {
       const url = `https://api.lever.co/v0/postings/${encodeURIComponent(company.boardToken)}?mode=json`;
-      const res = await fetch(url);
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
       if (!res.ok) continue;
 
       const data = await res.json();

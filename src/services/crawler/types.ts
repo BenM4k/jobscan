@@ -26,4 +26,5 @@ export interface CrawlResult {
   totalUpserted: number;
   sources: CrawlSourceResult[];
   durationMs: number;
+  error?: string;
 }

@@ -28,6 +28,7 @@ export async function fetchUnJobsJobs(keyword?: string): Promise<{ jobs: Crawled
         "User-Agent": USER_AGENT,
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       },
+      signal: AbortSignal.timeout(8000),
     });
 
     if (!res.ok) {

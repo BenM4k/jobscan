@@ -5,17 +5,13 @@ import Link from "next/link";
 import { JobSelect } from "@/dal/jobs.dal";
 import { JobStatus } from "@/services/db/schema";
 import { JobCardBadges } from "@/components/job/JobCardBadges";
-import { JobCardActions, AIProvider } from "@/components/job/JobCardActions";
+import { JobCardActions } from "@/components/job/JobCardActions";
 import { useTranslations } from "next-intl";
 
 interface JobCardItemProps {
   job: JobSelect;
-  aiProvider: AIProvider;
-  isScoring: boolean;
   onSelect?: (job: JobSelect) => void;
   onStatusChange: (jobId: string, status: JobStatus) => void;
-  onScoreJob: (jobId: string) => void;
-  onAiProviderChange: (provider: AIProvider) => void;
   onDeleteJob: (jobId: string) => void;
 }
 
@@ -30,11 +26,7 @@ function getCompanyInitials(companyName: string): string {
 
 export function JobCardItem({
   job,
-  aiProvider,
-  isScoring,
   onStatusChange,
-  onScoreJob,
-  onAiProviderChange,
   onDeleteJob,
 }: JobCardItemProps) {
   const [isBookmarked, setIsBookmarked] = useState(false);
@@ -140,12 +132,8 @@ export function JobCardItem({
         jobId={job.id}
         jobTitle={job.title}
         status={job.status}
-        aiProvider={aiProvider}
         fitScore={job.fitScore}
-        isScoring={isScoring}
         onStatusChange={onStatusChange}
-        onScoreJob={onScoreJob}
-        onAiProviderChange={onAiProviderChange}
       />
     </article>
   );

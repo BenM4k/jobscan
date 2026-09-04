@@ -44,7 +44,7 @@ export async function fetchGreenhouseJobs(
   for (const company of GREENHOUSE_COMPANIES) {
     try {
       const url = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(company.boardToken)}/jobs?content=true`;
-      const res = await fetch(url);
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
       if (!res.ok) continue;
 
       const data = await res.json();

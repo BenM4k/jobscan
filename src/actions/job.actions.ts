@@ -221,8 +221,6 @@ export async function restoreJobAction(jobData: JobSelect) {
   return { success: true, data: result.value };
 }
 
-import { revalidatePath } from "next/cache";
-
 export async function triggerDrcCrawlAction(keyword?: string) {
   const sessionResult = await requireSession();
   if (!sessionResult.ok || !sessionResult.value)
@@ -231,7 +229,9 @@ export async function triggerDrcCrawlAction(keyword?: string) {
   try {
     const { runDrcCrawler } = await import("@/services/crawler/run");
     const crawlResult = await runDrcCrawler(keyword, sessionResult.value.user.id);
-    revalidatePath("/dashboard");
+    if (!crawlResult.success) {
+      return { success: false, error: crawlResult.error || "DRC crawl search failed" };
+    }
     return { success: true, data: crawlResult };
   } catch (E) {
     console.error(E);

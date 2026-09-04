@@ -48,7 +48,7 @@ export async function fetchAshbyJobs(
   for (const company of ASHBY_COMPANIES) {
     try {
       const url = `https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(company.boardToken)}`;
-      const res = await fetch(url);
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
       if (!res.ok) continue;
 
       const data = await res.json();
