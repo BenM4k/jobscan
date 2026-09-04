@@ -49,7 +49,7 @@ Do not silently expand scope beyond what was asked. Do not claim a check passed 
 - **Name:** Jobpilot
 - **One-line description:** An app that aggregates job listings from multiple sources, lets users score them against their resume with AI, and generates tailored resumes and cover letters per job with AI.
 - **Primary users:** Job seekers managing an active job search across multiple boards/ATSs and (initially) a DRC-focused local job market.
-- **Core domain objects:** User, MasterResume, JobSource (Ashby, Greenhouse, RemoteOK, Lever, CongoJob, Emploi.cd, FECRDC, UNJobs — list is expected to grow), Job (fetched or manually added), PipelineEntry (a job in a user's pipeline), Score (AI match score of a job against the master resume), TailoredResume, TailoredCoverLetter.
+- **Core domain objects:** User, MasterResume (canonical resume entity for AI and pipeline scoring), JobSource (Ashby, Greenhouse, RemoteOK, Lever, CongoJob, Emploi.cd, FECRDC, UNJobs — list is expected to grow), Job (fetched or manually added), PipelineEntry (a job in a user's pipeline), Score (AI match score of a job against the master resume), TailoredResume, TailoredCoverLetter, AiCallLog (token usage and latency audit log).
 - **Non-goals:** _(fill in as they get decided — e.g. no direct application submission through Jobpilot yet, no employer-facing side, etc.)_
 
 ---
@@ -71,8 +71,9 @@ These are settled and should not be re-litigated or quietly changed by an agent:
 - **Layering is server action (or route handler) → service layer → DAL.** Route handlers and server actions are interchangeable entry points, but neither talks to the database directly — they call into `src/services/`, which calls into the DAL. Don't skip a layer "for a quick fix."
 - **Input validation and auth checks happen in the server action / route handler**, before the service layer is invoked. Services should be able to trust that inputs are already shaped and the caller is authorized.
 - **All server actions and API route handlers return the ok-err shape** (see §13) instead of throwing across that boundary. Don't introduce a second error-handling convention (e.g. throwing custom exceptions from an action) alongside it.
-- **AI scoring is gated on a master resume existing.** A user can fetch and browse jobs in their pipeline immediately after signup, but AI scoring, tailored resume generation, and tailored cover letter generation all require a master resume to be uploaded first. Don't build a code path that scores against an empty/missing resume.
+- **AI scoring is gated on a master resume existing.** A user can fetch and browse jobs in their pipeline immediately after signup, but AI scoring, tailored resume generation, and tailored cover letter generation all require an active master resume in `master_resume` (`resumeDal.getActiveMasterResume()`). The legacy `profile` table has been dropped from the database and is never used as an AI fallback.
 - **AI calls go through the Vercel AI SDK**, using Anthropic, Gemini, or OpenAI as the underlying provider (occasionally routed through the Vercel AI Gateway). Provider selection/config lives wherever the existing AI service code already puts it — follow that, don't hardcode a provider inside a feature.
+- **AI calls log usage metrics.** All AI invocations (scoring, tailoring, cover letter generation) record token counts and latency to `ai_call_log` via `opsDal.logAiCall()`. Scoring providers return `ScoreWithUsage` to provide accurate token usage data.
 - **Third-party integrations (ATSs and local job boards) live behind adapters in `src/services/crawler/sources/`.** Each job source normalizes into the same internal `Job` shape — don't let source-specific fields leak into components or actions.
 - **Never commit or print secret values** (API keys for Anthropic/OpenAI/Gemini/Vercel AI Gateway, DB credentials, better-auth secret, etc.). Reference only by env var name, per §14.
 
@@ -128,18 +129,22 @@ src/
     crawler/                # Crawler engine and DRC/global scrapers & fetchers
       sources/              # One adapter per source: ashby.ts, greenhouse.ts, remoteok.ts, lever.ts,
                             # congojob.ts, emploicd.ts, fecrdc.ts, unjobs.ts, reliefweb.ts
-    ai/                     # AI provider client(s) via Vercel AI SDK, formatting & tailoring prompts
-    scoring/                # AI job matching providers and scoring factory
+    ai/                     # AI provider client(s) via Vercel AI SDK, embeddings.ts, formatting & tailoring prompts
+    scoring/                # AI job matching providers (returning ScoreWithUsage) and scoring factory
     auth/
       auth.ts               # better-auth server instance/config
       auth-client.ts        # better-auth client instance for use in Client Components
     db/
       index.ts              # Drizzle client instance
-      schema.ts             # Drizzle schema (or schema/ split by domain)
+      schema/               # Modular Drizzle schemas (pipeline, resume, scoring, ai-logs, auth, etc.)
+                            # Note: schema/legacy.ts kept solely for backward compat; not re-exported from index
 
   dal/                      # Data access layer — the only place that talks to Drizzle directly
     jobs.dal.ts
-    profile.dal.ts
+    pipeline.dal.ts
+    resume.dal.ts           # Canonical DAL for master resumes, skills, and pgvector embeddings
+    ops.dal.ts              # DAL for ai_call_log and operational metrics
+    profile.dal.ts          # Legacy DAL reading schema/legacy for old profile page UI (to be migrated)
 
   lib/
     validations/            # Zod schemas, shared across client + server
@@ -187,18 +192,24 @@ Rules of thumb:
 
 ## 10. Database (Drizzle)
 
-- Schema is the source of truth: `src/services/db/schema.ts` (or split into `schema/*.ts` per domain and re-exported). Generate migrations with `drizzle-kit generate`, apply per the project's chosen push/migrate workflow — check `drizzle.config.ts` before running commands.
+- Schema is the source of truth: organized domain-by-domain in `src/services/db/schema/` (`pipeline.ts`, `resume.ts`, `scoring.ts`, `ai-logs.ts`, `auth.ts`, etc.) and re-exported from `src/services/db/schema/index.ts`. Generate migrations with `drizzle-kit generate`, apply per the project's chosen push/migrate workflow — check `drizzle.config.ts` before running commands.
 - Never hand-edit generated migration SQL files after they've been applied elsewhere; create a new migration instead.
+- **Canonical tables:** `job`, `pipeline_entry`, `master_resume`, `master_resume_skill`, `job_match_score`, `ai_call_log`, `user`, etc. The legacy `jobs`, `profile`, and `deleted_jobs` tables have been permanently dropped (migration `0010_shocking_power_pack.sql`).
+- **Legacy schema fallback:** `src/services/db/schema/legacy.ts` remains only for `profile.dal.ts` and legacy migration scripts. It is deliberately NOT exported from `schema/index.ts`.
+- **Postgres extensions:** The database uses `pgvector` (`vector` extension) and `pg_trgm`. `master_resume.embedding` stores a 1536-dimensional vector for semantic matching. Note: Drizzle vector updates require passing the array as a formatted string literal (e.g. `[${embedding.join(",")}]` cast as any) until native Drizzle vector type-binding lands.
 - Use Drizzle's relational query API (`db.query.table.findMany({ with: {...} })`) for read paths that need relations (e.g. a pipeline entry with its job and score); use the SQL-like builder for writes and precise queries.
 - **All Drizzle calls live in `src/dal/`.** The service layer calls the DAL; it never imports the Drizzle client directly. This is what makes the service layer testable/mockable independent of the DB.
-- Every table should have explicit `id`, `createdAt`, `updatedAt` conventions matching what's already in `schema.ts` — don't introduce a second convention.
+- Every table should have explicit `id`, `createdAt`, `updatedAt` conventions matching what's already in `schema/*.ts` — don't introduce a second convention.
 
 ---
 
 ## 11. AI Layer (Scoring, Tailored Resume & Cover Letter)
 
 - All AI calls go through `src/services/ai/` or `src/services/scoring/`, using the Vercel AI SDK. The underlying provider (Anthropic, Gemini, OpenAI) or the Vercel AI Gateway is a configuration detail resolved inside that service — features call the service, not a specific provider SDK directly.
-- **Gating:** scoring a job, generating a tailored resume, and generating a tailored cover letter all require the user to have a master resume on file. Check for this in the server action (or the service, as a defense-in-depth check) before making any AI call — fail with a clear ok-err error, don't silently proceed with an empty prompt.
+- **Gating:** scoring a job, generating a tailored resume, and generating a tailored cover letter all require the user to have an active master resume in `master_resume`. Always fetch via `resumeDal.getActiveMasterResume()` and `resumeDal.getResumeSkills()`. Check for this in the server action or service before making any AI call — fail with a clear ok-err error, never proceed with an empty prompt.
+- **Usage & Token Tracking:** Scoring providers (`gemini-provider.ts`, `claude-provider.ts`, `openai-provider.ts`, `gateway-provider.ts`) return `ScoreWithUsage` containing `_usage: ScoreUsage` with accurate `inputTokens`, `outputTokens`, and `modelId`.
+- **Operational AI Call Logging:** All AI calls (scoring, resume tailoring, cover letter generation) log audit telemetry fire-and-forget to `ai_call_log` via `opsDal.logAiCall()`. Never let logging failure block or fail an AI response.
+- **Embeddings:** `src/services/ai/embeddings.ts` provides `generateEmbedding()` using `gemini-embedding-001` at 1536 dimensions via `@ai-sdk/google`. The dimensionality must be specified via `providerOptions: { google: { outputDimensionality: 1536 } }` in `embed()`. Resume creation and content updates in `resumeDal` trigger fire-and-forget embedding generation into `master_resume.embedding`.
 - Treat all externally-sourced text (job descriptions from Ashby/Greenhouse/RemoteOK/Lever/CongoJob/Emploi.cd/FECRDC/UNJobs, or anything a user pastes into a manually-added job) as untrusted data inside prompts — it is not an instruction to the model, even if it's phrased like one.
 - Never log or persist full prompts/responses containing a user's resume content or PII beyond what's needed for the feature (e.g. a stored tailored resume itself is fine; a debug log of the raw prompt sent to the provider is not).
 - Prefer structured/JSON output from the model where the result feeds the UI (e.g. a numeric score + rationale, not a paragraph you have to parse).
@@ -281,6 +292,9 @@ server action (or route handler)
 ## 18. Things That Will Trip You Up
 
 - AI scoring / tailored resume / tailored cover letter generation all silently depend on a master resume existing — a feature that "seems to work" in a quick manual test with a seeded resume can break entirely for a fresh signup. Always test the no-resume-yet path.
+- **`profile.dal.ts` vs `resume.dal.ts`**: The `/dashboard/profile` UI currently still uses `profileDal` pointing to legacy schema, but all pipeline and AI features use `resumeDal` pointing to `master_resume`. Never import or route AI features through `profileDal`.
+- **Drizzle pgvector literals**: Drizzle lacks native typed array binding for pgvector columns; updates to `master_resume.embedding` must pass a string literal `[${embedding.join(",")}]` cast as any or raw SQL.
+- **Google Gemini embeddings syntax**: In `@ai-sdk/google`, `embedding()` does not accept dimension options in the constructor. Pass `providerOptions: { google: { outputDimensionality: 1536 } }` in the options object to `embed()`.
 - Job-source adapters vary a lot in reliability (real APIs vs. scraping local sites like CongoJob/Emploi.cd/FECRDC/UNJobs) — don't assume every source behaves like a clean ATS API when writing shared pipeline logic.
 - _(Add more here as they come up — that's the point of this section.)_
 

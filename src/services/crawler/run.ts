@@ -79,7 +79,6 @@ export async function runDrcCrawler(
           }
 
           // Skip job if candidate previously deleted it.
-          // Omit when there is no userId — deletion records are user-scoped.
           if (userId) {
             const deleted = await jobsDal.isJobDeleted(
               job.source,
@@ -91,14 +90,17 @@ export async function runDrcCrawler(
             }
           }
 
-          // Skip upsert when there is no userId — jobs.user_id is NOT NULL.
-          if (!userId) {
-            continue;
-          }
+          // 1. Record untouched raw payload
+          await jobsDal.insertRawJobPayload(
+            job.source as jobsDal.JobSource,
+            job.externalId,
+            job as unknown as Record<string, unknown>
+          );
 
+          // 2. Upsert canonical job listing (and user pipeline entry if userId provided)
           const res = await jobsDal.upsertJob({
-            userId,
-            source: job.source,
+            userId: userId || undefined,
+            source: job.source as jobsDal.JobSource,
             externalId: job.externalId,
             title: job.title,
             company: job.company,
@@ -110,10 +112,17 @@ export async function runDrcCrawler(
             city: job.city,
             workplaceType: job.workplaceType,
             remoteRegions: job.remoteRegions,
-            status: "new",
+            status: "active",
           });
 
           if (res.ok) {
+            // 3. Link cross-source ref
+            await jobsDal.linkJobSourceRef(
+              res.value.id,
+              job.source as jobsDal.JobSource,
+              job.externalId,
+              job.url
+            );
             sourceUpserted++;
           }
         } catch (jobErr) {

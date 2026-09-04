@@ -64,6 +64,20 @@
       "when": 1788195001000,
       "tag": "0008_add_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788512245012,
+      "tag": "0009_chunky_mysterio",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788519324589,
+      "tag": "0010_shocking_power_pack",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,8 @@
 import "server-only";
 import {
   ScoringProvider,
-  ScoreResult,
+  ScoreWithUsage,
+  ScoreUsage,
   AIProviderName,
   scoreResultSchema,
   SCORING_INSTRUCTIONS,
@@ -20,7 +21,7 @@ export class ClaudeProvider implements ScoringProvider {
     jobDescription: string,
     resumeText: string,
     skills: string[]
-  ): Promise<Result<ScoreResult, AppError>> {
+  ): Promise<Result<ScoreWithUsage, AppError>> {
     try {
       const apiKey = process.env.ANTHROPIC_API_KEY;
       if (!apiKey) {
@@ -40,14 +41,20 @@ export class ClaudeProvider implements ScoringProvider {
         skills
       );
 
-      const { output: object } = await generateText({
+      const result = await generateText({
         model: anthropic("claude-3-5-sonnet-latest"),
         output: Output.object({ schema: scoreResultSchema }),
         system: SCORING_INSTRUCTIONS,
         prompt: userPrompt,
       });
 
-      return ok(object);
+      const usage: ScoreUsage = {
+        inputTokens: result.usage?.inputTokens,
+        outputTokens: result.usage?.outputTokens,
+        modelId: "claude-3-5-sonnet-latest",
+      };
+
+      return ok({ ...result.output, _usage: usage });
     } catch (E) {
       console.error(E);
       const message = E instanceof Error ? E.message : "Unknown error";

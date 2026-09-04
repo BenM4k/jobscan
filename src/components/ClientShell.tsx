@@ -2,7 +2,7 @@
 
 import React, { useState, Suspense } from "react";
 import { useQueryState, parseAsString, parseAsStringEnum } from "nuqs";
-import { JobStatus, jobStatusEnum } from "@/services/db/schema";
+import { JobStatus, legacyJobStatusEnum as jobStatusEnum } from "@/services/db/schema";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { FetchJobsPopover } from "@/components/FetchJobsPopover";
 import { useTranslations } from "next-intl";

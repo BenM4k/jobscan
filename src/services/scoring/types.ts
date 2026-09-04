@@ -11,7 +11,17 @@ export const scoreResultSchema = z.object({
 
 export type ScoreResult = z.infer<typeof scoreResultSchema>;
 
+/** Usage metadata captured from the provider's generateText response. */
+export interface ScoreUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+  modelId: string;
+}
+
 export type AIProviderName = "claude" | "gemini" | "openai" | "gateway";
+
+/** The full value returned by a scoring provider: the score plus token usage. */
+export type ScoreWithUsage = ScoreResult & { _usage: ScoreUsage };
 
 export interface ScoringProvider {
   name: AIProviderName;
@@ -20,7 +30,7 @@ export interface ScoringProvider {
     jobDescription: string,
     resumeText: string,
     skills: string[]
-  ): Promise<Result<ScoreResult, AppError>>;
+  ): Promise<Result<ScoreWithUsage, AppError>>;
 }
 
 /**

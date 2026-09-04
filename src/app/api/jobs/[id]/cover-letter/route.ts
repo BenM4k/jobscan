@@ -3,7 +3,8 @@ import { streamText, toTextStream, createTextStreamResponse } from "ai";
 import { getGoogleModel } from "@/lib/ai";
 import { requireSession } from "@/lib/auth-guard";
 import * as jobsDal from "@/dal/jobs.dal";
-import * as profileDal from "@/dal/profile.dal";
+import * as resumeDal from "@/dal/resume.dal";
+import * as opsDal from "@/dal/ops.dal";
 
 function sanitizeResumeForScoring(resumeText: string): string {
   return resumeText
@@ -27,10 +28,14 @@ export async function POST(
     }
 
     const userId = sessionResult.value.user.id;
-    const [jobResult, profileResult] = await Promise.all([
+    const [jobResult, resumeResult] = await Promise.all([
       jobsDal.getJobById(id, userId),
-      profileDal.getProfile(userId),
+      resumeDal.getActiveMasterResume(userId),
     ]);
+    const skillsResult =
+      resumeResult.ok && resumeResult.value
+        ? await resumeDal.getResumeSkills(resumeResult.value.id)
+        : { ok: true as const, value: [] as string[] };
 
     if (!jobResult.ok || !jobResult.value) {
       return NextResponse.json(
@@ -40,9 +45,9 @@ export async function POST(
     }
 
     const job = jobResult.value;
-    const userProfile = profileResult.ok ? profileResult.value : null;
+    const activeResume = resumeResult.ok ? resumeResult.value : null;
 
-    if (!userProfile || !userProfile.resumeText) {
+    if (!activeResume || !activeResume.content) {
       return NextResponse.json(
         {
           error:
@@ -52,6 +57,8 @@ export async function POST(
       );
     }
 
+    const resumeText = activeResume.content;
+    const resumeSkills: string[] = skillsResult.ok ? skillsResult.value : [];
     const model = getGoogleModel();
 
     const instructions = `You are an elite executive career strategist and persuasive copywriter, trusted with a candidate's real resume and a real job posting. Your output will be sent directly to a hiring manager with no human review in between — it must be publication-ready on the first attempt.
@@ -76,18 +83,11 @@ HARD CONSTRAINTS:
     const location =
       [job.city, job.countryCode || job.country].filter(Boolean).join(", ") ||
       "Unspecified";
-    const sanitizedResume = sanitizeResumeForScoring(userProfile.resumeText);
-    const sanitizedSummary = userProfile.summary
-      ? sanitizeResumeForScoring(userProfile.summary)
-      : null;
-    const sanitizedSkills = userProfile.skills?.length
-      ? userProfile.skills.map(sanitizeResumeForScoring)
-      : null;
+    const sanitizedResume = sanitizeResumeForScoring(resumeText);
 
     const prompt = `CANDIDATE BACKGROUND:
 """
-${sanitizedSummary ? `Summary: ${sanitizedSummary}\n` : ""}
-${sanitizedSkills ? `Skills: ${sanitizedSkills.join(", ")}\n` : ""}
+${resumeSkills.length ? `Skills: ${resumeSkills.map(sanitizeResumeForScoring).join(", ")}\n` : ""}
 ${sanitizedResume}
 """
 
@@ -111,6 +111,13 @@ ${job.description || "No description provided."}
         try {
           if (text && text.trim().length > 0) {
             await jobsDal.updateJobCoverLetter(job.id, userId, text.trim());
+            await opsDal.logAiCall({
+              userId,
+              feature: "tailored_cover_letter",
+              provider: "google",
+              model: "gemini-2.5",
+              costEstimateUsd: "0.001",
+            });
           }
         } catch (saveError) {
           console.error("Failed to save streamed cover letter in background:", {

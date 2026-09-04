@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { generateText, Output } from "ai";
 import { getGoogleModel, JobScoreSchema } from "@/lib/ai";
 import * as jobsDal from "@/dal/jobs.dal";
-import * as profileDal from "@/dal/profile.dal";
+import * as resumeDal from "@/dal/resume.dal";
+import * as opsDal from "@/dal/ops.dal";
 import { requireSession } from "@/lib/auth-guard";
 
 function sanitizeResumeForScoring(resumeText: string): string {
@@ -26,9 +27,12 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const [jobResult, profileResult] = await Promise.all([
+    const [jobResult, resumeResult, skillsResult] = await Promise.all([
       jobsDal.getJobById(id, sessionResult.value.user.id),
-      profileDal.getProfile(sessionResult.value.user.id),
+      resumeDal.getActiveMasterResume(sessionResult.value.user.id),
+      resumeDal.getActiveMasterResume(sessionResult.value.user.id).then(async (r) =>
+        r.ok && r.value ? resumeDal.getResumeSkills(r.value.id) : { ok: true as const, value: [] as string[] }
+      ),
     ]);
 
     if (!jobResult.ok || !jobResult.value) {
@@ -39,9 +43,9 @@ export async function POST(
     }
 
     const job = jobResult.value;
-    const userProfile = profileResult.ok ? profileResult.value : null;
+    const activeResume = resumeResult.ok ? resumeResult.value : null;
 
-    if (!userProfile || !userProfile.resumeText) {
+    if (!activeResume || !activeResume.content) {
       return NextResponse.json(
         {
           error:
@@ -51,6 +55,8 @@ export async function POST(
       );
     }
 
+    const resumeText = activeResume.content;
+    const resumeSkills: string[] = skillsResult.ok ? skillsResult.value : [];
     const model = getGoogleModel();
 
     const instructions = `You are a world-class senior technical recruiter and talent assessment evaluator.
@@ -73,18 +79,11 @@ SCORING GUIDELINES:
     const location =
       [job.city, job.countryCode || job.country].filter(Boolean).join(", ") ||
       "Unspecified";
-    const sanitizedResume = sanitizeResumeForScoring(userProfile.resumeText);
-    const sanitizedSummary = userProfile.summary
-      ? sanitizeResumeForScoring(userProfile.summary)
-      : null;
-    const sanitizedSkills = userProfile.skills?.length
-      ? userProfile.skills.map(sanitizeResumeForScoring)
-      : null;
+    const sanitizedResume = sanitizeResumeForScoring(resumeText);
 
     const prompt = `CANDIDATE MASTER RESUME:
 """
-${sanitizedSummary ? `Summary: ${sanitizedSummary}\n` : ""}
-${sanitizedSkills ? `Skills: ${sanitizedSkills.join(", ")}\n` : ""}
+${resumeSkills.length ? `Skills: ${resumeSkills.map(sanitizeResumeForScoring).join(", ")}\n` : ""}
 ${sanitizedResume}
 """
 
@@ -109,6 +108,15 @@ ${job.description || "No description provided."}
         telemetry: { isEnabled: false },
       });
       score = result.output;
+      // Fire-and-forget — don't let logging failure block the response
+      opsDal.logAiCall({
+        userId: sessionResult.value.user.id,
+        feature: "scoring",
+        provider: "google",
+        model: model.modelId ?? "gemini",
+        inputTokens: result.usage?.inputTokens,
+        outputTokens: result.usage?.outputTokens,
+      }).catch((e) => console.error("Failed to log AI scoring call:", e));
     } catch (aiError) {
       console.error("AI scoring call failed:", {
         name: aiError instanceof Error ? aiError.name : "Unknown",

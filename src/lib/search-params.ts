@@ -1,5 +1,5 @@
 import { createSearchParamsCache, parseAsString, parseAsStringEnum } from "nuqs/server";
-import { jobStatusEnum } from "@/services/db/schema";
+import { legacyJobStatusEnum as jobStatusEnum } from "@/services/db/schema";
 
 export const searchParamsCache = createSearchParamsCache({
   status: parseAsStringEnum<"all" | (typeof jobStatusEnum)[number]>([
