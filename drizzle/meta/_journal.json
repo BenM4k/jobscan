@@ -78,6 +78,13 @@
       "when": 1788519324589,
       "tag": "0010_shocking_power_pack",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788526505097,
+      "tag": "0011_young_the_renegades",
+      "breakpoints": true
     }
   ]
 }

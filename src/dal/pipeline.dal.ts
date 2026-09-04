@@ -14,7 +14,7 @@ import {
 } from "@/services/db/schema";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
-import { eq, and, desc, sql, or, ilike, count, gte, lte } from "drizzle-orm";
+import { eq, and, desc, sql, or, ilike, count, gte, lte, ne } from "drizzle-orm";
 
 export type PipelineEntrySelect = typeof pipelineEntry.$inferSelect;
 export type PipelineEntryInsert = typeof pipelineEntry.$inferInsert;
@@ -130,6 +130,8 @@ export async function listPipelineEntries(
 
     if (filter?.status && filter.status !== "all") {
       conditions.push(eq(pipelineEntry.status, filter.status as PipelineStatus));
+    } else {
+      conditions.push(ne(pipelineEntry.status, "withdrawn"));
     }
     if (filter?.source && filter.source !== "all") {
       conditions.push(eq(job.source, filter.source as JobSource));
@@ -215,6 +217,8 @@ export async function countPipelineEntries(
 
     if (filter?.status && filter.status !== "all") {
       conditions.push(eq(pipelineEntry.status, filter.status as PipelineStatus));
+    } else {
+      conditions.push(ne(pipelineEntry.status, "withdrawn"));
     }
     if (filter?.source && filter.source !== "all") {
       conditions.push(eq(job.source, filter.source as JobSource));
@@ -269,35 +273,45 @@ export async function upsertPipelineEntry(
   resumeIdUsed?: string
 ): Promise<Result<PipelineEntrySelect, AppError>> {
   try {
-    const [entry] = await db
-      .insert(pipelineEntry)
-      .values({
-        userId,
-        jobId,
-        status,
-        resumeIdUsed: resumeIdUsed || null,
-      })
-      .onConflictDoUpdate({
-        target: [pipelineEntry.userId, pipelineEntry.jobId],
-        set: {
+    return await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select({ id: pipelineEntry.id, status: pipelineEntry.status })
+        .from(pipelineEntry)
+        .where(and(eq(pipelineEntry.userId, userId), eq(pipelineEntry.jobId, jobId)))
+        .limit(1);
+
+      const [entry] = await tx
+        .insert(pipelineEntry)
+        .values({
+          userId,
+          jobId,
           status,
-          resumeIdUsed: resumeIdUsed || sql`${pipelineEntry.resumeIdUsed}`,
-          updatedAt: new Date(),
-        },
-      })
-      .returning();
+          resumeIdUsed: resumeIdUsed || null,
+        })
+        .onConflictDoUpdate({
+          target: [pipelineEntry.userId, pipelineEntry.jobId],
+          set: {
+            status,
+            resumeIdUsed: resumeIdUsed || sql`${pipelineEntry.resumeIdUsed}`,
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
 
-    if (!entry) {
-      return err(new AppError("DB_ERROR", "Failed to upsert pipeline entry"));
-    }
+      if (!entry) {
+        return err(new AppError("DB_ERROR", "Failed to upsert pipeline entry"));
+      }
 
-    // Record initial status history
-    await db.insert(pipelineStatusHistory).values({
-      pipelineEntryId: entry.id,
-      status,
+      // Record status transition only for new entries or when status actually changes
+      if (!existing || existing.status !== status) {
+        await tx.insert(pipelineStatusHistory).values({
+          pipelineEntryId: entry.id,
+          status,
+        });
+      }
+
+      return ok(entry);
     });
-
-    return ok(entry);
   } catch (error) {
     return err(
       new AppError("DB_ERROR", "Failed to upsert pipeline entry", error)
@@ -311,26 +325,28 @@ export async function updatePipelineStatus(
   status: PipelineStatus
 ): Promise<Result<PipelineEntrySelect, AppError>> {
   try {
-    const [updated] = await db
-      .update(pipelineEntry)
-      .set({
+    return await db.transaction(async (tx) => {
+      const [updated] = await tx
+        .update(pipelineEntry)
+        .set({
+          status,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(pipelineEntry.id, id), eq(pipelineEntry.userId, userId)))
+        .returning();
+
+      if (!updated) {
+        return err(new AppError("NOT_FOUND", `Pipeline entry ${id} not found`));
+      }
+
+      // Record status transition history
+      await tx.insert(pipelineStatusHistory).values({
+        pipelineEntryId: updated.id,
         status,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(pipelineEntry.id, id), eq(pipelineEntry.userId, userId)))
-      .returning();
+      });
 
-    if (!updated) {
-      return err(new AppError("NOT_FOUND", `Pipeline entry ${id} not found`));
-    }
-
-    // Record status transition history
-    await db.insert(pipelineStatusHistory).values({
-      pipelineEntryId: updated.id,
-      status,
+      return ok(updated);
     });
-
-    return ok(updated);
   } catch (error) {
     return err(
       new AppError("DB_ERROR", `Failed to update status for entry ${id}`, error)

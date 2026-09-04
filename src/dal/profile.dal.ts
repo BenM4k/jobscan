@@ -61,29 +61,35 @@ export async function upsertProfile(
       .returning();
 
     if (upserted) {
-      try {
-        const activeRes = await resumeDal.getActiveMasterResume(userId);
-        if (activeRes.ok && activeRes.value) {
-          await resumeDal.updateMasterResume(
-            activeRes.value.id,
-            userId,
-            { content: data.resumeText },
-            data.skills || undefined
-          );
-        } else {
-          await resumeDal.createMasterResume(
-            {
-              userId,
-              content: data.resumeText,
-              label: "Default",
-              isActive: true,
-              version: 1,
-            },
-            data.skills || undefined
-          );
+      const activeRes = await resumeDal.getActiveMasterResume(userId);
+      if (!activeRes.ok) {
+        return err(activeRes.error);
+      }
+
+      if (activeRes.value) {
+        const updateRes = await resumeDal.updateMasterResume(
+          activeRes.value.id,
+          userId,
+          { content: data.resumeText },
+          data.skills || undefined
+        );
+        if (!updateRes.ok) {
+          return err(updateRes.error);
         }
-      } catch (syncErr) {
-        console.error("Failed to mirror profile to master_resume:", syncErr);
+      } else {
+        const createRes = await resumeDal.createMasterResume(
+          {
+            userId,
+            content: data.resumeText,
+            label: "Default",
+            isActive: true,
+            version: 1,
+          },
+          data.skills || undefined
+        );
+        if (!createRes.ok) {
+          return err(createRes.error);
+        }
       }
     }
 

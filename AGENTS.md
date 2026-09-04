@@ -71,7 +71,7 @@ These are settled and should not be re-litigated or quietly changed by an agent:
 - **Layering is server action (or route handler) → service layer → DAL.** Route handlers and server actions are interchangeable entry points, but neither talks to the database directly — they call into `src/services/`, which calls into the DAL. Don't skip a layer "for a quick fix."
 - **Input validation and auth checks happen in the server action / route handler**, before the service layer is invoked. Services should be able to trust that inputs are already shaped and the caller is authorized.
 - **All server actions and API route handlers return the ok-err shape** (see §13) instead of throwing across that boundary. Don't introduce a second error-handling convention (e.g. throwing custom exceptions from an action) alongside it.
-- **AI scoring is gated on a master resume existing.** A user can fetch and browse jobs in their pipeline immediately after signup, but AI scoring, tailored resume generation, and tailored cover letter generation all require an active master resume in `master_resume` (`resumeDal.getActiveMasterResume()`). The legacy `profile` table has been dropped from the database and is never used as an AI fallback.
+- **AI scoring is gated on a master resume existing.** A user can fetch and browse jobs in their pipeline immediately after signup, but AI scoring, tailored resume generation, and tailored cover letter generation all require an active master resume in `master_resume` (`resumeDal.getActiveMasterResume()`). The legacy `profile` table (slated for removal; dropped in migration `0010_shocking_power_pack.sql` while transitional schema in `schema/legacy.ts` is retained solely for legacy `/dashboard/profile` UI mirroring) is never used as an AI fallback.
 - **AI calls go through the Vercel AI SDK**, using Anthropic, Gemini, or OpenAI as the underlying provider (occasionally routed through the Vercel AI Gateway). Provider selection/config lives wherever the existing AI service code already puts it — follow that, don't hardcode a provider inside a feature.
 - **AI calls log usage metrics.** All AI invocations (scoring, tailoring, cover letter generation) record token counts and latency to `ai_call_log` via `opsDal.logAiCall()`. Scoring providers return `ScoreWithUsage` to provide accurate token usage data.
 - **Third-party integrations (ATSs and local job boards) live behind adapters in `src/services/crawler/sources/`.** Each job source normalizes into the same internal `Job` shape — don't let source-specific fields leak into components or actions.
@@ -136,7 +136,7 @@ src/
       auth-client.ts        # better-auth client instance for use in Client Components
     db/
       index.ts              # Drizzle client instance
-      schema/               # Modular Drizzle schemas (pipeline, resume, scoring, ai-logs, auth, etc.)
+      schema/               # Modular Drizzle schemas (pipeline, resume, scoring, ops, auth, etc.)
                             # Note: schema/legacy.ts kept solely for backward compat; not re-exported from index
 
   dal/                      # Data access layer — the only place that talks to Drizzle directly
@@ -192,10 +192,10 @@ Rules of thumb:
 
 ## 10. Database (Drizzle)
 
-- Schema is the source of truth: organized domain-by-domain in `src/services/db/schema/` (`pipeline.ts`, `resume.ts`, `scoring.ts`, `ai-logs.ts`, `auth.ts`, etc.) and re-exported from `src/services/db/schema/index.ts`. Generate migrations with `drizzle-kit generate`, apply per the project's chosen push/migrate workflow — check `drizzle.config.ts` before running commands.
+- Schema is the source of truth: organized domain-by-domain in `src/services/db/schema/` (`pipeline.ts`, `resume.ts`, `scoring.ts`, `ops.ts`, `auth.ts`, etc.) and re-exported from `src/services/db/schema/index.ts`. Generate migrations with `drizzle-kit generate`, apply per the project's chosen push/migrate workflow — check `drizzle.config.ts` before running commands.
 - Never hand-edit generated migration SQL files after they've been applied elsewhere; create a new migration instead.
-- **Canonical tables:** `job`, `pipeline_entry`, `master_resume`, `master_resume_skill`, `job_match_score`, `ai_call_log`, `user`, etc. The legacy `jobs`, `profile`, and `deleted_jobs` tables have been permanently dropped (migration `0010_shocking_power_pack.sql`).
-- **Legacy schema fallback:** `src/services/db/schema/legacy.ts` remains only for `profile.dal.ts` and legacy migration scripts. It is deliberately NOT exported from `schema/index.ts`.
+- **Canonical tables:** `job`, `pipeline_entry`, `master_resume`, `master_resume_skill`, `job_match_score`, `ai_call_log`, `user`, etc. The legacy `jobs`, `profile`, and `deleted_jobs` tables are dropped in migration `0010_shocking_power_pack.sql`.
+- **Legacy schema fallback:** `src/services/db/schema/legacy.ts` remains only for `profile.dal.ts` and legacy migration scripts during transitional `/dashboard/profile` UI usage (mirroring changes into `master_resume`). It is deliberately NOT exported from `schema/index.ts`.
 - **Postgres extensions:** The database uses `pgvector` (`vector` extension) and `pg_trgm`. `master_resume.embedding` stores a 1536-dimensional vector for semantic matching. Note: Drizzle vector updates require passing the array as a formatted string literal (e.g. `[${embedding.join(",")}]` cast as any) until native Drizzle vector type-binding lands.
 - Use Drizzle's relational query API (`db.query.table.findMany({ with: {...} })`) for read paths that need relations (e.g. a pipeline entry with its job and score); use the SQL-like builder for writes and precise queries.
 - **All Drizzle calls live in `src/dal/`.** The service layer calls the DAL; it never imports the Drizzle client directly. This is what makes the service layer testable/mockable independent of the DB.

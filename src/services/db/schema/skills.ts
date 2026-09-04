@@ -5,7 +5,9 @@ import {
   boolean,
   pgEnum,
   uniqueIndex,
+  check,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { timestamps } from "./common";
 import { job } from "./job";
 
@@ -40,6 +42,7 @@ export const skillRelation = pgTable(
       t.toSkillId,
       t.relationType
     ),
+    check("skill_relation_no_self_link", sql`${t.fromSkillId} != ${t.toSkillId}`),
   ]
 );
 

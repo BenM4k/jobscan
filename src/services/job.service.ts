@@ -109,11 +109,13 @@ export async function scoreJobWithAI(
 
   // Gate on master_resume — AI scoring requires an active resume (per AGENTS.md §5)
   const resumeRes = await resumeDal.getActiveMasterResume(userId);
-  const resumeText = resumeRes.ok && resumeRes.value ? resumeRes.value.content : "";
+  if (!resumeRes.ok) return err(resumeRes.error);
+  const activeResume = resumeRes.value;
+  const resumeText = activeResume?.content || "";
   let resumeSkills: string[] = [];
 
-  if (resumeRes.ok && resumeRes.value) {
-    const skillsRes = await resumeDal.getResumeSkills(resumeRes.value.id);
+  if (activeResume) {
+    const skillsRes = await resumeDal.getResumeSkills(activeResume.id);
     if (skillsRes.ok) resumeSkills = skillsRes.value;
   }
 
@@ -126,8 +128,7 @@ export async function scoreJobWithAI(
     );
   }
 
-  const providerName = preferredProvider || "gemini";
-  const provider = getScoringProvider(providerName);
+  const provider = getScoringProvider(preferredProvider);
   const scoreResult = await provider.scoreJob(
     job.title,
     job.description || "",
@@ -143,7 +144,7 @@ export async function scoreJobWithAI(
   await opsDal.logAiCall({
     userId,
     feature: "scoring",
-    provider: providerName,
+    provider: provider.name,
     model: _usage.modelId,
     inputTokens: _usage.inputTokens,
     outputTokens: _usage.outputTokens,
@@ -154,7 +155,12 @@ export async function scoreJobWithAI(
     score.fitScore,
     score.scoreReasoning,
     score.coverLetterDraft,
-    score.tailoredResume
+    score.tailoredResume,
+    score.matchedSkills,
+    score.missingSkills,
+    undefined,
+    _usage.modelId,
+    activeResume?.version
   );
 }
 

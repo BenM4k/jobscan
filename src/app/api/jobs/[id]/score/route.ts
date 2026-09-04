@@ -27,13 +27,15 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const [jobResult, resumeResult, skillsResult] = await Promise.all([
-      jobsDal.getJobById(id, sessionResult.value.user.id),
-      resumeDal.getActiveMasterResume(sessionResult.value.user.id),
-      resumeDal.getActiveMasterResume(sessionResult.value.user.id).then(async (r) =>
-        r.ok && r.value ? resumeDal.getResumeSkills(r.value.id) : { ok: true as const, value: [] as string[] }
-      ),
+    const userId = sessionResult.value.user.id;
+    const [jobResult, resumeResult] = await Promise.all([
+      jobsDal.getJobById(id, userId),
+      resumeDal.getActiveMasterResume(userId),
     ]);
+    const skillsResult =
+      resumeResult.ok && resumeResult.value
+        ? await resumeDal.getResumeSkills(resumeResult.value.id)
+        : { ok: true as const, value: [] as string[] };
 
     if (!jobResult.ok || !jobResult.value) {
       return NextResponse.json(
@@ -128,7 +130,11 @@ ${job.description || "No description provided."}
       );
     }
 
-    const updateResult = await jobsDal.updateJobScoreBreakdown(job.id, score);
+    const updateResult = await jobsDal.updateJobScoreBreakdown(job.id, {
+      ...score,
+      modelUsed: model.modelId ?? "gemini",
+      resumeVersion: activeResume.version,
+    });
 
     if (!updateResult.ok) {
       console.error("Failed to persist job score:", { jobId: job.id });

@@ -91,11 +91,18 @@ export async function runDrcCrawler(
           }
 
           // 1. Record untouched raw payload
-          await jobsDal.insertRawJobPayload(
+          const rawPayloadRes = await jobsDal.insertRawJobPayload(
             job.source as jobsDal.JobSource,
             job.externalId,
             job as unknown as Record<string, unknown>
           );
+          if (!rawPayloadRes.ok) {
+            console.error(
+              `[Crawler ${name}] Failed to insert raw job payload for ${job.externalId}:`,
+              rawPayloadRes.error
+            );
+            continue;
+          }
 
           // 2. Upsert canonical job listing (and user pipeline entry if userId provided)
           const res = await jobsDal.upsertJob({
@@ -117,13 +124,25 @@ export async function runDrcCrawler(
 
           if (res.ok) {
             // 3. Link cross-source ref
-            await jobsDal.linkJobSourceRef(
+            const linkRes = await jobsDal.linkJobSourceRef(
               res.value.id,
               job.source as jobsDal.JobSource,
               job.externalId,
               job.url
             );
+            if (!linkRes.ok) {
+              console.error(
+                `[Crawler ${name}] Failed to link job source ref for ${job.externalId}:`,
+                linkRes.error
+              );
+              continue;
+            }
             sourceUpserted++;
+          } else {
+            console.error(
+              `[Crawler ${name}] Failed to upsert job ${job.externalId}:`,
+              res.error
+            );
           }
         } catch (jobErr) {
           console.error(

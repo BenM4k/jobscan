@@ -15,19 +15,8 @@ import type { EducationItem, ExperienceItem, TailoredResumeData } from "@/lib/ai
 // Legacy tables — retained during migration until DAL & UI refactor
 // ─────────────────────────────────────────────────────────────
 
-export const legacyJobStatusEnum = [
-  "new",
-  "saved",
-  "scored",
-  "tailored",
-  "applied",
-  "interviewing",
-  "rejected",
-  "offer",
-] as const;
-
-export type JobStatus = (typeof legacyJobStatusEnum)[number];
-export type LegacyJobStatus = JobStatus;
+import { legacyJobStatusEnum, type JobStatus, type LegacyJobStatus } from "./pipeline";
+export { legacyJobStatusEnum, type JobStatus, type LegacyJobStatus };
 
 export const jobs = pgTable(
   "jobs",

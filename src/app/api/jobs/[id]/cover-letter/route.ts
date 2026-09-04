@@ -115,7 +115,7 @@ ${job.description || "No description provided."}
               userId,
               feature: "tailored_cover_letter",
               provider: "google",
-              model: "gemini-2.5",
+              model: model.modelId ?? "gemini",
               costEstimateUsd: "0.001",
             });
           }

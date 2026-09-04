@@ -151,6 +151,7 @@ export async function upsertJob(
     }
 
     let pipelineId = canonical.id;
+    let entryStatus: JobStatus = (data.status as JobStatus) || "saved";
     if (data.userId) {
       const pStatus =
         data.status === "applied" ||
@@ -178,6 +179,7 @@ export async function upsertJob(
 
       if (entry) {
         pipelineId = entry.id;
+        entryStatus = entry.status as JobStatus;
       }
     }
 
@@ -204,7 +206,7 @@ export async function upsertJob(
       coverLetterDraft: data.coverLetterDraft || null,
       tailoredResume: data.tailoredResume || null,
       tailoredResumeData: data.tailoredResumeData || null,
-      status: data.status || "saved",
+      status: entryStatus,
       createdAt: canonical.createdAt,
       updatedAt: canonical.updatedAt,
     });
@@ -304,38 +306,12 @@ export async function listJobs(
     }
 
     // Unscoped global catalog listing
-    const conditions = [];
-    if (sourceFilter && sourceFilter !== "all") {
-      conditions.push(eq(job.source, sourceFilter as JobSource));
-    }
-    if (startDate) {
-      const start = new Date(startDate);
-      if (!isNaN(start.getTime())) {
-        conditions.push(
-          gte(sql`COALESCE(${job.postedAt}, ${job.createdAt})`, start)
-        );
-      }
-    }
-    if (endDate) {
-      const end = new Date(endDate);
-      if (!isNaN(end.getTime())) {
-        end.setHours(23, 59, 59, 999);
-        conditions.push(
-          lte(sql`COALESCE(${job.postedAt}, ${job.createdAt})`, end)
-        );
-      }
-    }
-    if (queryFilter && queryFilter.trim()) {
-      const q = `%${queryFilter.trim()}%`;
-      conditions.push(
-        or(
-          ilike(job.title, q),
-          ilike(job.company, q),
-          ilike(job.description, q),
-          ilike(job.location, q)
-        )!
-      );
-    }
+    const conditions = buildUnscopedJobConditions(
+      sourceFilter,
+      startDate,
+      endDate,
+      queryFilter
+    );
 
     const rows = await db
       .select()
@@ -379,6 +355,47 @@ export async function listJobs(
   }
 }
 
+function buildUnscopedJobConditions(
+  sourceFilter?: string,
+  startDate?: string,
+  endDate?: string,
+  queryFilter?: string
+) {
+  const conditions = [];
+  if (sourceFilter && sourceFilter !== "all") {
+    conditions.push(eq(job.source, sourceFilter as JobSource));
+  }
+  if (startDate) {
+    const start = new Date(startDate);
+    if (!isNaN(start.getTime())) {
+      conditions.push(
+        gte(sql`COALESCE(${job.postedAt}, ${job.createdAt})`, start)
+      );
+    }
+  }
+  if (endDate) {
+    const end = new Date(endDate);
+    if (!isNaN(end.getTime())) {
+      end.setHours(23, 59, 59, 999);
+      conditions.push(
+        lte(sql`COALESCE(${job.postedAt}, ${job.createdAt})`, end)
+      );
+    }
+  }
+  if (queryFilter && queryFilter.trim()) {
+    const q = `%${queryFilter.trim()}%`;
+    conditions.push(
+      or(
+        ilike(job.title, q),
+        ilike(job.company, q),
+        ilike(job.description, q),
+        ilike(job.location, q)
+      )!
+    );
+  }
+  return conditions;
+}
+
 export async function countJobs(
   statusFilter?: pipelineDal.PipelineStatus | "all" | string,
   sourceFilter?: string,
@@ -398,7 +415,16 @@ export async function countJobs(
       });
     }
 
-    const [res] = await db.select({ value: count() }).from(job);
+    const conditions = buildUnscopedJobConditions(
+      sourceFilter,
+      startDate,
+      endDate,
+      queryFilter
+    );
+    const [res] = await db
+      .select({ value: count() })
+      .from(job)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
     return ok(res?.value ?? 0);
   } catch (error) {
     return err(new AppError("DB_ERROR", "Failed to count jobs", error));
@@ -452,44 +478,73 @@ export async function updateJobScoreAndCoverLetter(
   tailoredResumeText?: string,
   matchedSkills?: string[],
   missingSkills?: string[],
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  gaps?: string[]
+  _gaps?: string[],
+  modelUsed?: string,
+  resumeVersion?: number
 ): Promise<Result<JobSelect, AppError>> {
   try {
-    // 1. Persist Score snapshot
-    await db.insert(score).values({
-      pipelineEntryId: id,
-      resumeVersion: 1,
-      modelUsed: "gemini",
-      finalScore: fitScore.toString(),
-      matchedSkills: matchedSkills ?? [],
-      missingSkills: missingSkills ?? [],
-      explanation: scoreReasoning,
-    });
-
-    // 2. Persist Cover Letter
-    if (coverLetterDraft) {
-      await tailoringDal.saveTailoredCoverLetter(id, coverLetterDraft);
-    }
-
-    // 3. Persist Tailored Resume if provided
-    if (tailoredResumeText) {
-      await tailoringDal.saveTailoredResume(id, tailoredResumeText);
-    }
-
-    // 4. Update pipeline entry status to saved if still new
-    await db
-      .update(pipelineEntry)
-      .set({ updatedAt: new Date() })
-      .where(eq(pipelineEntry.id, id));
-
+    // 1. Resolve pipeline entry by entry id or job id
     const [entry] = await db
       .select()
       .from(pipelineEntry)
-      .where(eq(pipelineEntry.id, id))
+      .where(or(eq(pipelineEntry.id, id), eq(pipelineEntry.jobId, id)))
       .limit(1);
 
-    return await getJobById(id, entry?.userId);
+    if (!entry) {
+      return err(new AppError("NOT_FOUND", `Pipeline entry for job ${id} not found`));
+    }
+
+    const pipelineEntryId = entry.id;
+
+    // 2. Persist Score snapshot (upsert exactly one current score per pipeline entry)
+    const [existingScore] = await db
+      .select()
+      .from(score)
+      .where(eq(score.pipelineEntryId, pipelineEntryId))
+      .limit(1);
+
+    if (existingScore) {
+      await db
+        .update(score)
+        .set({
+          finalScore: fitScore.toString(),
+          explanation: scoreReasoning,
+          matchedSkills: matchedSkills ?? [],
+          missingSkills: missingSkills ?? [],
+          modelUsed: modelUsed ?? existingScore.modelUsed,
+          resumeVersion: resumeVersion ?? existingScore.resumeVersion,
+          updatedAt: new Date(),
+        })
+        .where(eq(score.id, existingScore.id));
+    } else {
+      await db.insert(score).values({
+        pipelineEntryId,
+        resumeVersion: resumeVersion ?? 1,
+        modelUsed: modelUsed ?? "gemini",
+        finalScore: fitScore.toString(),
+        matchedSkills: matchedSkills ?? [],
+        missingSkills: missingSkills ?? [],
+        explanation: scoreReasoning,
+      });
+    }
+
+    // 3. Persist Cover Letter
+    if (coverLetterDraft) {
+      await tailoringDal.saveTailoredCoverLetter(pipelineEntryId, coverLetterDraft);
+    }
+
+    // 4. Persist Tailored Resume if provided
+    if (tailoredResumeText) {
+      await tailoringDal.saveTailoredResume(pipelineEntryId, tailoredResumeText);
+    }
+
+    // 5. Update pipeline entry timestamp
+    await db
+      .update(pipelineEntry)
+      .set({ updatedAt: new Date() })
+      .where(eq(pipelineEntry.id, pipelineEntryId));
+
+    return await getJobById(pipelineEntryId, entry.userId);
   } catch (error) {
     return err(
       new AppError("DB_ERROR", `Failed to update score for job ${id}`, error)
@@ -505,6 +560,8 @@ export async function updateJobScoreBreakdown(
     missingSkills: string[];
     gaps: string[];
     reasoning: string;
+    modelUsed?: string;
+    resumeVersion?: number;
   }
 ): Promise<Result<JobSelect, AppError>> {
   return await updateJobScoreAndCoverLetter(
@@ -515,7 +572,9 @@ export async function updateJobScoreBreakdown(
     undefined,
     scoreData.matchedSkills,
     scoreData.missingSkills,
-    scoreData.gaps
+    scoreData.gaps,
+    scoreData.modelUsed,
+    scoreData.resumeVersion
   );
 }
 
@@ -545,10 +604,10 @@ export async function updateJobTailoredResume(
 export async function updateJobCoverLetter(
   id: string,
   userId: string,
-  coverLetterText: string
+  coverLetterDraft: string
 ): Promise<Result<JobSelect, AppError>> {
   try {
-    await tailoringDal.saveTailoredCoverLetter(id, coverLetterText);
+    await tailoringDal.saveTailoredCoverLetter(id, coverLetterDraft);
     return await getJobById(id, userId);
   } catch (error) {
     return err(
@@ -562,7 +621,23 @@ export async function deleteJob(
   userId: string
 ): Promise<Result<boolean, AppError>> {
   try {
-    return await pipelineDal.deletePipelineEntry(id, userId);
+    const updateRes = await pipelineDal.updatePipelineStatus(id, userId, "withdrawn");
+    if (updateRes.ok) {
+      return ok(true);
+    }
+    // Also try resolving if id is a canonical jobId
+    const [byJob] = await db
+      .select({ id: pipelineEntry.id })
+      .from(pipelineEntry)
+      .where(and(eq(pipelineEntry.jobId, id), eq(pipelineEntry.userId, userId)))
+      .limit(1);
+    if (byJob) {
+      const updateByJobRes = await pipelineDal.updatePipelineStatus(byJob.id, userId, "withdrawn");
+      if (updateByJobRes.ok) {
+        return ok(true);
+      }
+    }
+    return err(updateRes.error);
   } catch (error) {
     return err(new AppError("DB_ERROR", `Failed to delete job ${id}`, error));
   }

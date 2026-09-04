@@ -12,7 +12,7 @@ import {
   pipelineStatusEnum,
 } from "../src/services/db/schema";
 import { profile, jobs as oldJobs } from "../src/services/db/schema/legacy";
-import { sql } from "drizzle-orm";
+import { sql, eq, and } from "drizzle-orm";
 
 type PipelineStatus = (typeof pipelineStatusEnum.enumValues)[number];
 
@@ -44,20 +44,33 @@ export async function runDataMigration() {
   for (const prof of profiles) {
     if (!prof.userId || !prof.resumeText) continue;
 
-    // Upsert master resume
-    const [resume] = await db
-      .insert(masterResume)
-      .values({
-        userId: prof.userId,
-        label: "Default",
-        content: prof.resumeText,
-        isActive: true,
-        version: 1,
-      })
-      .onConflictDoNothing()
-      .returning();
+    // Look up and reuse existing active "Default" resume to make migration reruns idempotent
+    const [existingResume] = await db
+      .select()
+      .from(masterResume)
+      .where(
+        and(
+          eq(masterResume.userId, prof.userId),
+          eq(masterResume.label, "Default"),
+          eq(masterResume.isActive, true)
+        )
+      )
+      .limit(1);
 
-    const resumeId = resume?.id;
+    let resumeId = existingResume?.id;
+    if (!resumeId) {
+      const [resume] = await db
+        .insert(masterResume)
+        .values({
+          userId: prof.userId,
+          label: "Default",
+          content: prof.resumeText,
+          isActive: true,
+          version: 1,
+        })
+        .returning();
+      resumeId = resume?.id;
+    }
 
     // Migrate skills
     const skillsList = Array.isArray(prof.skills) ? prof.skills : [];

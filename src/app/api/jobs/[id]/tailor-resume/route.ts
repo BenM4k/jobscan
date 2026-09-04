@@ -111,7 +111,7 @@ ${job.gaps?.length ? `Identified Skills & Gaps from Evaluation:\n- Matched: ${jo
         userId: sessionResult.value.user.id,
         feature: "tailored_resume",
         provider: "google",
-        model: "gemini-2.5",
+        model: model.modelId ?? "gemini",
         inputTokens: result.usage?.inputTokens,
         outputTokens: result.usage?.outputTokens,
         costEstimateUsd: "0.002",

@@ -2,7 +2,7 @@
 
 import React, { useState, Suspense } from "react";
 import { useQueryState, parseAsString, parseAsStringEnum } from "nuqs";
-import { JobStatus, legacyJobStatusEnum as jobStatusEnum } from "@/services/db/schema";
+import { pipelineStatusEnum, type PipelineStatus } from "@/services/db/schema";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { FetchJobsPopover } from "@/components/FetchJobsPopover";
 import { useTranslations } from "next-intl";
@@ -23,15 +23,16 @@ type Source =
   | "manual";
 
 type SourceOption = "all" | Source;
-type StatusOption = "all" | JobStatus;
+type StatusOption = "all" | PipelineStatus;
 
 function FilterBar() {
   const t = useTranslations("dashboard");
   const [statusFilter, setStatusFilter] = useQueryState(
     "status",
-    parseAsStringEnum<StatusOption>(["all", ...jobStatusEnum]).withDefault(
+    parseAsStringEnum<StatusOption>([
       "all",
-    ),
+      ...pipelineStatusEnum.enumValues,
+    ]).withDefault("all"),
   );
 
   const [sourceFilter, setSourceFilter] = useQueryState(
@@ -91,12 +92,12 @@ function FilterBar() {
           className="appearance-none bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 rounded-xl px-3.5 py-1.5 sm:px-4 sm:py-2 pr-7 hover:border-slate-300 dark:hover:border-zinc-700 transition cursor-pointer text-xs focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500 font-medium"
         >
           <option value="all">{t("statusAll")}</option>
-          <option value="new">{t("statusNew")}</option>
-          <option value="scored">{t("statusScored")}</option>
+          <option value="saved">{t("statusSaved")}</option>
           <option value="applied">{t("statusApplied")}</option>
           <option value="interviewing">{t("statusInterviewing")}</option>
-          <option value="rejected">{t("statusRejected")}</option>
           <option value="offer">{t("statusOffer")}</option>
+          <option value="rejected">{t("statusRejected")}</option>
+          <option value="withdrawn">{t("statusWithdrawn")}</option>
         </select>
         <span
           className="absolute right-2.5 top-2 sm:top-2.5 pointer-events-none text-[10px] text-gray-400 dark:text-zinc-500"

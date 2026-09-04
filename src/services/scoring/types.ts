@@ -7,6 +7,8 @@ export const scoreResultSchema = z.object({
   scoreReasoning: z.string().describe("Detailed 2-3 sentence explanation of match alignment and key strengths"),
   coverLetterDraft: z.string().describe("A compelling, highly customized multi-paragraph cover letter tailored specifically to this role and company with realistic value propositions"),
   tailoredResume: z.string().describe("A complete, professionally formatted tailored resume with summary, skills, and newly generated realistic bullet points tailored directly to the job description requirements"),
+  matchedSkills: z.array(z.string()).describe("Candidate skills and qualifications explicitly matched to the job description").optional().default([]),
+  missingSkills: z.array(z.string()).describe("Important skills, qualifications, or requirements from the job description missing or not demonstrated").optional().default([]),
 });
 
 export type ScoreResult = z.infer<typeof scoreResultSchema>;

@@ -12,6 +12,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { timestamps } from "./common";
+import { user } from "./auth";
 
 // ─────────────────────────────────────────────────────────────
 // PHASE 0 & 2 — Ingestion hygiene & Normalized Job Catalog
@@ -63,7 +64,9 @@ export const job = pgTable(
     embedding: vector("embedding", { dimensions: 1536 }),
     simhash: numeric("simhash"),
 
-    addedByUserId: uuid("added_by_user_id"),
+    addedByUserId: uuid("added_by_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
     ...timestamps,
   },
   (t) => [

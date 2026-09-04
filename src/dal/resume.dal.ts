@@ -10,7 +10,6 @@ import {
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 import { eq, and, desc, sql } from "drizzle-orm";
-import { upsertSkills } from "./skills.dal";
 import { generateEmbedding } from "@/services/ai/embeddings";
 
 export type MasterResumeSelect = typeof masterResume.$inferSelect;
@@ -77,18 +76,22 @@ export async function createMasterResume(
   skills?: string[]
 ): Promise<Result<MasterResumeSelect, AppError>> {
   try {
-    // If setting as active, deactivate other personas for this user
-    if (data.isActive) {
-      await db
-        .update(masterResume)
-        .set({ isActive: false })
-        .where(eq(masterResume.userId, data.userId));
-    }
+    // If setting as active, deactivate other personas and create in one transaction
+    const created = await db.transaction(async (tx) => {
+      if (data.isActive) {
+        await tx
+          .update(masterResume)
+          .set({ isActive: false })
+          .where(eq(masterResume.userId, data.userId));
+      }
 
-    const [created] = await db
-      .insert(masterResume)
-      .values(data)
-      .returning();
+      const [res] = await tx
+        .insert(masterResume)
+        .values(data)
+        .returning();
+
+      return res;
+    });
 
     if (!created) {
       return err(new AppError("DB_ERROR", "Failed to create master resume"));
@@ -122,21 +125,35 @@ export async function updateMasterResume(
   skills?: string[]
 ): Promise<Result<MasterResumeSelect, AppError>> {
   try {
-    if (data.isActive) {
-      await db
-        .update(masterResume)
-        .set({ isActive: false })
-        .where(eq(masterResume.userId, userId));
-    }
+    const updated = await db.transaction(async (tx) => {
+      const [target] = await tx
+        .select({ id: masterResume.id })
+        .from(masterResume)
+        .where(and(eq(masterResume.id, id), eq(masterResume.userId, userId)))
+        .limit(1);
 
-    const [updated] = await db
-      .update(masterResume)
-      .set({
-        ...data,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(masterResume.id, id), eq(masterResume.userId, userId)))
-      .returning();
+      if (!target) {
+        return null;
+      }
+
+      if (data.isActive) {
+        await tx
+          .update(masterResume)
+          .set({ isActive: false })
+          .where(eq(masterResume.userId, userId));
+      }
+
+      const [res] = await tx
+        .update(masterResume)
+        .set({
+          ...data,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(masterResume.id, id), eq(masterResume.userId, userId)))
+        .returning();
+
+      return res;
+    });
 
     if (!updated) {
       return err(new AppError("NOT_FOUND", `Master resume ${id} not found`));
@@ -170,22 +187,29 @@ export async function setActiveMasterResume(
   userId: string
 ): Promise<Result<boolean, AppError>> {
   try {
-    await db
-      .update(masterResume)
-      .set({ isActive: false })
-      .where(eq(masterResume.userId, userId));
+    return await db.transaction(async (tx) => {
+      const [target] = await tx
+        .select({ id: masterResume.id })
+        .from(masterResume)
+        .where(and(eq(masterResume.id, id), eq(masterResume.userId, userId)))
+        .limit(1);
 
-    const [updated] = await db
-      .update(masterResume)
-      .set({ isActive: true })
-      .where(and(eq(masterResume.id, id), eq(masterResume.userId, userId)))
-      .returning();
+      if (!target) {
+        return err(new AppError("NOT_FOUND", `Resume ${id} not found`));
+      }
 
-    if (!updated) {
-      return err(new AppError("NOT_FOUND", `Resume ${id} not found`));
-    }
+      await tx
+        .update(masterResume)
+        .set({ isActive: false })
+        .where(eq(masterResume.userId, userId));
 
-    return ok(true);
+      await tx
+        .update(masterResume)
+        .set({ isActive: true })
+        .where(and(eq(masterResume.id, id), eq(masterResume.userId, userId)));
+
+      return ok(true);
+    });
   } catch (error) {
     return err(new AppError("DB_ERROR", `Failed to set active resume ${id}`, error));
   }
@@ -211,20 +235,33 @@ export async function syncResumeSkills(
   skillNames: string[]
 ): Promise<Result<void, AppError>> {
   try {
-    await db.delete(resumeSkill).where(eq(resumeSkill.resumeId, resumeId));
-    const upserted = await upsertSkills(skillNames);
-    if (!upserted.ok) return err(upserted.error);
+    return await db.transaction(async (tx) => {
+      await tx.delete(resumeSkill).where(eq(resumeSkill.resumeId, resumeId));
+      const cleanNames = skillNames.map((n) => n.trim()).filter(Boolean);
+      if (cleanNames.length === 0) return ok(undefined);
 
-    for (const sk of upserted.value) {
-      await db
-        .insert(resumeSkill)
-        .values({
-          resumeId,
-          skillId: sk.id,
-        })
-        .onConflictDoNothing();
-    }
-    return ok(undefined);
+      for (const name of cleanNames) {
+        const [sk] = await tx
+          .insert(skill)
+          .values({ name })
+          .onConflictDoUpdate({
+            target: skill.name,
+            set: { name },
+          })
+          .returning();
+
+        if (sk) {
+          await tx
+            .insert(resumeSkill)
+            .values({
+              resumeId,
+              skillId: sk.id,
+            })
+            .onConflictDoNothing();
+        }
+      }
+      return ok(undefined);
+    });
   } catch (error) {
     return err(new AppError("DB_ERROR", "Failed to sync resume skills", error));
   }
