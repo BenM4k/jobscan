@@ -109,7 +109,7 @@ export async function dispatchUserDigestEmail(
       });
 
       if (error) {
-        console.error(`[DigestService] Resend returned error sending to ${user.email}:`, error);
+        console.error(`[DigestService] Resend returned error sending to user ${user.id}:`, error);
         return err(
           new AppError(
             "EXTERNAL_API_ERROR",
@@ -120,7 +120,7 @@ export async function dispatchUserDigestEmail(
       }
     } else {
       console.log(
-        `[DigestService] Mock email sent to ${user.email} with ${jobs.length} jobs (RESEND_API_KEY not configured)`
+        `[DigestService] Mock email sent to user ${user.id} with ${jobs.length} jobs (RESEND_API_KEY not configured)`
       );
     }
 

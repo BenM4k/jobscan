@@ -54,10 +54,19 @@ const US_CA_STATE_PROVINCE_CODES = new Set([
   "DC", "PR", "VI", "GU",
   // Canadian Provinces
   "AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT",
-  // Common state names lowercased
-  "california", "new york", "texas", "washington", "florida", "illinois",
-  "massachusetts", "colorado", "georgia", "north carolina", "virginia",
-  "ontario", "quebec", "british columbia", "alberta",
+  // US States and Territories full names (lowercased)
+  "alabama", "alaska", "arizona", "arkansas", "california", "colorado", "connecticut",
+  "delaware", "florida", "georgia", "hawaii", "idaho", "illinois", "indiana", "iowa",
+  "kansas", "kentucky", "louisiana", "maine", "maryland", "massachusetts", "michigan",
+  "minnesota", "mississippi", "missouri", "montana", "nebraska", "nevada", "new hampshire",
+  "new jersey", "new mexico", "new york", "north carolina", "north dakota", "ohio",
+  "oklahoma", "oregon", "pennsylvania", "rhode island", "south carolina", "south dakota",
+  "tennessee", "texas", "utah", "vermont", "virginia", "washington", "west virginia",
+  "wisconsin", "wyoming", "district of columbia", "puerto rico", "guam", "virgin islands",
+  // Canadian Provinces full names (lowercased)
+  "alberta", "british columbia", "manitoba", "new brunswick", "newfoundland and labrador",
+  "nova scotia", "ontario", "prince edward island", "quebec", "saskatchewan",
+  "northwest territories", "nunavut", "yukon",
 ]);
 
 export function isValidCountry(candidate?: string): boolean {

@@ -212,9 +212,17 @@ export async function generateTailoredResumeAction(
         const { AppError } = await import("@/lib/errors");
         return { ok: false, error: new AppError("NOT_FOUND", "Job not found") };
       }
+      let tailoredResumeText = jobRes.value.tailoredResume || "";
+      if (record.resultRef) {
+        const tailoringDal = await import("@/dal/tailoring.dal");
+        const trRecord = await tailoringDal.getTailoredResume(targetId);
+        if (trRecord.ok && trRecord.value?.content) {
+          tailoredResumeText = trRecord.value.content;
+        }
+      }
       return ok({
         job: jobRes.value,
-        tailoredResumeText: jobRes.value.tailoredResume || "",
+        tailoredResumeText,
         structured: jobRes.value.tailoredResumeData || null,
         tailoredResumeRecordId: record.resultRef || undefined,
       });
@@ -284,9 +292,17 @@ export async function generateTailoredCoverLetterAction(
         const { AppError } = await import("@/lib/errors");
         return { ok: false, error: new AppError("NOT_FOUND", "Job not found") };
       }
+      let coverLetter = jobRes.value.coverLetterDraft || "";
+      if (record.resultRef) {
+        const tailoringDal = await import("@/dal/tailoring.dal");
+        const clRecord = await tailoringDal.getTailoredCoverLetter(targetId);
+        if (clRecord.ok && clRecord.value?.content) {
+          coverLetter = clRecord.value.content;
+        }
+      }
       return ok({
         job: jobRes.value,
-        coverLetter: jobRes.value.coverLetterDraft || "",
+        coverLetter,
         coverLetterRecordId: record.resultRef || undefined,
       });
     },

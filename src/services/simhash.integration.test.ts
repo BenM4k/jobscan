@@ -29,6 +29,7 @@ async function runConcurrentDedupTest() {
   const extIdB = `ext-lev-${crypto.randomUUID()}`;
 
   let createdCanonicalId: string | null = null;
+  let secondCanonicalId: string | null = null;
 
   try {
     console.log("Simulating concurrent ingestion from two different ATS sources...");
@@ -63,8 +64,15 @@ async function runConcurrentDedupTest() {
       ),
     ]);
 
-    assert(resA.ok, `resA should be ok: ${!resA.ok ? resA.error.message : ""}`);
-    assert(resB.ok, `resB should be ok: ${!resB.ok ? resB.error.message : ""}`);
+    if (resA.ok && resA.value.canonicalJob?.id) {
+      createdCanonicalId = resA.value.canonicalJob.id;
+    }
+    if (resB.ok && resB.value.canonicalJob?.id) {
+      secondCanonicalId = resB.value.canonicalJob.id;
+    }
+
+    assert(resA.ok, "resA should succeed");
+    assert(resB.ok, "resB should succeed");
     if (!resA.ok || !resB.ok) return;
 
     const valA = resA.value;
@@ -78,17 +86,16 @@ async function runConcurrentDedupTest() {
     assert(dupCount === 1, `Expected exactly 1 detected duplicate, got ${dupCount}`);
     assert(valA.canonicalJob.id === valB.canonicalJob.id, "Both results point to the same canonical job ID");
 
-    createdCanonicalId = valA.canonicalJob.id;
-
     // Verify DB count
-    const rows = await db.select().from(job).where(eq(job.id, createdCanonicalId));
+    const rows = await db.select().from(job).where(eq(job.id, createdCanonicalId!));
     assert(rows.length === 1, `Expected exactly 1 job in DB, found ${rows.length}`);
 
     console.log("✓ Concurrent cross-source ingestion test passed! Exactly one canonical job created.");
   } finally {
-    if (createdCanonicalId) {
-      await db.delete(jobSourceRef).where(eq(jobSourceRef.jobId, createdCanonicalId));
-      await db.delete(job).where(eq(job.id, createdCanonicalId));
+    const idsToClean = new Set([createdCanonicalId, secondCanonicalId].filter(Boolean) as string[]);
+    for (const cid of idsToClean) {
+      await db.delete(jobSourceRef).where(eq(jobSourceRef.jobId, cid));
+      await db.delete(job).where(eq(job.id, cid));
     }
   }
 }

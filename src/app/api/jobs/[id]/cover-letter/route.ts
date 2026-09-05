@@ -113,11 +113,20 @@ export async function POST(
         );
       }
 
-      const existingJobRes = await jobsDal.getJobById(storedTarget, userId);
-      const cachedText =
-        existingJobRes.ok && existingJobRes.value?.coverLetterDraft
-          ? existingJobRes.value.coverLetterDraft
-          : "";
+      let cachedText = "";
+      if (state.record.resultRef) {
+        const clRecord = await tailoringDal.getTailoredCoverLetter(storedTarget);
+        if (clRecord.ok && clRecord.value?.content) {
+          cachedText = clRecord.value.content;
+        }
+      }
+
+      if (!cachedText) {
+        const existingJobRes = await jobsDal.getJobById(storedTarget, userId);
+        if (existingJobRes.ok && existingJobRes.value?.coverLetterDraft) {
+          cachedText = existingJobRes.value.coverLetterDraft;
+        }
+      }
 
       if (cachedText) {
         return new Response(cachedText, {
@@ -236,11 +245,15 @@ ${job.description || "No description provided."}
             const clRecordId =
               clRecord.ok && clRecord.value ? clRecord.value.id : job.id;
             if (idempotencyAttemptId) {
-              await idempotencyDal.completeIdempotentAction(
+              const completeRes = await idempotencyDal.completeIdempotentAction(
                 state.record.id,
                 idempotencyAttemptId,
                 clRecordId
               );
+              if (!completeRes.ok) {
+                console.error("Failed to complete idempotency key for cover letter:", completeRes.error);
+                await idempotencyDal.failIdempotentAction(state.record.id, idempotencyAttemptId);
+              }
             }
           } else {
             if (idempotencyAttemptId) {

@@ -44,6 +44,10 @@ export const jobFetchRequested = inngest.createFunction(
   {
     id: "job-fetch-requested",
     triggers: [jobFetchRequestedEvent],
+    debounce: {
+      key: "event.data.userId || 'global'",
+      period: "10m",
+    },
   },
   async ({ event, step }) => {
     const { source = "all", target, userId } = event.data;

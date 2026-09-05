@@ -27,6 +27,13 @@ export function shouldDispatchEmptyFeedFetch(
   userOrGlobalKey: string,
   now: number = Date.now()
 ): boolean {
+  // Prune expired entries to prevent unbounded map growth
+  for (const [key, timestamp] of emptyFeedDispatchTracker.entries()) {
+    if (now - timestamp >= EMPTY_FEED_FETCH_COOLDOWN_MS) {
+      emptyFeedDispatchTracker.delete(key);
+    }
+  }
+
   const lastTrigger = emptyFeedDispatchTracker.get(userOrGlobalKey);
   if (lastTrigger && now - lastTrigger < EMPTY_FEED_FETCH_COOLDOWN_MS) {
     return false;

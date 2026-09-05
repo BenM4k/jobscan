@@ -72,9 +72,17 @@ export async function POST(
           const { AppError } = await import("@/lib/errors");
           return { ok: false, error: new AppError("NOT_FOUND", "Job opportunity not found") };
         }
+        let tailoredResumeText = existingJobRes.value.tailoredResume || "";
+        if (record.resultRef) {
+          const tailoringDal = await import("@/dal/tailoring.dal");
+          const trRecord = await tailoringDal.getTailoredResume(targetJobId);
+          if (trRecord.ok && trRecord.value?.content) {
+            tailoredResumeText = trRecord.value.content;
+          }
+        }
         return ok({
           job: existingJobRes.value,
-          tailoredResumeText: existingJobRes.value.tailoredResume || "",
+          tailoredResumeText,
           structured: existingJobRes.value.tailoredResumeData || null,
           tailoredResumeRecordId: record.resultRef || undefined,
         });
@@ -92,6 +100,12 @@ export async function POST(
         return NextResponse.json(
           { error: result.error.message },
           { status: 400 }
+        );
+      }
+      if (result.error.code === "NOT_FOUND") {
+        return NextResponse.json(
+          { error: result.error.message || "Job opportunity not found" },
+          { status: 404 }
         );
       }
       return NextResponse.json(

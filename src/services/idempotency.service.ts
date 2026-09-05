@@ -149,6 +149,7 @@ export async function runWithIdempotency<T>({
     );
     if (!completeRes.ok) {
       console.warn(`[Idempotency] Failed to complete action due to lost lease or conflict:`, completeRes.error);
+      return err(completeRes.error);
     }
 
     return ok({ data: result.value.data, isCached: false });

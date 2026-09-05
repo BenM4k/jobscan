@@ -55,7 +55,7 @@ async function runTests() {
     // First attempt should be locked
     const begin1 = await idempotencyDal.beginIdempotentAction(testUserId, action1, key1);
     assert(begin1.ok, "begin1 should succeed");
-    if (!begin1.ok) return;
+    if (!begin1.ok || begin1.value.type !== "locked") return;
     assert(begin1.value.type === "locked", "begin1 type should be locked");
     const record1 = begin1.value.record;
 
@@ -67,7 +67,11 @@ async function runTests() {
 
     // Complete record1
     const resultRef1 = crypto.randomUUID();
-    const complete1 = await idempotencyDal.completeIdempotentAction(record1.id, resultRef1);
+    const complete1 = await idempotencyDal.completeIdempotentAction(
+      record1.id,
+      record1.attemptId,
+      resultRef1
+    );
     assert(complete1.ok, "complete1 should succeed");
     if (!complete1.ok) return;
     assert(complete1.value.status === "completed", "record status should be completed");
