@@ -52,6 +52,7 @@ export async function POST(
       userId,
       action: "generate_tailored_resume",
       key: idempotencyKey,
+      targetId: id,
       execute: async () => {
         const tailorRes = await generateTailoredResume(id, userId);
         if (!tailorRes.ok) {
@@ -64,7 +65,8 @@ export async function POST(
         });
       },
       resolveExisting: async (record) => {
-        const existingJobRes = await jobsDal.getJobById(id, userId);
+        const targetJobId = record.targetId || id;
+        const existingJobRes = await jobsDal.getJobById(targetJobId, userId);
         if (!existingJobRes.ok) return existingJobRes;
         if (!existingJobRes.value) {
           const { AppError } = await import("@/lib/errors");

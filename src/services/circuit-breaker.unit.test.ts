@@ -272,9 +272,55 @@ async function runCircuitBreakerUnitTests() {
       assert(false, "Should have thrown");
     } catch (err: unknown) {
       assert(err instanceof CircuitBreakerOpenError, "Adapter threw CircuitBreakerOpenError");
+      assert(adapter.fetchCount === countBefore, "fetchCount unchanged when circuit breaker open");
     }
-    assert(adapter.fetchCount === countBefore, "Underlying fetchRawInternal was NOT called");
     adapter.circuitBreaker.reset();
+  }
+
+  // 9. Probe in flight rejection in HALF_OPEN & post-action timestamp verification
+  {
+    const breaker = new CircuitBreaker("test-probe-flight", {
+      failureThreshold: 2,
+      baseBackoffMs: 10_000,
+      now: clock,
+    });
+
+    // Trip the circuit
+    try { await breaker.execute(async () => { throw new Error("fail-1"); }); } catch {}
+    try { await breaker.execute(async () => { throw new Error("fail-2"); }); } catch {}
+    assert(breaker.getState() === "OPEN", "Circuit tripped OPEN");
+
+    // Advance time past backoff
+    simulatedTime += 10_001;
+    assert(breaker.getState() === "HALF_OPEN", "Circuit is HALF_OPEN");
+
+    // Start a probe that takes simulated time
+    let probeResolved = false;
+    let finishProbe: () => void = () => {};
+    const probePromise = breaker.execute(async () => {
+      // Simulate action taking time
+      simulatedTime += 2000;
+      await new Promise<void>((resolve) => { finishProbe = resolve; });
+      probeResolved = true;
+      return "probe-done";
+    });
+
+    // While probe is in flight, a concurrent call should be rejected
+    let concurrentThrew = false;
+    try {
+      await breaker.execute(async () => "concurrent");
+    } catch (err) {
+      if (err instanceof CircuitBreakerOpenError) {
+        concurrentThrew = true;
+      }
+    }
+    assert(concurrentThrew, "Concurrent call during probe is rejected with CircuitBreakerOpenError");
+
+    // Finish probe
+    finishProbe();
+    const result = await probePromise;
+    assert(result === "probe-done" && probeResolved, "Probe completed successfully");
+    assert(breaker.getState() === "CLOSED", "Circuit closed after probe succeeded");
   }
 
   console.log("All CircuitBreaker unit tests passed successfully! ✓");

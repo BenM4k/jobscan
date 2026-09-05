@@ -25,6 +25,7 @@ export interface RunWithIdempotencyOptions<T> {
     | "generate_tailored_cover_letter"
     | string;
   key: string | null | undefined;
+  targetId?: string | null;
   execute: () => Promise<
     Result<{ data: T; resultRef?: string | null }, AppError>
   >;
@@ -43,8 +44,8 @@ export type RunWithIdempotencyResult<T> = {
  * Orchestrates action-level idempotency for paid AI mutations according to AGENTS.md §5 & §13.
  *
  * 1. Validates the client-minted UUID key.
- * 2. Attempts atomic insert in_progress via DAL.
- * 3. If duplicate completed, resolves existing entity without calling AI.
+ * 2. Attempts atomic insert in_progress via DAL with targetId tracking.
+ * 3. If duplicate completed, verifies target match and resolves existing entity without calling AI.
  * 4. If in-progress, returns early with OPERATION_IN_PROGRESS.
  * 5. Executes AI mutation, marks completed with resultRef on success, or marks failed on error.
  */
@@ -52,6 +53,7 @@ export async function runWithIdempotency<T>({
   userId,
   action,
   key,
+  targetId,
   execute,
   resolveExisting,
   dal,
@@ -86,6 +88,7 @@ export async function runWithIdempotency<T>({
     userId,
     action,
     validKey,
+    targetId,
   );
 
   if (!beginRes.ok) {
@@ -94,16 +97,29 @@ export async function runWithIdempotency<T>({
 
   const state = beginRes.value;
 
-  // 1. If duplicate is already completed, return existing stored result
+  // 1. If duplicate is already completed, verify target match and return existing stored result
   if (state.type === "completed") {
+    if (state.record.targetId && targetId && state.record.targetId !== targetId) {
+      return err(
+        new AppError(
+          "CONFLICT",
+          `Idempotency key ${validKey} was already completed for target ${state.record.targetId}, cannot reuse for ${targetId}`
+        )
+      );
+    }
+
     const existingRes = await resolveExisting(state.record);
     if (existingRes.ok) {
       return ok({ data: existingRes.value, isCached: true });
     }
-    // If resolving existing record failed (e.g. deleted entity), log and fall through to re-execute
-    console.warn(
-      `[Idempotency] Failed to resolve completed result for ${action}:${validKey}, re-executing:`,
-      existingRes.error,
+
+    // If resolving existing record failed, return error without starting another paid action
+    return err(
+      new AppError(
+        "NOT_FOUND",
+        `Completed operation for ${action}:${validKey} could not be resolved from cache: ${existingRes.error.message}`,
+        existingRes.error,
+      )
     );
   }
 
@@ -122,18 +138,22 @@ export async function runWithIdempotency<T>({
     const result = await execute();
 
     if (!result.ok) {
-      await failAction(state.record.id);
+      await failAction(state.record.id, state.attemptId);
       return err(result.error);
     }
 
-    await completeAction(
+    const completeRes = await completeAction(
       state.record.id,
+      state.attemptId,
       result.value.resultRef,
     );
+    if (!completeRes.ok) {
+      console.warn(`[Idempotency] Failed to complete action due to lost lease or conflict:`, completeRes.error);
+    }
 
     return ok({ data: result.value.data, isCached: false });
   } catch (error) {
-    await failAction(state.record.id);
+    await failAction(state.record.id, state.attemptId);
     return err(
       new AppError(
         "AI_EXECUTION_ERROR",

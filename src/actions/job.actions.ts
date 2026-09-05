@@ -106,8 +106,8 @@ export async function transitionJobStatusAction(
 
 export async function scoreJobAction(
   jobId: string,
+  idempotencyKey: string,
   provider?: "claude" | "gemini" | "openai" | "gateway",
-  idempotencyKey?: string,
 ) {
   const sessionResult = await requireSession();
   if (!sessionResult.ok || !sessionResult.value)
@@ -129,6 +129,7 @@ export async function scoreJobAction(
     userId,
     action: "run_scoring",
     key: parsed.data.idempotencyKey,
+    targetId: parsed.data.jobId,
     execute: async () => {
       const scoreRes = await jobService.scoreJobWithAI(
         parsed.data.jobId,
@@ -140,7 +141,7 @@ export async function scoreJobAction(
     },
     resolveExisting: async (record) => {
       const jobsDal = await import("@/dal/jobs.dal");
-      const targetId = record.resultRef || parsed.data.jobId;
+      const targetId = record.targetId || record.resultRef || parsed.data.jobId;
       const existingRes = await jobsDal.getJobById(targetId, userId);
       if (!existingRes.ok) return existingRes;
       if (!existingRes.value) {
@@ -193,6 +194,7 @@ export async function generateTailoredResumeAction(
     userId,
     action: "generate_tailored_resume",
     key: parsed.data.idempotencyKey,
+    targetId: parsed.data.jobId,
     execute: async () => {
       const tailorRes = await generateTailoredResume(parsed.data.jobId, userId);
       if (!tailorRes.ok) return tailorRes;
@@ -203,7 +205,8 @@ export async function generateTailoredResumeAction(
     },
     resolveExisting: async (record) => {
       const jobsDal = await import("@/dal/jobs.dal");
-      const jobRes = await jobsDal.getJobById(parsed.data.jobId, userId);
+      const targetId = record.targetId || parsed.data.jobId;
+      const jobRes = await jobsDal.getJobById(targetId, userId);
       if (!jobRes.ok) return jobRes;
       if (!jobRes.value) {
         const { AppError } = await import("@/lib/errors");
@@ -260,6 +263,7 @@ export async function generateTailoredCoverLetterAction(
     userId,
     action: "generate_tailored_cover_letter",
     key: parsed.data.idempotencyKey,
+    targetId: parsed.data.jobId,
     execute: async () => {
       const clRes = await generateTailoredCoverLetter(
         parsed.data.jobId,
@@ -273,7 +277,8 @@ export async function generateTailoredCoverLetterAction(
     },
     resolveExisting: async (record) => {
       const jobsDal = await import("@/dal/jobs.dal");
-      const jobRes = await jobsDal.getJobById(parsed.data.jobId, userId);
+      const targetId = record.targetId || parsed.data.jobId;
+      const jobRes = await jobsDal.getJobById(targetId, userId);
       if (!jobRes.ok) return jobRes;
       if (!jobRes.value) {
         const { AppError } = await import("@/lib/errors");

@@ -1,6 +1,4 @@
-if (typeof window !== "undefined") {
-  throw new Error("This module can only be executed on the server.");
-}
+import "server-only";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "./schema";
@@ -15,12 +13,21 @@ const isRemote =
   connectionString.includes("supabase.co") ||
   connectionString.includes("sslmode");
 
-const cleanConnectionString = isRemote
-  ? connectionString.replace(/[?&]sslmode=[^&]+/, "")
-  : connectionString;
+function cleanConnectionString(rawUrl: string, remote: boolean): string {
+  if (!remote) return rawUrl;
+  try {
+    const url = new URL(rawUrl);
+    url.searchParams.delete("sslmode");
+    return url.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
+const sanitizedConnectionString = cleanConnectionString(connectionString, isRemote);
 
 const pool = new Pool({
-  connectionString: cleanConnectionString,
+  connectionString: sanitizedConnectionString,
   ssl: isRemote ? { rejectUnauthorized: false } : undefined,
 });
 

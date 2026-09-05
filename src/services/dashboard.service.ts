@@ -19,6 +19,26 @@ export interface DashboardFeedResult {
   totalJobs: number;
 }
 
+// Cooldown window (10 minutes) to prevent concurrent repeated empty-feed triggers
+export const EMPTY_FEED_FETCH_COOLDOWN_MS = 10 * 60 * 1000;
+const emptyFeedDispatchTracker = new Map<string, number>();
+
+export function shouldDispatchEmptyFeedFetch(
+  userOrGlobalKey: string,
+  now: number = Date.now()
+): boolean {
+  const lastTrigger = emptyFeedDispatchTracker.get(userOrGlobalKey);
+  if (lastTrigger && now - lastTrigger < EMPTY_FEED_FETCH_COOLDOWN_MS) {
+    return false;
+  }
+  emptyFeedDispatchTracker.set(userOrGlobalKey, now);
+  return true;
+}
+
+export function resetEmptyFeedDispatchTracker(): void {
+  emptyFeedDispatchTracker.clear();
+}
+
 export async function getDashboardFeedData(
   filters: DashboardFilters = {},
 ): Promise<DashboardFeedResult> {
@@ -59,17 +79,22 @@ export async function getDashboardFeedData(
 
   // If pipeline is completely empty on initial dashboard load (no filters applied),
   // dispatch background job fetch via Inngest without blocking the request path.
+  // Uses in-memory cooldown and durable Inngest event ID to prevent concurrent duplicate workflows.
+  const dedupeKey = userId || "global-empty-feed";
   if (
     jobs.length === 0 &&
     !statusFilter &&
     !sourceFilter &&
     !startDate &&
     !endDate &&
-    !queryFilter
+    !queryFilter &&
+    shouldDispatchEmptyFeedFetch(dedupeKey)
   ) {
+    const bucket = Math.floor(Date.now() / EMPTY_FEED_FETCH_COOLDOWN_MS);
     inngest
       .send({
         name: "job.fetch.requested",
+        id: `empty-feed-${dedupeKey}-${bucket}`,
         data: { source: "all", userId },
       })
       .catch((err) => {

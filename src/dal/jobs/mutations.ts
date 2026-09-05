@@ -1,6 +1,4 @@
-if (typeof window !== "undefined") {
-  throw new Error("This module can only be executed on the server.");
-}
+import "server-only";
 
 import { db } from "@/services/db";
 import {
@@ -28,7 +26,7 @@ import {
 } from "./types";
 import { getJobById } from "./queries";
 
-async function upsertCanonicalJob(
+export async function upsertCanonicalJob(
   data: JobInsert,
   location: string | null
 ): Promise<CanonicalJobSelect | null> {
@@ -64,6 +62,97 @@ async function upsertCanonicalJob(
     })
     .returning();
   return canonical || null;
+}
+
+export interface CanonicalSimhashResult {
+  isDuplicate: boolean;
+  canonicalJob: CanonicalJobSelect;
+}
+
+/**
+ * Serializes similarity recheck and canonical insertion in one atomic transaction with an advisory lock
+ * to prevent concurrent cross-source near-duplicates from creating separate canonical jobs.
+ */
+export async function upsertCanonicalJobWithSimhashDedup(
+  data: JobInsert,
+  simhashBigInt: bigint | string,
+  maxDistance: number = 3
+): Promise<Result<CanonicalSimhashResult, AppError>> {
+  try {
+    const targetBigIntStr =
+      typeof simhashBigInt === "bigint"
+        ? simhashBigInt.toString()
+        : BigInt(simhashBigInt).toString();
+
+    const locationParts = [data.city, data.country].filter(Boolean);
+    const location =
+      locationParts.length > 0 ? locationParts.join(", ") : data.city || null;
+
+    const res = await db.transaction(async (tx) => {
+      // Advisory transaction lock serialized per Postgres connection
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('simhash_job_dedup_lock'))`);
+
+      // 1. Recheck for near-duplicate within transaction
+      const [matched] = await tx
+        .select()
+        .from(job)
+        .where(
+          and(
+            sql`${job.simhash} IS NOT NULL`,
+            sql`bit_count((${job.simhash}::bigint # ${sql.raw(targetBigIntStr)}::bigint)::bit(64)) <= ${maxDistance}`
+          )
+        )
+        .orderBy(
+          sql`bit_count((${job.simhash}::bigint # ${sql.raw(targetBigIntStr)}::bigint)::bit(64)) ASC`
+        )
+        .limit(1);
+
+      if (matched) {
+        return { isDuplicate: true, canonicalJob: matched };
+      }
+
+      // 2. Insert or update canonical job on (source, externalId)
+      const [canonical] = await tx
+        .insert(job)
+        .values({
+          source: data.source as JobSource,
+          externalId: data.externalId || null,
+          title: data.title,
+          company: data.company,
+          url: data.url || null,
+          description: data.description || "",
+          postedAt: data.postedAt || null,
+          location,
+          status: "active",
+          simhash: data.simhash ? sql`${data.simhash}::numeric` : null,
+          addedByUserId: data.source === "manual" ? data.userId || null : null,
+        })
+        .onConflictDoUpdate({
+          target: [job.source, job.externalId],
+          set: {
+            title: data.title,
+            company: data.company,
+            url: data.url || null,
+            description: data.description || "",
+            postedAt: data.postedAt || null,
+            location,
+            simhash: data.simhash
+              ? sql`${data.simhash}::numeric`
+              : sql`${job.simhash}`,
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+
+      return { isDuplicate: false, canonicalJob: canonical };
+    });
+
+    return ok(res);
+  } catch (error) {
+    return err(
+      new AppError("DB_ERROR", "Failed in serialized simhash dedup upsert", error)
+    );
+  }
 }
 
 export async function upsertUserPipelineEntry(

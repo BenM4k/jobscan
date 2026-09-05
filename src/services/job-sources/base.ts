@@ -112,18 +112,24 @@ export abstract class BaseJobSourceAdapter<TRaw = unknown>
         const canonicalJob = existingMatch.value;
 
         // Link jobSourceRef pointing at existing canonical job
-        await jobsDal.linkJobSourceRef(
+        const linkRes = await jobsDal.linkJobSourceRef(
           canonicalJob.id,
           normalized.source as jobsDal.JobSource,
           normalized.externalId,
           normalized.url
         );
+        if (!linkRes.ok) {
+          return err(linkRes.error);
+        }
 
         // Back-reference: Record canonical job ID in raw_job_payload
-        await jobsDal.updateRawJobPayloadNormalizedJob(
+        const updatePayloadRes = await jobsDal.updateRawJobPayloadNormalizedJob(
           rawRecord.id,
           canonicalJob.id
         );
+        if (!updatePayloadRes.ok) {
+          return err(updatePayloadRes.error);
+        }
 
         // Ensure user pipeline entry is created if userId is present
         let pipelineEntryId = canonicalJob.id;
@@ -196,18 +202,24 @@ export abstract class BaseJobSourceAdapter<TRaw = unknown>
       const canonicalJob = upsertRes.value;
 
       // Link jobSourceRef for cross-source dedup
-      await jobsDal.linkJobSourceRef(
+      const linkRes = await jobsDal.linkJobSourceRef(
         canonicalJob.id,
         normalized.source as jobsDal.JobSource,
         normalized.externalId,
         normalized.url
       );
+      if (!linkRes.ok) {
+        return err(linkRes.error);
+      }
 
       // Back-reference: Record canonical job ID in raw_job_payload
-      await jobsDal.updateRawJobPayloadNormalizedJob(
+      const updatePayloadRes = await jobsDal.updateRawJobPayloadNormalizedJob(
         rawRecord.id,
         canonicalJob.id
       );
+      if (!updatePayloadRes.ok) {
+        return err(updatePayloadRes.error);
+      }
 
       return ok(canonicalJob);
     } catch (error) {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { JobSelect } from "@/dal/jobs.dal";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
@@ -18,6 +18,7 @@ export function JobCoverLetterSection({ job, onJobUpdated }: JobCoverLetterSecti
   const [coverLetter, setCoverLetter] = useState(job.coverLetterDraft || "");
   const [isSaving, setIsSaving] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const pendingIdempotencyKeyRef = useRef<string | null>(null);
   const t = useTranslations("jobDetail");
   const tCommon = useTranslations("common");
 
@@ -25,7 +26,10 @@ export function JobCoverLetterSection({ job, onJobUpdated }: JobCoverLetterSecti
     try {
       setIsStreaming(true);
       setCoverLetter("");
-      const idempotencyKey = crypto.randomUUID();
+      if (!pendingIdempotencyKeyRef.current) {
+        pendingIdempotencyKeyRef.current = crypto.randomUUID();
+      }
+      const idempotencyKey = pendingIdempotencyKeyRef.current;
 
       const res = await fetch(`/api/jobs/${job.id}/cover-letter`, {
         method: "POST",
@@ -55,6 +59,7 @@ export function JobCoverLetterSection({ job, onJobUpdated }: JobCoverLetterSecti
         setCoverLetter(accumulated);
       }
 
+      pendingIdempotencyKeyRef.current = null;
       posthog.capture("cover_letter_generated");
       toast.success("Cover letter generated! Feel free to edit and save.");
       onJobUpdated({ ...job, coverLetterDraft: accumulated });

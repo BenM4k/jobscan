@@ -20,6 +20,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   let idempotencyRecordId: string | null = null;
+  let idempotencyAttemptId: string | null = null;
 
   try {
     const sessionResult = await requireSession();
@@ -74,7 +75,8 @@ export async function POST(
     const beginRes = await idempotencyDal.beginIdempotentAction(
       userId,
       "generate_tailored_cover_letter",
-      validKey
+      validKey,
+      id
     );
 
     if (!beginRes.ok) {
@@ -86,6 +88,9 @@ export async function POST(
 
     const state = beginRes.value;
     idempotencyRecordId = state.record.id;
+    if (state.type === "locked") {
+      idempotencyAttemptId = state.attemptId;
+    }
 
     if (state.type === "in_progress") {
       return NextResponse.json(
@@ -98,7 +103,17 @@ export async function POST(
     }
 
     if (state.type === "completed") {
-      const existingJobRes = await jobsDal.getJobById(id, userId);
+      const storedTarget = state.record.targetId || id;
+      if (state.record.targetId && state.record.targetId !== id) {
+        return NextResponse.json(
+          {
+            error: `Idempotency key was completed for target job ${state.record.targetId}, cannot reuse for ${id}`,
+          },
+          { status: 409 }
+        );
+      }
+
+      const existingJobRes = await jobsDal.getJobById(storedTarget, userId);
       const cachedText =
         existingJobRes.ok && existingJobRes.value?.coverLetterDraft
           ? existingJobRes.value.coverLetterDraft
@@ -112,7 +127,12 @@ export async function POST(
           },
         });
       }
-      // If cached text is empty for some reason, continue below to generate
+
+      // If cannot be resolved, return an error without starting another paid action
+      return NextResponse.json(
+        { error: "Completed cover letter could not be resolved from cache" },
+        { status: 404 }
+      );
     }
 
     const [jobResult, resumeResult] = await Promise.all([
@@ -125,7 +145,9 @@ export async function POST(
         : { ok: true as const, value: [] as string[] };
 
     if (!jobResult.ok || !jobResult.value) {
-      await idempotencyDal.failIdempotentAction(state.record.id);
+      if (idempotencyAttemptId) {
+        await idempotencyDal.failIdempotentAction(state.record.id, idempotencyAttemptId);
+      }
       return NextResponse.json(
         { error: "Job opportunity not found" },
         { status: 404 },
@@ -136,7 +158,9 @@ export async function POST(
     const activeResume = resumeResult.ok ? resumeResult.value : null;
 
     if (!activeResume || !activeResume.content) {
-      await idempotencyDal.failIdempotentAction(state.record.id);
+      if (idempotencyAttemptId) {
+        await idempotencyDal.failIdempotentAction(state.record.id, idempotencyAttemptId);
+      }
       return NextResponse.json(
         {
           error:
@@ -211,15 +235,22 @@ ${job.description || "No description provided."}
             const clRecord = await tailoringDal.getTailoredCoverLetter(job.id);
             const clRecordId =
               clRecord.ok && clRecord.value ? clRecord.value.id : job.id;
-            await idempotencyDal.completeIdempotentAction(
-              state.record.id,
-              clRecordId
-            );
+            if (idempotencyAttemptId) {
+              await idempotencyDal.completeIdempotentAction(
+                state.record.id,
+                idempotencyAttemptId,
+                clRecordId
+              );
+            }
           } else {
-            await idempotencyDal.failIdempotentAction(state.record.id);
+            if (idempotencyAttemptId) {
+              await idempotencyDal.failIdempotentAction(state.record.id, idempotencyAttemptId);
+            }
           }
         } catch (saveError) {
-          await idempotencyDal.failIdempotentAction(state.record.id);
+          if (idempotencyAttemptId) {
+            await idempotencyDal.failIdempotentAction(state.record.id, idempotencyAttemptId);
+          }
           console.error("Failed to save streamed cover letter in background:", {
             jobId: job.id,
             name: saveError instanceof Error ? saveError.name : "Unknown",
@@ -240,8 +271,8 @@ ${job.description || "No description provided."}
       },
     });
   } catch (error) {
-    if (idempotencyRecordId) {
-      await idempotencyDal.failIdempotentAction(idempotencyRecordId);
+    if (idempotencyRecordId && idempotencyAttemptId) {
+      await idempotencyDal.failIdempotentAction(idempotencyRecordId, idempotencyAttemptId);
     }
     console.error("Cover letter stream error:", {
       name: error instanceof Error ? error.name : "Unknown",

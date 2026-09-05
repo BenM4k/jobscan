@@ -75,6 +75,7 @@ export class CircuitBreaker {
   private lastFailureTime: number | null = null;
   private lastSuccessTime: number | null = null;
   private nextAttemptTime: number | null = null;
+  private probeInFlight = false;
 
   public readonly failureThreshold: number;
   public readonly baseBackoffMs: number;
@@ -115,14 +116,29 @@ export class CircuitBreaker {
       }
     }
 
+    if (this.state === "HALF_OPEN") {
+      if (this.probeInFlight) {
+        // Concurrent probe in flight, reject concurrent calls
+        throw new CircuitBreakerOpenError(
+          this.id,
+          this.consecutiveFailures,
+          this.nextAttemptTime ?? currentTime,
+          currentTime
+        );
+      }
+      this.probeInFlight = true;
+    }
+
     // 2. Perform the action
     try {
       const result = await action();
-      this.onSuccess(currentTime);
+      this.onSuccess(this.now());
       return result;
     } catch (error) {
-      this.onFailure(currentTime);
+      this.onFailure(this.now());
       throw error;
+    } finally {
+      this.probeInFlight = false;
     }
   }
 
@@ -177,6 +193,7 @@ export class CircuitBreaker {
     this.lastFailureTime = null;
     this.lastSuccessTime = null;
     this.nextAttemptTime = null;
+    this.probeInFlight = false;
   }
 
   /**

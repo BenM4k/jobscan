@@ -61,6 +61,7 @@ export async function POST(
       userId,
       action: "run_scoring",
       key: idempotencyKey,
+      targetId: id,
       execute: async () => {
         const [jobResult, resumeResult] = await Promise.all([
           jobsDal.getJobById(id, userId),
@@ -178,8 +179,9 @@ ${job.description || "No description provided."}
           resultRef: job.id,
         });
       },
-      resolveExisting: async () => {
-        const existingJobRes = await jobsDal.getJobById(id, userId);
+      resolveExisting: async (record) => {
+        const targetJobId = record.targetId || id;
+        const existingJobRes = await jobsDal.getJobById(targetJobId, userId);
         if (!existingJobRes.ok) return existingJobRes;
         if (!existingJobRes.value) {
           const { AppError } = await import("@/lib/errors");

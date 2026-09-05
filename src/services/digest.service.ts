@@ -101,12 +101,23 @@ export async function dispatchUserDigestEmail(
       "JobPilot Digest <onboarding@bennymak.best>";
 
     if (resend) {
-      await resend.emails.send({
+      const { error } = await resend.emails.send({
         from: fromEmail,
         to: user.email,
         subject: `JobPilot: ${jobs.length} new jobs matched for you`,
         html: buildDigestHtml(user.name, jobs, appUrl),
       });
+
+      if (error) {
+        console.error(`[DigestService] Resend returned error sending to ${user.email}:`, error);
+        return err(
+          new AppError(
+            "EXTERNAL_API_ERROR",
+            `Resend email sending failed: ${error.message}`,
+            error
+          )
+        );
+      }
     } else {
       console.log(
         `[DigestService] Mock email sent to ${user.email} with ${jobs.length} jobs (RESEND_API_KEY not configured)`

@@ -30,7 +30,7 @@ export const scheduledJobFetch = inngest.createFunction(
 
     // 2. Poll DRC local job boards
     await step.run("poll-drc-crawler", async () => {
-      const crawlResult = await runDrcCrawler();
+      const crawlResult = await runDrcCrawler(undefined, undefined, { drcOnly: true });
       return {
         success: crawlResult.success,
         totalUpserted: crawlResult.totalUpserted,
@@ -50,7 +50,7 @@ export const jobFetchRequested = inngest.createFunction(
 
     if (source === "drc") {
       return await step.run("fetch-drc", async () => {
-        const crawlResult = await runDrcCrawler(target, userId);
+        const crawlResult = await runDrcCrawler(target, userId, { drcOnly: true });
         return {
           success: crawlResult.success,
           totalUpserted: crawlResult.totalUpserted,
@@ -71,7 +71,7 @@ export const jobFetchRequested = inngest.createFunction(
       }
 
       return await step.run("fetch-drc-crawler", async () => {
-        const crawlResult = await runDrcCrawler(target, userId);
+        const crawlResult = await runDrcCrawler(target, userId, { drcOnly: true });
         return {
           success: crawlResult.success,
           totalUpserted: crawlResult.totalUpserted,

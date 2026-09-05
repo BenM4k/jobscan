@@ -4,7 +4,9 @@ CREATE TABLE "idempotency_key" (
 	"user_id" uuid NOT NULL,
 	"action" text NOT NULL,
 	"status" varchar(20) DEFAULT 'in_progress' NOT NULL,
+	"target_id" text,
 	"result_ref" uuid,
+	"attempt_id" uuid DEFAULT gen_random_uuid() NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint

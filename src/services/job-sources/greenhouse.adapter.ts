@@ -1,6 +1,6 @@
 import "server-only";
 import { BaseJobSourceAdapter } from "./base";
-import type { NormalizedJob } from "./types";
+import { type NormalizedJob, isValidCountry } from "./types";
 
 export interface GreenhouseJobRaw {
   id: number;
@@ -58,7 +58,8 @@ export class GreenhouseAdapter extends BaseJobSourceAdapter<GreenhouseJobRaw> {
       const parts = locName.split(",").map((s) => s.trim());
       if (parts.length > 1) {
         city = parts[0];
-        country = parts[parts.length - 1];
+        const suffix = parts[parts.length - 1];
+        country = isValidCountry(suffix) ? suffix : undefined;
       } else {
         city = locName;
       }
@@ -68,7 +69,7 @@ export class GreenhouseAdapter extends BaseJobSourceAdapter<GreenhouseJobRaw> {
       externalId: String(raw.id),
       source: "greenhouse",
       title: raw.title?.trim() || "Untitled Position",
-      company: "Greenhouse",
+      company: "Airbnb",
       url: raw.absolute_url,
       description: cleanDescription,
       postedAt: raw.updated_at ? new Date(raw.updated_at) : new Date(),

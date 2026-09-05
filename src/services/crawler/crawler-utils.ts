@@ -127,68 +127,42 @@ export async function ingestCrawledJob(
     const simhashText = buildJobSimhashText(normTitle, normCompany, normDesc);
     const simhashRes = computeSimhash(simhashText);
 
-    // Dedup check before DB Call 2 upsert
-    const existingMatch = await jobsDal.findJobBySimhash(
+    // Atomically check near-duplicates and upsert canonical job in one serialized DB operation
+    const dedupRes = await jobsDal.upsertCanonicalJobWithSimhashDedup(
+      {
+        userId: userId || undefined,
+        source: (rawPayload.source as jobsDal.JobSource) || (job.source as jobsDal.JobSource),
+        externalId: (rawPayload.externalId as string) || job.externalId,
+        title: normTitle,
+        company: normCompany,
+        url: (rawPayload.url as string) || job.url,
+        description: normDesc,
+        postedAt: rawPayload.postedAt ? new Date(rawPayload.postedAt as string | Date) : job.postedAt,
+        country: (rawPayload.country as string) || job.country,
+        countryCode: (rawPayload.countryCode as string) || job.countryCode,
+        city: (rawPayload.city as string) || job.city,
+        workplaceType: (rawPayload.workplaceType as "remote" | "on-site" | "hybrid" | null | undefined) || job.workplaceType,
+        remoteRegions: (rawPayload.remoteRegions as string[]) || job.remoteRegions,
+        status: "active",
+        simhash: simhashRes.hashString,
+      },
       simhashRes.signedBigInt,
       DEFAULT_SIMHASH_THRESHOLD
     );
 
-    if (existingMatch.ok && existingMatch.value) {
-      const canonicalJob = existingMatch.value;
-
-      // Link cross-source ref and back-reference on raw payload
-      const linkRes = await jobsDal.linkJobSourceRef(
-        canonicalJob.id,
-        job.source as jobsDal.JobSource,
-        job.externalId,
-        job.url
-      );
-      if (!linkRes.ok) {
-        console.error(
-          `[Crawler ${sourceName || job.source}] Failed to link job source ref for duplicate ${job.externalId}:`,
-          linkRes.error
-        );
-        return false;
-      }
-
-      await jobsDal.updateRawJobPayloadNormalizedJob(stored.id, canonicalJob.id);
-
-      if (userId) {
-        await jobsDal.upsertUserPipelineEntry(userId, canonicalJob.id, "saved");
-      }
-
-      return true;
-    }
-
-    const res = await jobsDal.upsertJob({
-      userId: userId || undefined,
-      source: (rawPayload.source as jobsDal.JobSource) || (job.source as jobsDal.JobSource),
-      externalId: (rawPayload.externalId as string) || job.externalId,
-      title: normTitle,
-      company: normCompany,
-      url: (rawPayload.url as string) || job.url,
-      description: normDesc,
-      postedAt: rawPayload.postedAt ? new Date(rawPayload.postedAt as string | Date) : job.postedAt,
-      country: (rawPayload.country as string) || job.country,
-      countryCode: (rawPayload.countryCode as string) || job.countryCode,
-      city: (rawPayload.city as string) || job.city,
-      workplaceType: (rawPayload.workplaceType as "remote" | "on-site" | "hybrid" | null | undefined) || job.workplaceType,
-      remoteRegions: (rawPayload.remoteRegions as string[]) || job.remoteRegions,
-      status: "active",
-      simhash: simhashRes.hashString,
-    });
-
-    if (!res.ok) {
+    if (!dedupRes.ok) {
       console.error(
-        `[Crawler ${sourceName || job.source}] Failed to upsert job ${job.externalId}:`,
-        res.error
+        `[Crawler ${sourceName || job.source}] Failed in serialized simhash dedup upsert for ${job.externalId}:`,
+        dedupRes.error
       );
       return false;
     }
 
+    const { canonicalJob } = dedupRes.value;
+
     // Link cross-source ref and back-reference on raw payload
     const linkRes = await jobsDal.linkJobSourceRef(
-      res.value.id,
+      canonicalJob.id,
       job.source as jobsDal.JobSource,
       job.externalId,
       job.url
@@ -201,7 +175,18 @@ export async function ingestCrawledJob(
       return false;
     }
 
-    await jobsDal.updateRawJobPayloadNormalizedJob(stored.id, res.value.id);
+    const updatePayloadRes = await jobsDal.updateRawJobPayloadNormalizedJob(stored.id, canonicalJob.id);
+    if (!updatePayloadRes.ok) {
+      console.error(
+        `[Crawler ${sourceName || job.source}] Failed to update raw payload normalized job ref for ${job.externalId}:`,
+        updatePayloadRes.error
+      );
+      return false;
+    }
+
+    if (userId) {
+      await jobsDal.upsertUserPipelineEntry(userId, canonicalJob.id, "saved");
+    }
 
     return true;
   } catch (err) {

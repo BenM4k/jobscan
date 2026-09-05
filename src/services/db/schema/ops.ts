@@ -86,7 +86,9 @@ export const idempotencyKey = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     action: text("action").notNull(),
     status: varchar("status", { length: 20 }).default("in_progress").notNull(),
+    targetId: text("target_id"),
     resultRef: uuid("result_ref"),
+    attemptId: uuid("attempt_id").defaultRandom().notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [

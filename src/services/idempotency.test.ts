@@ -83,9 +83,9 @@ async function runTests() {
     const keyFail = crypto.randomUUID();
     const beginFail = await idempotencyDal.beginIdempotentAction(testUserId, action1, keyFail);
     assert(beginFail.ok && beginFail.value.type === "locked", "beginFail should be locked");
-    if (!beginFail.ok) return;
+    if (!beginFail.ok || beginFail.value.type !== "locked") return;
 
-    await idempotencyDal.failIdempotentAction(beginFail.value.record.id);
+    await idempotencyDal.failIdempotentAction(beginFail.value.record.id, beginFail.value.attemptId);
     const retryFail = await idempotencyDal.beginIdempotentAction(testUserId, action1, keyFail);
     assert(retryFail.ok && retryFail.value.type === "locked", "failed action should be reclaimable for retry");
 
@@ -166,6 +166,40 @@ async function runTests() {
     assert(invalidRes.ok === false && invalidRes.error.code === "INVALID_IDEMPOTENCY_KEY", "code matches");
 
     console.log("✓ Test 3 passed: missing/invalid keys are strictly rejected.");
+
+    // ------------------------------------------------------------------------
+    // Test 4: Concurrent reclaims (failed and stale rows)
+    // ------------------------------------------------------------------------
+    console.log("Test 4: Testing concurrent reclaims for failed action...");
+    const keyReclaim = crypto.randomUUID();
+    const actionReclaim = "test_reclaim_action";
+    const initialAttemptId = crypto.randomUUID();
+
+    // Seed a failed record
+    await db.insert(idempotencyKey).values({
+      userId: testUserId,
+      action: actionReclaim,
+      key: keyReclaim,
+      status: "failed",
+      attemptId: initialAttemptId,
+    });
+
+    // Launch concurrent reclaims simultaneously
+    const [reclaim1, reclaim2] = await Promise.all([
+      idempotencyDal.beginIdempotentAction(testUserId, actionReclaim, keyReclaim),
+      idempotencyDal.beginIdempotentAction(testUserId, actionReclaim, keyReclaim),
+    ]);
+
+    assert(reclaim1.ok && reclaim2.ok, "both reclaim attempts should succeed at DB level");
+    if (!reclaim1.ok || !reclaim2.ok) return;
+
+    const lockedCount = [reclaim1.value.type, reclaim2.value.type].filter((t) => t === "locked").length;
+    const inProgressCount = [reclaim1.value.type, reclaim2.value.type].filter((t) => t === "in_progress").length;
+
+    assert(lockedCount === 1, `Expected exactly 1 locked caller, got ${lockedCount}`);
+    assert(inProgressCount === 1, `Expected exactly 1 in_progress caller, got ${inProgressCount}`);
+
+    console.log("✓ Test 4 passed: exactly one concurrent caller obtained the lease on reclaim.");
 
     console.log("\nALL IDEMPOTENCY TESTS PASSED SUCCESSFULLY! 🎉");
   } finally {

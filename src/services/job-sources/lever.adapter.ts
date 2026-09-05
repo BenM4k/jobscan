@@ -1,6 +1,6 @@
 import "server-only";
 import { BaseJobSourceAdapter } from "./base";
-import type { NormalizedJob } from "./types";
+import { type NormalizedJob, isValidCountry } from "./types";
 
 export interface LeverJobRaw {
   id: string;
@@ -65,7 +65,8 @@ export class LeverAdapter extends BaseJobSourceAdapter<LeverJobRaw> {
       const parts = locName.split(",").map((s) => s.trim());
       if (parts.length > 1) {
         city = parts[0];
-        country = parts[parts.length - 1];
+        const suffix = parts[parts.length - 1];
+        country = isValidCountry(suffix) ? suffix : undefined;
       } else {
         city = locName;
       }
@@ -75,7 +76,7 @@ export class LeverAdapter extends BaseJobSourceAdapter<LeverJobRaw> {
       externalId: raw.id,
       source: "lever",
       title: raw.text,
-      company: "Lever Posting",
+      company: "Netflix",
       url: raw.hostedUrl,
       description: raw.descriptionPlain || "",
       postedAt: raw.createdAt ? new Date(raw.createdAt) : new Date(),

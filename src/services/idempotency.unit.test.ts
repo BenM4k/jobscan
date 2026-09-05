@@ -37,6 +37,7 @@ async function runUnitTests() {
   // 3. New lock -> executes and completes
   let executeCount = 0;
   let completedRef: string | null | undefined = null;
+  let completedAttemptId: string | null = null;
 
   const newRes = await runWithIdempotency({
     userId: testUserId,
@@ -46,6 +47,7 @@ async function runUnitTests() {
       beginIdempotentAction: async () =>
         ok({
           type: "locked",
+          attemptId: "attempt-1",
           record: {
             id: "record-1",
             userId: testUserId,
@@ -53,11 +55,14 @@ async function runUnitTests() {
             key: validKey,
             status: "in_progress",
             resultRef: null,
+            targetId: null,
+            attemptId: "attempt-1",
             createdAt: new Date(),
           },
         }),
-      completeIdempotentAction: async (_id: string, ref?: string | null) => {
+      completeIdempotentAction: async (_id: string, attemptId: string, ref?: string | null) => {
         completedRef = ref;
+        completedAttemptId = attemptId;
         return ok({} as unknown as IdempotencyKeySelect);
       },
     },
@@ -71,6 +76,7 @@ async function runUnitTests() {
   assert(newRes.ok && newRes.value.isCached === false, "new action executes");
   assert(executeCount === 1, "execute called once");
   assert(completedRef === "score-123", "completed with resultRef");
+  assert(completedAttemptId === "attempt-1", "completed with attemptId");
 
   // 4. In-progress duplicate -> rejects with OPERATION_IN_PROGRESS
   const inProgressRes = await runWithIdempotency({
@@ -88,6 +94,8 @@ async function runUnitTests() {
             key: validKey,
             status: "in_progress",
             resultRef: null,
+            targetId: null,
+            attemptId: "attempt-1",
             createdAt: new Date(),
           },
         }),
@@ -118,6 +126,8 @@ async function runUnitTests() {
             key: validKey,
             status: "completed",
             resultRef: "score-123",
+            targetId: null,
+            attemptId: "attempt-1",
             createdAt: new Date(),
           },
         }),
@@ -135,6 +145,7 @@ async function runUnitTests() {
 
   // 6. Execution error -> marks failed and bubbles error
   let failedId: string | null = null;
+  let failedAttemptId: string | null = null;
   const failRes = await runWithIdempotency({
     userId: testUserId,
     action: "run_scoring",
@@ -143,6 +154,7 @@ async function runUnitTests() {
       beginIdempotentAction: async () =>
         ok({
           type: "locked",
+          attemptId: "attempt-fail-1",
           record: {
             id: "record-fail",
             userId: testUserId,
@@ -150,11 +162,14 @@ async function runUnitTests() {
             key: validKey,
             status: "in_progress",
             resultRef: null,
+            targetId: null,
+            attemptId: "attempt-fail-1",
             createdAt: new Date(),
           },
         }),
-      failIdempotentAction: async (id: string) => {
+      failIdempotentAction: async (id: string, attemptId: string) => {
         failedId = id;
+        failedAttemptId = attemptId;
         return ok({} as unknown as IdempotencyKeySelect);
       },
     },
@@ -164,6 +179,7 @@ async function runUnitTests() {
 
   assert(!failRes.ok && failRes.error.code === "RATE_LIMITED", "error surfaced");
   assert(failedId === "record-fail", "marked failed in DAL");
+  assert(failedAttemptId === "attempt-fail-1", "attemptId passed to failIdempotentAction");
 
   console.log("All unit tests for runWithIdempotency passed successfully! 🚀");
 }

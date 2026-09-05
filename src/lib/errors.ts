@@ -15,6 +15,7 @@ export type AppErrorCode =
   | "AI_PROVIDER_ERROR"
   | "INTERNAL_ERROR"
   | "CIRCUIT_BREAKER_OPEN"
+  | "CONFLICT"
   | "UNKNOWN";
 
 export class AppError extends Error {

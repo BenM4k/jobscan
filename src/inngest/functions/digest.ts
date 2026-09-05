@@ -11,11 +11,25 @@ export const scheduledDigestCron = inngest.createFunction(
   },
   async ({ step }) => {
     const usersResult = await step.run("query-eligible-users", async () => {
-      const res = await growthDal.getEligibleDigestUsers();
-      if (!res.ok) {
-        throw new Error(`Failed to query eligible users: ${res.error.message}`);
+      // Daily users are processed every day
+      const dailyRes = await growthDal.getEligibleDigestUsers("daily");
+      if (!dailyRes.ok) {
+        throw new Error(`Failed to query daily eligible users: ${dailyRes.error.message}`);
       }
-      return res.value;
+
+      const users: growthDal.DigestUser[] = [...dailyRes.value];
+
+      // Weekly users are processed only on Mondays (UTC day 1)
+      const isWeeklyDay = new Date().getUTCDay() === 1;
+      if (isWeeklyDay) {
+        const weeklyRes = await growthDal.getEligibleDigestUsers("weekly");
+        if (!weeklyRes.ok) {
+          throw new Error(`Failed to query weekly eligible users: ${weeklyRes.error.message}`);
+        }
+        users.push(...weeklyRes.value);
+      }
+
+      return users;
     });
 
     if (usersResult.length === 0) {

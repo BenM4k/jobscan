@@ -1,6 +1,6 @@
 import "server-only";
 import { BaseJobSourceAdapter } from "./base";
-import type { NormalizedJob } from "./types";
+import { type NormalizedJob, isValidCountry } from "./types";
 
 export interface AshbyJobRaw {
   id: string;
@@ -62,17 +62,18 @@ export class AshbyAdapter extends BaseJobSourceAdapter<AshbyJobRaw> {
       (raw.locationName && !/remote/i.test(raw.locationName)
         ? raw.locationName.split(",")[0]?.trim()
         : undefined);
-    const country =
+    const rawCountry =
       raw.address?.postalAddress?.addressCountry ||
       (raw.locationName && raw.locationName.includes(",")
         ? raw.locationName.split(",").pop()?.trim()
         : undefined);
+    const country = isValidCountry(rawCountry) ? rawCountry : undefined;
 
     return {
       externalId: raw.id,
       source: "ashby",
       title: raw.title,
-      company: "Ashby Board",
+      company: "Notion",
       url: raw.jobUrl,
       description: raw.descriptionHtml || "",
       postedAt: raw.publishedAt ? new Date(raw.publishedAt) : new Date(),

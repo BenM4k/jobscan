@@ -43,3 +43,31 @@ export interface JobSourceAdapter<TRaw = unknown> extends JobSource {
   /** Sequential pipeline orchestrator: DB call 1 (raw) -> DB call 2 (normalize & save) */
   ingest(raw: TRaw, userId?: string): Promise<Result<JobSelect, AppError>>;
 }
+
+const US_CA_STATE_PROVINCE_CODES = new Set([
+  // US States & Territories
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+  "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+  "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+  "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+  "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
+  "DC", "PR", "VI", "GU",
+  // Canadian Provinces
+  "AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT",
+  // Common state names lowercased
+  "california", "new york", "texas", "washington", "florida", "illinois",
+  "massachusetts", "colorado", "georgia", "north carolina", "virginia",
+  "ontario", "quebec", "british columbia", "alberta",
+]);
+
+export function isValidCountry(candidate?: string): boolean {
+  if (!candidate || !candidate.trim()) return false;
+  const trimmed = candidate.trim();
+  if (
+    US_CA_STATE_PROVINCE_CODES.has(trimmed.toUpperCase()) ||
+    US_CA_STATE_PROVINCE_CODES.has(trimmed.toLowerCase())
+  ) {
+    return false;
+  }
+  return true;
+}
