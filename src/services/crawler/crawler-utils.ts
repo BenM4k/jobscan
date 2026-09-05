@@ -3,6 +3,11 @@ import { isDrcJob } from "./drc-filter";
 import * as jobsDal from "@/dal/jobs.dal";
 import { isOlderThanOneMonth } from "@/lib/date-utils";
 import * as resumeDal from "@/dal/resume.dal";
+import {
+  buildJobSimhashText,
+  computeSimhash,
+  DEFAULT_SIMHASH_THRESHOLD,
+} from "@/lib/simhash";
 
 export function matchesKeyword(candidate: CrawledJob, keyword?: string): boolean {
   if (!keyword || !keyword.trim()) return true;
@@ -95,36 +100,83 @@ export async function ingestCrawledJob(
       }
     }
 
-    const [rawPayloadRes, res] = await Promise.all([
-      jobsDal.insertRawJobPayload(
-        job.source as jobsDal.JobSource,
-        job.externalId,
-        job as unknown as Record<string, unknown>
-      ),
-      jobsDal.upsertJob({
-        userId: userId || undefined,
-        source: job.source as jobsDal.JobSource,
-        externalId: job.externalId,
-        title: job.title,
-        company: job.company,
-        url: job.url,
-        description: job.description,
-        postedAt: job.postedAt,
-        country: job.country,
-        countryCode: job.countryCode,
-        city: job.city,
-        workplaceType: job.workplaceType,
-        remoteRegions: job.remoteRegions,
-        status: "active",
-      }),
-    ]);
+    // DB Call 1: Ingest raw payload first
+    const rawPayloadRes = await jobsDal.insertRawJobPayload(
+      job.source as jobsDal.JobSource,
+      job.externalId,
+      job as unknown as Record<string, unknown>
+    );
 
     if (!rawPayloadRes.ok) {
       console.error(
         `[Crawler ${sourceName || job.source}] Failed to insert raw job payload for ${job.externalId}:`,
         rawPayloadRes.error
       );
+      return false;
     }
+
+    // DB Call 2: Read payload from raw_job_payload, normalize, and upsert canonical job
+    const stored = rawPayloadRes.value;
+    const rawPayload = stored.payload as Record<string, unknown>;
+
+    const normTitle = (rawPayload.title as string) || job.title;
+    const normCompany = (rawPayload.company as string) || job.company;
+    const normDesc = (rawPayload.description as string) || job.description;
+
+    // Compute 64-bit SimHash for cross-source deduplication
+    const simhashText = buildJobSimhashText(normTitle, normCompany, normDesc);
+    const simhashRes = computeSimhash(simhashText);
+
+    // Dedup check before DB Call 2 upsert
+    const existingMatch = await jobsDal.findJobBySimhash(
+      simhashRes.signedBigInt,
+      DEFAULT_SIMHASH_THRESHOLD
+    );
+
+    if (existingMatch.ok && existingMatch.value) {
+      const canonicalJob = existingMatch.value;
+
+      // Link cross-source ref and back-reference on raw payload
+      const linkRes = await jobsDal.linkJobSourceRef(
+        canonicalJob.id,
+        job.source as jobsDal.JobSource,
+        job.externalId,
+        job.url
+      );
+      if (!linkRes.ok) {
+        console.error(
+          `[Crawler ${sourceName || job.source}] Failed to link job source ref for duplicate ${job.externalId}:`,
+          linkRes.error
+        );
+        return false;
+      }
+
+      await jobsDal.updateRawJobPayloadNormalizedJob(stored.id, canonicalJob.id);
+
+      if (userId) {
+        await jobsDal.upsertUserPipelineEntry(userId, canonicalJob.id, "saved");
+      }
+
+      return true;
+    }
+
+    const res = await jobsDal.upsertJob({
+      userId: userId || undefined,
+      source: (rawPayload.source as jobsDal.JobSource) || (job.source as jobsDal.JobSource),
+      externalId: (rawPayload.externalId as string) || job.externalId,
+      title: normTitle,
+      company: normCompany,
+      url: (rawPayload.url as string) || job.url,
+      description: normDesc,
+      postedAt: rawPayload.postedAt ? new Date(rawPayload.postedAt as string | Date) : job.postedAt,
+      country: (rawPayload.country as string) || job.country,
+      countryCode: (rawPayload.countryCode as string) || job.countryCode,
+      city: (rawPayload.city as string) || job.city,
+      workplaceType: (rawPayload.workplaceType as "remote" | "on-site" | "hybrid" | null | undefined) || job.workplaceType,
+      remoteRegions: (rawPayload.remoteRegions as string[]) || job.remoteRegions,
+      status: "active",
+      simhash: simhashRes.hashString,
+    });
 
     if (!res.ok) {
       console.error(
@@ -134,6 +186,7 @@ export async function ingestCrawledJob(
       return false;
     }
 
+    // Link cross-source ref and back-reference on raw payload
     const linkRes = await jobsDal.linkJobSourceRef(
       res.value.id,
       job.source as jobsDal.JobSource,
@@ -147,6 +200,8 @@ export async function ingestCrawledJob(
       );
       return false;
     }
+
+    await jobsDal.updateRawJobPayloadNormalizedJob(stored.id, res.value.id);
 
     return true;
   } catch (err) {

@@ -4,7 +4,7 @@ import * as jobsDal from "@/dal/jobs.dal";
 import * as resumeDal from "@/dal/resume.dal";
 import * as opsDal from "@/dal/ops.dal";
 
-import { getJobSourceAdapter } from "./adapters/factory";
+import { getJobSourceAdapter } from "./job-sources";
 import { getScoringProvider } from "./scoring/factory";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
@@ -21,8 +21,6 @@ const VALID_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
   withdrawn: ["saved"],
 };
 
-import { isOlderThanOneMonth } from "@/lib/date-utils";
-
 export async function fetchAndUpsertJobs(
   sourceId: "greenhouse" | "remoteok" | "lever" | "ashby",
   target?: string,
@@ -32,62 +30,26 @@ export async function fetchAndUpsertJobs(
     const adapter = getJobSourceAdapter(sourceId);
     const rawItems = await adapter.fetchRaw(target);
 
-
     let upsertedCount = 0;
     for (const raw of rawItems) {
-      const normalized = adapter.normalize(raw);
-
-      // Skip jobs posted longer than a month ago
-      if (normalized.postedAt && isOlderThanOneMonth(normalized.postedAt)) {
+      // DB Call 1: Write untouched external response into raw_job_payload first
+      const rawRes = await adapter.saveRaw(raw);
+      if (!rawRes.ok) {
         continue;
       }
 
-      // Check if candidate previously deleted this job listing.
-      if (userId) {
-        const deleted = await jobsDal.isJobDeleted(normalized.source, normalized.externalId, userId);
-        if (deleted) {
-          continue;
-        }
-      }
-
-      // 1. Ingest raw payload
-      await jobsDal.insertRawJobPayload(
-        normalized.source as jobsDal.JobSource,
-        normalized.externalId,
-        raw as Record<string, unknown>
-      );
-
-      // 2. Upsert canonical job
-      const res = await jobsDal.upsertJob({
-        userId: userId || undefined,
-        source: normalized.source,
-        externalId: normalized.externalId,
-        title: normalized.title,
-        company: normalized.company,
-        url: normalized.url,
-        description: normalized.description,
-        postedAt: normalized.postedAt,
-        country: normalized.country,
-        countryCode: normalized.countryCode,
-        city: normalized.city,
-        workplaceType: normalized.workplaceType,
-        remoteRegions: normalized.remoteRegions,
-        status: "active",
-      });
-
-      if (res.ok) {
-        await jobsDal.linkJobSourceRef(
-          res.value.id,
-          normalized.source as jobsDal.JobSource,
-          normalized.externalId,
-          normalized.url
-        );
+      // DB Call 2: Read stored payload from raw_job_payload, normalize, and upsert canonical job
+      const normRes = await adapter.normalizeFromStored(rawRes.value, userId);
+      if (normRes.ok) {
         upsertedCount++;
       }
     }
 
     return ok({ fetched: rawItems.length, upserted: upsertedCount });
   } catch (error) {
+    if (error instanceof AppError) {
+      return err(error);
+    }
     return err(
       new AppError(
         "EXTERNAL_API_ERROR",

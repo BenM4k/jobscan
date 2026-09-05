@@ -40,6 +40,7 @@ export interface JobSelect {
   createdAt: Date;
   updatedAt?: Date;
   embedding?: number[] | null;
+  simhash?: string | null;
 }
 
 export type JobInsert = Partial<JobSelect> & {

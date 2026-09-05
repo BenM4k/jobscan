@@ -15,8 +15,12 @@ const isRemote =
   connectionString.includes("supabase.co") ||
   connectionString.includes("sslmode");
 
+const cleanConnectionString = isRemote
+  ? connectionString.replace(/[?&]sslmode=[^&]+/, "")
+  : connectionString;
+
 const pool = new Pool({
-  connectionString,
+  connectionString: cleanConnectionString,
   ssl: isRemote ? { rejectUnauthorized: false } : undefined,
 });
 

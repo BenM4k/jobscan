@@ -44,6 +44,7 @@ async function upsertCanonicalJob(
       postedAt: data.postedAt || null,
       location,
       status: "active",
+      simhash: data.simhash ? sql`${data.simhash}::numeric` : null,
       addedByUserId: data.source === "manual" ? data.userId || null : null,
     })
     .onConflictDoUpdate({
@@ -55,6 +56,9 @@ async function upsertCanonicalJob(
         description: data.description || "",
         postedAt: data.postedAt || null,
         location,
+        simhash: data.simhash
+          ? sql`${data.simhash}::numeric`
+          : sql`${job.simhash}`,
         updatedAt: new Date(),
       },
     })
@@ -62,7 +66,7 @@ async function upsertCanonicalJob(
   return canonical || null;
 }
 
-async function upsertUserPipelineEntry(
+export async function upsertUserPipelineEntry(
   userId: string,
   canonicalJobId: string,
   status: JobStatus = "saved",
@@ -509,6 +513,62 @@ export async function linkJobSourceRef(
   } catch (error) {
     return err(
       new AppError("DB_ERROR", "Failed to link job source ref", error)
+    );
+  }
+}
+
+export async function updateRawJobPayloadNormalizedJob(
+  id: string,
+  normalizedJobId: string
+): Promise<Result<void, AppError>> {
+  try {
+    await db
+      .update(rawJobPayload)
+      .set({
+        normalizedJobId,
+        updatedAt: new Date(),
+      })
+      .where(eq(rawJobPayload.id, id));
+
+    return ok(undefined);
+  } catch (error) {
+    return err(
+      new AppError(
+        "DB_ERROR",
+        `Failed to link normalized job ${normalizedJobId} to raw job payload ${id}`,
+        error
+      )
+    );
+  }
+}
+
+export async function setRawJobPayloadNormalizedJob(
+  source: JobSource,
+  externalId: string,
+  normalizedJobId: string
+): Promise<Result<void, AppError>> {
+  try {
+    await db
+      .update(rawJobPayload)
+      .set({
+        normalizedJobId,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(rawJobPayload.source, source),
+          eq(rawJobPayload.externalId, externalId)
+        )
+      );
+
+    return ok(undefined);
+  } catch (error) {
+    return err(
+      new AppError(
+        "DB_ERROR",
+        `Failed to link normalized job ${normalizedJobId} to raw job payload ${source}:${externalId}`,
+        error
+      )
     );
   }
 }

@@ -52,9 +52,15 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
     try {
       setIsScoring(true);
       setScoringError(null);
+      const idempotencyKey = crypto.randomUUID();
 
       const res = await fetch(`/api/jobs/${job.id}/score`, {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
+        body: JSON.stringify({ idempotencyKey }),
       });
 
       if (!res.ok) {

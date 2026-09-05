@@ -23,8 +23,14 @@ export function JobTailoredResumeSection({ job, onJobUpdated }: JobTailoredResum
   const handleGenerate = async () => {
     try {
       setIsGenerating(true);
+      const idempotencyKey = crypto.randomUUID();
       const res = await fetch(`/api/jobs/${job.id}/tailor-resume`, {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
+        body: JSON.stringify({ idempotencyKey }),
       });
 
       if (!res.ok) {

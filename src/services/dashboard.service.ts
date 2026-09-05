@@ -1,7 +1,7 @@
 import * as jobsDal from "@/dal/jobs.dal";
 import { JobSelect } from "@/dal/jobs.dal";
 import { JobStatus } from "@/services/db/schema";
-import { runDrcCrawler } from "@/services/crawler/run";
+import { inngest } from "@/inngest/client";
 
 export interface DashboardFilters {
   statusFilter?: JobStatus;
@@ -54,11 +54,11 @@ export async function getDashboardFeedData(
     ),
   ]);
 
-  let jobs = dalListResult.ok ? dalListResult.value : [];
-  let totalJobs = countResult.ok ? countResult.value : jobs.length;
+  const jobs = dalListResult.ok ? dalListResult.value : [];
+  const totalJobs = countResult.ok ? countResult.value : jobs.length;
 
-  // If pipeline is completely empty on initial dashboard load (no filters or query applied),
-  // automatically trigger initial DRC job crawl to populate opportunities
+  // If pipeline is completely empty on initial dashboard load (no filters applied),
+  // dispatch background job fetch via Inngest without blocking the request path.
   if (
     jobs.length === 0 &&
     !statusFilter &&
@@ -67,37 +67,14 @@ export async function getDashboardFeedData(
     !endDate &&
     !queryFilter
   ) {
-    try {
-      await runDrcCrawler(undefined, userId);
-      const [reFetched, reCount] = await Promise.all([
-        jobsDal.listJobs(
-          statusFilter,
-          sourceFilter,
-          limit,
-          offset,
-          startDate,
-          endDate,
-          queryFilter,
-          userId,
-        ),
-        jobsDal.countJobs(
-          statusFilter,
-          sourceFilter,
-          startDate,
-          endDate,
-          queryFilter,
-          userId,
-        ),
-      ]);
-      if (reFetched.ok) {
-        jobs = reFetched.value;
-      }
-      if (reCount.ok) {
-        totalJobs = reCount.value;
-      }
-    } catch (err) {
-      console.error("Failed initial auto-crawl on dashboard feed load:", err);
-    }
+    inngest
+      .send({
+        name: "job.fetch.requested",
+        data: { source: "all", userId },
+      })
+      .catch((err) => {
+        console.warn("[Dashboard] Non-blocking Inngest job fetch trigger failed:", err);
+      });
   }
 
   return {
@@ -105,3 +82,4 @@ export async function getDashboardFeedData(
     totalJobs,
   };
 }
+

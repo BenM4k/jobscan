@@ -4,6 +4,8 @@ import { requireSession } from "@/lib/auth-guard";
 import * as jobService from "@/services/job.service";
 import { JobStatus } from "@/services/db/schema";
 import { z } from "zod";
+import { runWithIdempotency } from "@/services/idempotency.service";
+import { ok } from "@/lib/result";
 
 const triggerFetchSchema = z.object({
   sourceId: z.enum(["greenhouse", "remoteok", "lever", "ashby"]),
@@ -25,14 +27,34 @@ const transitionStatusSchema = z.object({
 });
 
 const scoreJobSchema = z.object({
-  jobId: z.string().uuid(),
+  jobId: z.uuid(),
   provider: z.enum(["claude", "gemini", "openai", "gateway"]).optional(),
+  idempotencyKey: z.uuid({
+    message: "A valid UUID idempotencyKey is required for scoring",
+  }),
+});
+
+const tailoredResumeActionSchema = z.object({
+  jobId: z.uuid(),
+  idempotencyKey: z.uuid({
+    message: "A valid UUID idempotencyKey is required",
+  }),
+});
+
+const tailoredCoverLetterActionSchema = z.object({
+  jobId: z.uuid(),
+  idempotencyKey: z.uuid({
+    message: "A valid UUID idempotencyKey is required",
+  }),
 });
 
 export async function triggerJobFetchAction(formData: FormData) {
   const sessionResult = await requireSession();
   if (!sessionResult.ok || !sessionResult.value)
-    return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
+    return {
+      success: false,
+      error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message,
+    };
 
   const parsed = triggerFetchSchema.safeParse({
     sourceId: formData.get("sourceId"),
@@ -60,7 +82,10 @@ export async function transitionJobStatusAction(
 ) {
   const sessionResult = await requireSession();
   if (!sessionResult.ok || !sessionResult.value)
-    return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
+    return {
+      success: false,
+      error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message,
+    };
 
   const parsed = transitionStatusSchema.safeParse({ jobId, status });
   if (!parsed.success) {
@@ -82,26 +107,195 @@ export async function transitionJobStatusAction(
 export async function scoreJobAction(
   jobId: string,
   provider?: "claude" | "gemini" | "openai" | "gateway",
+  idempotencyKey?: string,
 ) {
   const sessionResult = await requireSession();
   if (!sessionResult.ok || !sessionResult.value)
-    return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
+    return {
+      success: false,
+      error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message,
+    };
 
-  const parsed = scoreJobSchema.safeParse({ jobId, provider });
+  const parsed = scoreJobSchema.safeParse({ jobId, provider, idempotencyKey });
   if (!parsed.success) {
-    return { success: false, error: "Invalid job scoring arguments" };
+    return {
+      success: false,
+      error: parsed.error.issues[0]?.message || "Invalid job scoring arguments",
+    };
   }
 
-  const result = await jobService.scoreJobWithAI(
-    parsed.data.jobId,
-    sessionResult.value.user.id,
-    parsed.data.provider,
-  );
+  const userId = sessionResult.value.user.id;
+  const result = await runWithIdempotency({
+    userId,
+    action: "run_scoring",
+    key: parsed.data.idempotencyKey,
+    execute: async () => {
+      const scoreRes = await jobService.scoreJobWithAI(
+        parsed.data.jobId,
+        userId,
+        parsed.data.provider,
+      );
+      if (!scoreRes.ok) return scoreRes;
+      return ok({ data: scoreRes.value, resultRef: parsed.data.jobId });
+    },
+    resolveExisting: async (record) => {
+      const jobsDal = await import("@/dal/jobs.dal");
+      const targetId = record.resultRef || parsed.data.jobId;
+      const existingRes = await jobsDal.getJobById(targetId, userId);
+      if (!existingRes.ok) return existingRes;
+      if (!existingRes.value) {
+        const { AppError } = await import("@/lib/errors");
+        return { ok: false, error: new AppError("NOT_FOUND", "Job not found") };
+      }
+      return ok(existingRes.value);
+    },
+  });
+
   if (!result.ok) {
     return { success: false, error: result.error.message };
   }
 
-  return { success: true, data: result.value };
+  return {
+    success: true,
+    data: result.value.data,
+    isCached: result.value.isCached,
+  };
+}
+
+export async function generateTailoredResumeAction(
+  jobId: string,
+  idempotencyKey: string,
+) {
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok || !sessionResult.value)
+    return {
+      success: false,
+      error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message,
+    };
+
+  const parsed = tailoredResumeActionSchema.safeParse({
+    jobId,
+    idempotencyKey,
+  });
+  if (!parsed.success) {
+    return {
+      success: false,
+      error:
+        parsed.error.issues[0]?.message || "Invalid tailored resume arguments",
+    };
+  }
+
+  const userId = sessionResult.value.user.id;
+  const { generateTailoredResume } =
+    await import("@/services/tailoring.service");
+
+  const result = await runWithIdempotency({
+    userId,
+    action: "generate_tailored_resume",
+    key: parsed.data.idempotencyKey,
+    execute: async () => {
+      const tailorRes = await generateTailoredResume(parsed.data.jobId, userId);
+      if (!tailorRes.ok) return tailorRes;
+      return ok({
+        data: tailorRes.value,
+        resultRef: tailorRes.value.tailoredResumeRecordId,
+      });
+    },
+    resolveExisting: async (record) => {
+      const jobsDal = await import("@/dal/jobs.dal");
+      const jobRes = await jobsDal.getJobById(parsed.data.jobId, userId);
+      if (!jobRes.ok) return jobRes;
+      if (!jobRes.value) {
+        const { AppError } = await import("@/lib/errors");
+        return { ok: false, error: new AppError("NOT_FOUND", "Job not found") };
+      }
+      return ok({
+        job: jobRes.value,
+        tailoredResumeText: jobRes.value.tailoredResume || "",
+        structured: jobRes.value.tailoredResumeData || null,
+        tailoredResumeRecordId: record.resultRef || undefined,
+      });
+    },
+  });
+
+  if (!result.ok) {
+    return { success: false, error: result.error.message };
+  }
+
+  return {
+    success: true,
+    data: result.value.data,
+    isCached: result.value.isCached,
+  };
+}
+
+export async function generateTailoredCoverLetterAction(
+  jobId: string,
+  idempotencyKey: string,
+) {
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok || !sessionResult.value)
+    return {
+      success: false,
+      error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message,
+    };
+
+  const parsed = tailoredCoverLetterActionSchema.safeParse({
+    jobId,
+    idempotencyKey,
+  });
+  if (!parsed.success) {
+    return {
+      success: false,
+      error:
+        parsed.error.issues[0]?.message || "Invalid cover letter arguments",
+    };
+  }
+
+  const userId = sessionResult.value.user.id;
+  const { generateTailoredCoverLetter } =
+    await import("@/services/tailoring.service");
+
+  const result = await runWithIdempotency({
+    userId,
+    action: "generate_tailored_cover_letter",
+    key: parsed.data.idempotencyKey,
+    execute: async () => {
+      const clRes = await generateTailoredCoverLetter(
+        parsed.data.jobId,
+        userId,
+      );
+      if (!clRes.ok) return clRes;
+      return ok({
+        data: clRes.value,
+        resultRef: clRes.value.coverLetterRecordId,
+      });
+    },
+    resolveExisting: async (record) => {
+      const jobsDal = await import("@/dal/jobs.dal");
+      const jobRes = await jobsDal.getJobById(parsed.data.jobId, userId);
+      if (!jobRes.ok) return jobRes;
+      if (!jobRes.value) {
+        const { AppError } = await import("@/lib/errors");
+        return { ok: false, error: new AppError("NOT_FOUND", "Job not found") };
+      }
+      return ok({
+        job: jobRes.value,
+        coverLetter: jobRes.value.coverLetterDraft || "",
+        coverLetterRecordId: record.resultRef || undefined,
+      });
+    },
+  });
+
+  if (!result.ok) {
+    return { success: false, error: result.error.message };
+  }
+
+  return {
+    success: true,
+    data: result.value.data,
+    isCached: result.value.isCached,
+  };
 }
 
 export async function fetchMoreJobsAction(
@@ -115,7 +309,10 @@ export async function fetchMoreJobsAction(
 ) {
   const sessionResult = await requireSession();
   if (!sessionResult.ok || !sessionResult.value)
-    return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
+    return {
+      success: false,
+      error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message,
+    };
 
   const dalListResult = await (
     await import("@/dal/jobs.dal")
@@ -139,7 +336,7 @@ export async function fetchMoreJobsAction(
 const addManualJobSchema = z.object({
   title: z.string().min(1, "Job title is required"),
   company: z.string().min(1, "Company name is required"),
-  url: z.string().url("Please provide a valid job posting URL"),
+  url: z.url("Please provide a valid job posting URL"),
   description: z
     .string()
     .min(10, "Job description must be at least 10 characters"),
@@ -148,7 +345,10 @@ const addManualJobSchema = z.object({
 export async function addManualJobAction(formData: FormData) {
   const sessionResult = await requireSession();
   if (!sessionResult.ok || !sessionResult.value)
-    return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
+    return {
+      success: false,
+      error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message,
+    };
 
   const parsed = addManualJobSchema.safeParse({
     title: formData.get("title")?.toString() || "",
@@ -188,7 +388,10 @@ export async function addManualJobAction(formData: FormData) {
 export async function deleteJobAction(jobId: string) {
   const sessionResult = await requireSession();
   if (!sessionResult.ok || !sessionResult.value)
-    return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
+    return {
+      success: false,
+      error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message,
+    };
 
   const jobsDal = await import("@/dal/jobs.dal");
   const result = await jobsDal.deleteJob(jobId, sessionResult.value.user.id);
@@ -204,7 +407,10 @@ import { JobSelect } from "@/dal/jobs.dal";
 export async function restoreJobAction(jobData: JobSelect) {
   const sessionResult = await requireSession();
   if (!sessionResult.ok || !sessionResult.value)
-    return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
+    return {
+      success: false,
+      error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message,
+    };
 
   const jobsDal = await import("@/dal/jobs.dal");
   const restoreStatus =
@@ -224,13 +430,22 @@ export async function restoreJobAction(jobData: JobSelect) {
 export async function triggerDrcCrawlAction(keyword?: string) {
   const sessionResult = await requireSession();
   if (!sessionResult.ok || !sessionResult.value)
-    return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
+    return {
+      success: false,
+      error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message,
+    };
 
   try {
     const { runDrcCrawler } = await import("@/services/crawler/run");
-    const crawlResult = await runDrcCrawler(keyword, sessionResult.value.user.id);
+    const crawlResult = await runDrcCrawler(
+      keyword,
+      sessionResult.value.user.id,
+    );
     if (!crawlResult.success) {
-      return { success: false, error: crawlResult.error || "DRC crawl search failed" };
+      return {
+        success: false,
+        error: crawlResult.error || "DRC crawl search failed",
+      };
     }
     return { success: true, data: crawlResult };
   } catch (E) {

@@ -25,9 +25,15 @@ export function JobCoverLetterSection({ job, onJobUpdated }: JobCoverLetterSecti
     try {
       setIsStreaming(true);
       setCoverLetter("");
+      const idempotencyKey = crypto.randomUUID();
 
       const res = await fetch(`/api/jobs/${job.id}/cover-letter`, {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
+        body: JSON.stringify({ idempotencyKey }),
       });
 
       if (!res.ok) {

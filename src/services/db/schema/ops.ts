@@ -2,6 +2,7 @@ import {
   pgTable,
   uuid,
   text,
+  varchar,
   integer,
   numeric,
   boolean,
@@ -74,3 +75,28 @@ export const featureFlagAssignment = pgTable(
     ),
   ]
 );
+
+export const idempotencyKey = pgTable(
+  "idempotency_key",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    key: text("key").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    action: text("action").notNull(),
+    status: varchar("status", { length: 20 }).default("in_progress").notNull(),
+    resultRef: uuid("result_ref"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("idempotency_key_unique_idx").on(
+      t.userId,
+      t.action,
+      t.key
+    ),
+  ]
+);
+
+export type IdempotencyKeySelect = typeof idempotencyKey.$inferSelect;
+export type IdempotencyKeyInsert = typeof idempotencyKey.$inferInsert;

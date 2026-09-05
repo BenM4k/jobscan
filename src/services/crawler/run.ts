@@ -12,6 +12,7 @@ import {
   resolveCrawlerKeyword,
   ingestCrawledJob,
 } from "./crawler-utils";
+import { getCircuitBreaker } from "@/lib/circuit-breaker";
 
 const SOURCE_FETCHERS = [
   { name: "reliefweb", fetcher: fetchReliefWebJobs },
@@ -73,8 +74,11 @@ export async function runDrcCrawler(
 
     const fetchSettled = await Promise.allSettled(
       SOURCE_FETCHERS.map(async ({ name, fetcher }) => {
-        const { result, jobs: rawJobs } = await fetcher(targetKeyword);
-        return { name, result, rawJobs };
+        const breaker = getCircuitBreaker(name);
+        return breaker.execute(async () => {
+          const { result, jobs: rawJobs } = await fetcher(targetKeyword);
+          return { name, result, rawJobs };
+        });
       })
     );
 
