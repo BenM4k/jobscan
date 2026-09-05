@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { JobSelect } from "@/dal/jobs.dal";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
@@ -17,14 +17,24 @@ export function JobTailoredResumeSection({ job, onJobUpdated }: JobTailoredResum
   const [isEditing, setIsEditing] = useState(false);
   const [editedResume, setEditedResume] = useState(job.tailoredResume || "");
   const [isCopied, setIsCopied] = useState(false);
+  const pendingIdempotencyKeyRef = useRef<string | null>(null);
   const t = useTranslations("jobDetail");
   const tCommon = useTranslations("common");
 
   const handleGenerate = async () => {
     try {
       setIsGenerating(true);
+      if (!pendingIdempotencyKeyRef.current) {
+        pendingIdempotencyKeyRef.current = crypto.randomUUID();
+      }
+      const idempotencyKey = pendingIdempotencyKeyRef.current;
       const res = await fetch(`/api/jobs/${job.id}/tailor-resume`, {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
+        body: JSON.stringify({ idempotencyKey }),
       });
 
       if (!res.ok) {
@@ -33,6 +43,7 @@ export function JobTailoredResumeSection({ job, onJobUpdated }: JobTailoredResum
       }
 
       const { data, tailoredResume } = await res.json();
+      pendingIdempotencyKeyRef.current = null;
       posthog.capture("tailored_resume_generated");
       setEditedResume(tailoredResume);
       onJobUpdated(data);

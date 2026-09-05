@@ -23,6 +23,9 @@ importers:
       '@base-ui/react':
         specifier: ^1.7.0
         version: 1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@counterrealist/simhash':
+        specifier: ^1.0.2
+        version: 1.0.2
       '@hookform/resolvers':
         specifier: ^5.7.1
         version: 5.9.1(@standard-schema/spec@1.1.0)(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(react-hook-form@7.85.0(react@19.2.8))(zod@4.4.3)
@@ -432,6 +435,9 @@ packages:
 
   '@bufbuild/protobuf@2.14.0':
     resolution: {integrity: sha512-C3UGsiCwSprE2NKIIFA3hCDlpXTMCAXRZuEVp88L1GY36Y41+rYL5fryE+nOFhp4p4JPQvdV8PQ4DWgHgeTE+w==}
+
+  '@counterrealist/simhash@1.0.2':
+    resolution: {integrity: sha512-Cl/ScBewSdi9tHFH402vnKg7D6zsr3Vy3fTDJD6TxxOhEoc5CMlHacNJJGa8B7baoNZuAltsRM3SX0qDMsFoVA==}
 
   '@dotenvx/dotenvx@1.75.1':
     resolution: {integrity: sha512-/BITOC9dmS/edY2zQwZNicQ059O6RKabtQfyEafV0nGtfYRNHYy1DIPiYVcov40+tob9hfmBnbR963dS+EQ1DQ==}
@@ -2024,6 +2030,9 @@ packages:
 
   '@posthog/core@1.49.2':
     resolution: {integrity: sha512-AXHDo/4nisUg7OPG1TQNgREK7n+chBQXLQyttp7bDTDsDg2k9lV06TmnpvuNbwJs53q9mP9hjezKEZu4fYadfg==}
+
+  '@posthog/siphash@1.1.3':
+    resolution: {integrity: sha512-nEFExVAIrA4cV0PiZaBY5ci4yaTu76cUFvhk+LWpuR7NUORRCZJI34tDc84Ph0yxE/qncye25d8ERGVS71JJLw==}
 
   '@posthog/types@1.407.1':
     resolution: {integrity: sha512-WhbkXPC2rgylXqmxHqv70ffI3k+KxyR6s7DBIfr5NvIqHkxp6v0pk31D/jbz0DNVbzwkLjyll2pxr4FNbJiYzg==}
@@ -5793,6 +5802,10 @@ snapshots:
 
   '@bufbuild/protobuf@2.14.0': {}
 
+  '@counterrealist/simhash@1.0.2':
+    dependencies:
+      '@posthog/siphash': 1.1.3
+
   '@dotenvx/dotenvx@1.75.1':
     dependencies:
       '@dotenvx/primitives': 0.8.0
@@ -7218,6 +7231,8 @@ snapshots:
   '@posthog/core@1.49.2':
     dependencies:
       '@posthog/types': 1.407.1
+
+  '@posthog/siphash@1.1.3': {}
 
   '@posthog/types@1.407.1': {}
 

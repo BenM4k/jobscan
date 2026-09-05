@@ -1,6 +1,4 @@
-if (typeof window !== "undefined") {
-  throw new Error("This module can only be executed on the server.");
-}
+import "server-only";
 import { db } from "@/services/db";
 import { aiCallLog, aiFeatureEnum, featureFlag, featureFlagAssignment } from "@/services/db/schema";
 import { ok, err, Result } from "@/lib/result";

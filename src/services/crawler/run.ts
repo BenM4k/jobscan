@@ -12,6 +12,15 @@ import {
   resolveCrawlerKeyword,
   ingestCrawledJob,
 } from "./crawler-utils";
+import { getCircuitBreaker } from "@/lib/circuit-breaker";
+
+export const DRC_ONLY_SOURCES = new Set([
+  "reliefweb",
+  "emploicd",
+  "congojob",
+  "unjobs",
+  "fecrdc",
+]);
 
 const SOURCE_FETCHERS = [
   { name: "reliefweb", fetcher: fetchReliefWebJobs },
@@ -62,6 +71,7 @@ async function ingestJobsConcurrently(
 export async function runDrcCrawler(
   keyword?: string,
   userId?: string,
+  options?: { drcOnly?: boolean }
 ): Promise<CrawlResult> {
   const startTime = Date.now();
   const sourceResults: CrawlSourceResult[] = [];
@@ -71,15 +81,22 @@ export async function runDrcCrawler(
     const targetKeyword = await resolveCrawlerKeyword(keyword, userId);
     const filterKw = targetKeyword?.toLowerCase();
 
+    const fetchersToRun = options?.drcOnly
+      ? SOURCE_FETCHERS.filter((s) => DRC_ONLY_SOURCES.has(s.name))
+      : SOURCE_FETCHERS;
+
     const fetchSettled = await Promise.allSettled(
-      SOURCE_FETCHERS.map(async ({ name, fetcher }) => {
-        const { result, jobs: rawJobs } = await fetcher(targetKeyword);
-        return { name, result, rawJobs };
+      fetchersToRun.map(async ({ name, fetcher }) => {
+        const breaker = getCircuitBreaker(name);
+        return breaker.execute(async () => {
+          const { result, jobs: rawJobs } = await fetcher(targetKeyword);
+          return { name, result, rawJobs };
+        });
       })
     );
 
-    for (let i = 0; i < SOURCE_FETCHERS.length; i++) {
-      const sourceDef = SOURCE_FETCHERS[i];
+    for (let i = 0; i < fetchersToRun.length; i++) {
+      const sourceDef = fetchersToRun[i];
       const settled = fetchSettled[i];
 
       if (settled.status === "rejected") {

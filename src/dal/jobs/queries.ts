@@ -1,9 +1,7 @@
-if (typeof window !== "undefined") {
-  throw new Error("This module can only be executed on the server.");
-}
+import "server-only";
 
 import { db } from "@/services/db";
-import { job, pipelineEntry } from "@/services/db/schema";
+import { job, rawJobPayload, pipelineEntry } from "@/services/db/schema";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 import { eq, and, desc, sql, or, ilike, count, gte, lte } from "drizzle-orm";
@@ -12,6 +10,7 @@ import {
   JobSelect,
   CanonicalJobSelect,
   JobSource,
+  RawJobPayloadSelect,
   pipelineEntryToJobSelect,
 } from "./types";
 
@@ -302,3 +301,105 @@ export async function searchJobsFullText(
     );
   }
 }
+
+export async function getRawJobPayload(
+  source: JobSource,
+  externalId: string
+): Promise<Result<RawJobPayloadSelect, AppError>> {
+  try {
+    const [row] = await db
+      .select()
+      .from(rawJobPayload)
+      .where(
+        and(
+          eq(rawJobPayload.source, source),
+          eq(rawJobPayload.externalId, externalId)
+        )
+      )
+      .limit(1);
+
+    if (!row) {
+      return err(
+        new AppError(
+          "NOT_FOUND",
+          `Raw job payload for ${source}:${externalId} not found`
+        )
+      );
+    }
+
+    return ok(row);
+  } catch (error) {
+    return err(
+      new AppError(
+        "DB_ERROR",
+        `Failed to retrieve raw job payload for ${source}:${externalId}`,
+        error
+      )
+    );
+  }
+}
+
+export async function getRawJobPayloadById(
+  id: string
+): Promise<Result<RawJobPayloadSelect, AppError>> {
+  try {
+    const [row] = await db
+      .select()
+      .from(rawJobPayload)
+      .where(eq(rawJobPayload.id, id))
+      .limit(1);
+
+    if (!row) {
+      return err(
+        new AppError("NOT_FOUND", `Raw job payload with ID ${id} not found`)
+      );
+    }
+
+    return ok(row);
+  } catch (error) {
+    return err(
+      new AppError(
+        "DB_ERROR",
+        `Failed to retrieve raw job payload with ID ${id}`,
+        error
+      )
+    );
+  }
+}
+
+/**
+ * Queries for an existing canonical job with SimHash within the specified Hamming distance threshold.
+ * Uses PostgreSQL bitwise XOR (#) and popcount (bit_count) on 64-bit bit strings.
+ */
+export async function findJobBySimhash(
+  targetSimhash: string | bigint,
+  maxDistance: number = 3
+): Promise<Result<CanonicalJobSelect | null, AppError>> {
+  try {
+    const targetBigIntStr =
+      typeof targetSimhash === "bigint"
+        ? targetSimhash.toString()
+        : BigInt(targetSimhash).toString();
+
+    const [matched] = await db
+      .select()
+      .from(job)
+      .where(
+        and(
+          sql`${job.simhash} IS NOT NULL`,
+          sql`bit_count((${job.simhash}::bigint # ${sql.raw(targetBigIntStr)}::bigint)::bit(64)) <= ${maxDistance}`
+        )
+      )
+      .orderBy(
+        sql`bit_count((${job.simhash}::bigint # ${sql.raw(targetBigIntStr)}::bigint)::bit(64)) ASC`
+      )
+      .limit(1);
+
+    return ok(matched || null);
+  } catch (error) {
+    return err(
+      new AppError("DB_ERROR", "Failed to query job by simhash", error)
+    );
+  }
+}
+

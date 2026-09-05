@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { JobSelect } from "@/dal/jobs.dal";
 import { JobStatus } from "@/services/db/schema";
 import { transitionJobStatusAction } from "@/actions/job.actions";
@@ -32,6 +32,7 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
   const [isScoring, setIsScoring] = useState(false);
   const [scoringError, setScoringError] = useState<string | null>(null);
   const [missingResumeOpen, setMissingResumeOpen] = useState(false);
+  const pendingScoreIdempotencyKeyRef = useRef<string | null>(null);
   const router = useRouter();
   const t = useTranslations("dashboard");
   const tCommon = useTranslations("common");
@@ -52,9 +53,18 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
     try {
       setIsScoring(true);
       setScoringError(null);
+      if (!pendingScoreIdempotencyKeyRef.current) {
+        pendingScoreIdempotencyKeyRef.current = crypto.randomUUID();
+      }
+      const idempotencyKey = pendingScoreIdempotencyKeyRef.current;
 
       const res = await fetch(`/api/jobs/${job.id}/score`, {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
+        body: JSON.stringify({ idempotencyKey }),
       });
 
       if (!res.ok) {
@@ -68,6 +78,7 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
       }
 
       const { data } = await res.json();
+      pendingScoreIdempotencyKeyRef.current = null;
       posthog.capture("job_scored", { location: "detail" });
       setJob(data);
       toast.success("Job scored against Master Resume successfully!");

@@ -41,4 +41,7 @@ yarn-error.log*
 next-env.d.ts
 
 # ide / tools
-.claude
+/.claude
+/.codex
+/.fallow
+/.impeccable

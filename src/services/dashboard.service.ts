@@ -1,7 +1,7 @@
 import * as jobsDal from "@/dal/jobs.dal";
 import { JobSelect } from "@/dal/jobs.dal";
 import { JobStatus } from "@/services/db/schema";
-import { runDrcCrawler } from "@/services/crawler/run";
+import { inngest } from "@/inngest/client";
 
 export interface DashboardFilters {
   statusFilter?: JobStatus;
@@ -17,6 +17,33 @@ export interface DashboardFilters {
 export interface DashboardFeedResult {
   jobs: JobSelect[];
   totalJobs: number;
+}
+
+// Cooldown window (10 minutes) to prevent concurrent repeated empty-feed triggers
+export const EMPTY_FEED_FETCH_COOLDOWN_MS = 10 * 60 * 1000;
+const emptyFeedDispatchTracker = new Map<string, number>();
+
+export function shouldDispatchEmptyFeedFetch(
+  userOrGlobalKey: string,
+  now: number = Date.now()
+): boolean {
+  // Prune expired entries to prevent unbounded map growth
+  for (const [key, timestamp] of emptyFeedDispatchTracker.entries()) {
+    if (now - timestamp >= EMPTY_FEED_FETCH_COOLDOWN_MS) {
+      emptyFeedDispatchTracker.delete(key);
+    }
+  }
+
+  const lastTrigger = emptyFeedDispatchTracker.get(userOrGlobalKey);
+  if (lastTrigger && now - lastTrigger < EMPTY_FEED_FETCH_COOLDOWN_MS) {
+    return false;
+  }
+  emptyFeedDispatchTracker.set(userOrGlobalKey, now);
+  return true;
+}
+
+export function resetEmptyFeedDispatchTracker(): void {
+  emptyFeedDispatchTracker.clear();
 }
 
 export async function getDashboardFeedData(
@@ -54,50 +81,32 @@ export async function getDashboardFeedData(
     ),
   ]);
 
-  let jobs = dalListResult.ok ? dalListResult.value : [];
-  let totalJobs = countResult.ok ? countResult.value : jobs.length;
+  const jobs = dalListResult.ok ? dalListResult.value : [];
+  const totalJobs = countResult.ok ? countResult.value : jobs.length;
 
-  // If pipeline is completely empty on initial dashboard load (no filters or query applied),
-  // automatically trigger initial DRC job crawl to populate opportunities
+  // If pipeline is completely empty on initial dashboard load (no filters applied),
+  // dispatch background job fetch via Inngest without blocking the request path.
+  // Uses in-memory cooldown and durable Inngest event ID to prevent concurrent duplicate workflows.
+  const dedupeKey = userId || "global-empty-feed";
   if (
     jobs.length === 0 &&
     !statusFilter &&
     !sourceFilter &&
     !startDate &&
     !endDate &&
-    !queryFilter
+    !queryFilter &&
+    shouldDispatchEmptyFeedFetch(dedupeKey)
   ) {
-    try {
-      await runDrcCrawler(undefined, userId);
-      const [reFetched, reCount] = await Promise.all([
-        jobsDal.listJobs(
-          statusFilter,
-          sourceFilter,
-          limit,
-          offset,
-          startDate,
-          endDate,
-          queryFilter,
-          userId,
-        ),
-        jobsDal.countJobs(
-          statusFilter,
-          sourceFilter,
-          startDate,
-          endDate,
-          queryFilter,
-          userId,
-        ),
-      ]);
-      if (reFetched.ok) {
-        jobs = reFetched.value;
-      }
-      if (reCount.ok) {
-        totalJobs = reCount.value;
-      }
-    } catch (err) {
-      console.error("Failed initial auto-crawl on dashboard feed load:", err);
-    }
+    const bucket = Math.floor(Date.now() / EMPTY_FEED_FETCH_COOLDOWN_MS);
+    inngest
+      .send({
+        name: "job.fetch.requested",
+        id: `empty-feed-${dedupeKey}-${bucket}`,
+        data: { source: "all", userId },
+      })
+      .catch((err) => {
+        console.warn("[Dashboard] Non-blocking Inngest job fetch trigger failed:", err);
+      });
   }
 
   return {
@@ -105,3 +114,4 @@ export async function getDashboardFeedData(
     totalJobs,
   };
 }
+

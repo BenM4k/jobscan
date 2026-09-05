@@ -20,6 +20,7 @@
     "@ai-sdk/google": "^4.0.44",
     "@ai-sdk/openai": "^4.0.42",
     "@base-ui/react": "^1.7.0",
+    "@counterrealist/simhash": "^1.0.2",
     "@hookform/resolvers": "^5.7.1",
     "ai": "^7.0.66",
     "better-auth": "^1.6.25",
