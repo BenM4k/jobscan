@@ -1,0 +1,2 @@
+ALTER TABLE "job" ADD COLUMN IF NOT EXISTS "description_tsv" "tsvector" GENERATED ALWAYS AS (to_tsvector('english', "description")) STORED;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "job_description_tsv_idx" ON "job" USING gin ("description_tsv");

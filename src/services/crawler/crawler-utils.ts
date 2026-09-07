@@ -8,6 +8,7 @@ import {
   computeSimhash,
   DEFAULT_SIMHASH_THRESHOLD,
 } from "@/lib/simhash";
+import { embedJob } from "@/services/ai/embed";
 
 export function matchesKeyword(candidate: CrawledJob, keyword?: string): boolean {
   if (!keyword || !keyword.trim()) return true;
@@ -182,6 +183,16 @@ export async function ingestCrawledJob(
         updatePayloadRes.error
       );
       return false;
+    }
+
+    if (!dedupRes.value.isDuplicate) {
+      embedJob(canonicalJob.id, {
+        title: canonicalJob.title,
+        company: canonicalJob.company,
+        description: canonicalJob.description || "",
+      }).catch((e) =>
+        console.warn(`[Crawler] Embedding generation failed for job ${canonicalJob.id}:`, e)
+      );
     }
 
     if (userId) {

@@ -11,10 +11,11 @@ import {
 } from "@/services/db/schema";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
-import { eq, and, sql, or } from "drizzle-orm";
+import { eq, and, sql, or, desc } from "drizzle-orm";
 import { isOlderThanOneMonth } from "@/lib/date-utils";
 import * as pipelineDal from "@/dal/pipeline.dal";
 import * as tailoringDal from "@/dal/tailoring.dal";
+import { getAgeInDays, applyExponentialDecay } from "@/services/ranking/decay";
 import type { TailoredResumeData } from "@/lib/ai";
 import {
   CanonicalJobSelect,
@@ -320,7 +321,9 @@ export async function updateJobScoreAndCoverLetter(
   _gaps?: string[],
   modelUsed?: string,
   resumeVersion?: number,
-  userId?: string
+  userId?: string,
+  cosineSimilarity?: number | null,
+  bm25Rank?: number | null
 ): Promise<Result<JobSelect, AppError>> {
   try {
     const entryConditions = [
@@ -349,6 +352,14 @@ export async function updateJobScoreAndCoverLetter(
       pipelineEntryId,
       resumeVersion: resumeVersion ?? 1,
       modelUsed: modelUsed ?? "gemini",
+      cosineSimilarity:
+        cosineSimilarity !== undefined && cosineSimilarity !== null
+          ? cosineSimilarity.toString()
+          : null,
+      bm25Rank:
+        bm25Rank !== undefined && bm25Rank !== null
+          ? bm25Rank.toString()
+          : null,
       finalScore: fitScore.toString(),
       matchedSkills: matchedSkills ?? [],
       missingSkills: missingSkills ?? [],
@@ -398,6 +409,8 @@ export async function updateJobScoreBreakdown(
     reasoning: string;
     modelUsed?: string;
     resumeVersion?: number;
+    cosineSimilarity?: number | null;
+    bm25Rank?: number | null;
   },
   userId?: string
 ): Promise<Result<JobSelect, AppError>> {
@@ -412,8 +425,164 @@ export async function updateJobScoreBreakdown(
     scoreData.gaps,
     scoreData.modelUsed,
     scoreData.resumeVersion,
-    userId
+    userId,
+    scoreData.cosineSimilarity,
+    scoreData.bm25Rank
   );
+}
+
+/**
+ * Saves a pure hybrid score snapshot (dense vector cosine + sparse full-text ts_rank).
+ */
+export async function saveHybridScore(
+  pipelineEntryOrJobId: string,
+  data: {
+    finalScore: number;
+    cosineSimilarity: number | null;
+    bm25Rank: number | null;
+    resumeVersion?: number;
+    explanation?: string;
+  },
+  userId?: string
+): Promise<Result<JobSelect, AppError>> {
+  try {
+    const entryConditions = [
+      or(eq(pipelineEntry.id, pipelineEntryOrJobId), eq(pipelineEntry.jobId, pipelineEntryOrJobId)),
+    ];
+    if (userId) {
+      entryConditions.push(eq(pipelineEntry.userId, userId));
+    }
+
+    const [entry] = await db
+      .select()
+      .from(pipelineEntry)
+      .where(and(...entryConditions))
+      .limit(1);
+
+    if (!entry) {
+      return err(
+        new AppError("NOT_FOUND", `Pipeline entry for job ${pipelineEntryOrJobId} not found`)
+      );
+    }
+
+    await db.insert(score).values({
+      pipelineEntryId: entry.id,
+      resumeVersion: data.resumeVersion ?? 1,
+      modelUsed: "hybrid-pgvector-bm25",
+      finalScore: data.finalScore.toString(),
+      cosineSimilarity: data.cosineSimilarity != null ? data.cosineSimilarity.toString() : null,
+      bm25Rank: data.bm25Rank != null ? data.bm25Rank.toString() : null,
+      explanation:
+        data.explanation ||
+        "Hybrid score blended with dense vector cosine similarity and sparse full-text ts_rank.",
+    });
+
+    await db
+      .update(pipelineEntry)
+      .set({ updatedAt: new Date() })
+      .where(eq(pipelineEntry.id, entry.id));
+
+    return await getJobById(entry.id, entry.userId);
+  } catch (error) {
+    return err(
+      new AppError("DB_ERROR", `Failed to save hybrid score for ${pipelineEntryOrJobId}`, error)
+    );
+  }
+}
+
+/**
+ * Re-tunes weights for an existing score record without re-running AI calls.
+ * Reads stored cosineSimilarity and bm25Rank, re-blends with w1 and w2, and updates finalScore.
+ */
+export async function recalculateScoreWithWeights(
+  pipelineEntryOrJobId: string,
+  w1: number,
+  w2: number,
+  userId?: string
+): Promise<Result<{ finalScore: number; cosineSimilarity: number | null; bm25Rank: number | null }, AppError>> {
+  try {
+    const entryConditions = [
+      or(eq(pipelineEntry.id, pipelineEntryOrJobId), eq(pipelineEntry.jobId, pipelineEntryOrJobId)),
+    ];
+    if (userId) {
+      entryConditions.push(eq(pipelineEntry.userId, userId));
+    }
+
+    const [entry] = await db
+      .select()
+      .from(pipelineEntry)
+      .where(and(...entryConditions))
+      .limit(1);
+
+    if (!entry) {
+      return err(new AppError("NOT_FOUND", `Pipeline entry not found for ${pipelineEntryOrJobId}`));
+    }
+
+    // Find the latest score for this pipeline entry
+    const [latestScore] = await db
+      .select()
+      .from(score)
+      .where(eq(score.pipelineEntryId, entry.id))
+      .orderBy(desc(score.createdAt))
+      .limit(1);
+
+    if (!latestScore) {
+      return err(new AppError("NOT_FOUND", `No score record found for entry ${entry.id}`));
+    }
+
+    const cosine = latestScore.cosineSimilarity ? Number(latestScore.cosineSimilarity) : null;
+    const bm25 = latestScore.bm25Rank ? Number(latestScore.bm25Rank) : null;
+
+    if (cosine === null && bm25 === null) {
+      return err(new AppError("VALIDATION_ERROR", "Stored score does not have cosineSimilarity or bm25Rank to retune"));
+    }
+
+    // Blend: finalScore = w1*cosine + w2*bm25
+    let newScore: number;
+    const totalWeight = (w1 || 0) + (w2 || 0);
+
+    if (cosine !== null && bm25 !== null) {
+      const blended = totalWeight > 0 ? (w1 * cosine + w2 * bm25) / totalWeight : cosine;
+      newScore = Math.min(100, Math.max(0, Math.round(blended * 100)));
+    } else if (cosine !== null) {
+      newScore = Math.min(100, Math.max(0, Math.round(cosine * 100)));
+    } else {
+      newScore = Math.min(100, Math.max(0, Math.round(bm25! * 100)));
+    }
+
+    // Query job postedAt or createdAt for age-based exponential decay
+    const [jobRow] = await db
+      .select({ postedAt: job.postedAt, createdAt: job.createdAt })
+      .from(job)
+      .where(eq(job.id, entry.jobId))
+      .limit(1);
+
+    const ageInDays = getAgeInDays(jobRow?.postedAt || jobRow?.createdAt || entry.createdAt);
+    const finalScoreWithDecay = applyExponentialDecay(newScore, ageInDays);
+
+    await db
+      .update(score)
+      .set({
+        finalScore: finalScoreWithDecay.toString(),
+        updatedAt: new Date(),
+      })
+      .where(eq(score.id, latestScore.id));
+
+    await db
+      .update(pipelineEntry)
+      .set({ updatedAt: new Date() })
+      .where(eq(pipelineEntry.id, entry.id));
+
+    return ok({
+      finalScore: finalScoreWithDecay,
+      cosineSimilarity: cosine,
+      bm25Rank: bm25,
+    });
+  } catch (error) {
+    return err(
+      new AppError("DB_ERROR", `Failed to recalculate score weights for ${pipelineEntryOrJobId}`, error)
+    );
+  }
 }
 
 export async function updateJobTailoredResume(
@@ -658,6 +827,31 @@ export async function setRawJobPayloadNormalizedJob(
         `Failed to link normalized job ${normalizedJobId} to raw job payload ${source}:${externalId}`,
         error
       )
+    );
+  }
+}
+
+/**
+ * Store a pre-computed embedding vector on a canonical job row.
+ * Uses pgvector literal format [v1,v2,...]::vector.
+ */
+export async function setJobEmbedding(
+  jobId: string,
+  embedding: number[]
+): Promise<Result<void, AppError>> {
+  try {
+    const vectorLiteral = `[${embedding.join(",")}]`;
+    await db
+      .update(job)
+      .set({
+        embedding: sql`${vectorLiteral}::vector`,
+        updatedAt: new Date(),
+      })
+      .where(eq(job.id, jobId));
+    return ok(undefined);
+  } catch (error) {
+    return err(
+      new AppError("DB_ERROR", `Failed to set embedding for job ${jobId}`, error)
     );
   }
 }

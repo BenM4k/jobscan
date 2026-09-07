@@ -55,6 +55,7 @@ export type ExperienceItem = z.infer<typeof ExperienceItemSchema>;
 
 export const JobScoreSchema = z.object({
   overallScore: z.number().min(0).max(100).describe("Overall match score from 0 to 100"),
+  explanation: z.string().optional().describe("Short 1-2 sentence explanation of why this job matched"),
   matchedSkills: z.array(z.string()).describe("Skills present in both the resume and the job posting"),
   missingSkills: z.array(z.string()).describe("Skills required by the job posting that are missing in the resume"),
   gaps: z.array(z.string()).describe("Experience or qualification gaps identified"),
