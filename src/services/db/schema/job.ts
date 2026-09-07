@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   pgTable,
   uuid,
@@ -10,9 +11,16 @@ import {
   vector,
   index,
   uniqueIndex,
+  customType,
 } from "drizzle-orm/pg-core";
 import { timestamps } from "./common";
 import { user } from "./auth";
+
+export const tsvector = customType<{ data: string }>({
+  dataType() {
+    return "tsvector";
+  },
+});
 
 // ─────────────────────────────────────────────────────────────
 // PHASE 0 & 2 — Ingestion hygiene & Normalized Job Catalog
@@ -60,9 +68,12 @@ export const job = pgTable(
     salaryNormalizedYearlyUsd: numeric("salary_normalized_yearly_usd"),
     rawSalaryText: text("raw_salary_text"),
 
-    // --- Matching (pgvector & SimHash) ---
+    // --- Matching (pgvector, SimHash, & Full-Text tsvector) ---
     embedding: vector("embedding", { dimensions: 1536 }),
     simhash: numeric("simhash"),
+    descriptionTsv: tsvector("description_tsv").generatedAlwaysAs(
+      sql`to_tsvector('english', "description")`
+    ),
 
     addedByUserId: uuid("added_by_user_id").references(() => user.id, {
       onDelete: "set null",
@@ -76,6 +87,7 @@ export const job = pgTable(
       t.embedding.op("vector_cosine_ops")
     ),
     index("job_simhash_idx").on(t.simhash),
+    index("job_description_tsv_idx").using("gin", t.descriptionTsv),
   ]
 );
 

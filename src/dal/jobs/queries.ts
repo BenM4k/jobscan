@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/services/db";
-import { job, rawJobPayload, pipelineEntry } from "@/services/db/schema";
+import { job, rawJobPayload, pipelineEntry, masterResume } from "@/services/db/schema";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 import { eq, and, desc, sql, or, ilike, count, gte, lte } from "drizzle-orm";
@@ -12,6 +12,7 @@ import {
   JobSource,
   RawJobPayloadSelect,
   pipelineEntryToJobSelect,
+  JobWithSimilarity,
 } from "./types";
 
 export function buildUnscopedJobConditions(
@@ -278,6 +279,125 @@ export async function searchJobsByVector(
   }
 }
 
+/**
+ * Query jobs ordered by cosine distance using pgvector's <=> operator,
+ * returning each job with its calculated cosine similarity (1 - distance).
+ */
+export async function searchJobsByCosineSimilarity(
+  embedding: number[],
+  options: { limit?: number; minSimilarity?: number } = {}
+): Promise<Result<JobWithSimilarity[], AppError>> {
+  try {
+    const limit = options.limit ?? 10;
+    const vectorLiteral = `[${embedding.join(",")}]`;
+    const distanceExpr = sql<number>`${job.embedding} <=> ${vectorLiteral}::vector`;
+    const similarityExpr = sql<number>`1 - (${job.embedding} <=> ${vectorLiteral}::vector)`;
+
+    const conditions = [sql`${job.embedding} IS NOT NULL`];
+    if (options.minSimilarity !== undefined) {
+      conditions.push(
+        sql`(1 - (${job.embedding} <=> ${vectorLiteral}::vector)) >= ${options.minSimilarity}`
+      );
+    }
+
+    const rows = await db
+      .select({
+        job,
+        similarity: similarityExpr,
+      })
+      .from(job)
+      .where(and(...conditions))
+      .orderBy(distanceExpr)
+      .limit(limit);
+
+    return ok(
+      rows.map((r) => ({
+        ...r.job,
+        similarity: Number(r.similarity),
+      }))
+    );
+  } catch (error) {
+    return err(
+      new AppError("DB_ERROR", "Failed cosine similarity search", error)
+    );
+  }
+}
+
+/**
+ * Find canonical jobs most similar to a user's master resume using pgvector's <=> operator.
+ */
+export async function findJobsSimilarToResume(
+  resumeId: string,
+  options: { limit?: number; minSimilarity?: number } = {}
+): Promise<Result<JobWithSimilarity[], AppError>> {
+  try {
+    const [found] = await db
+      .select({ embedding: masterResume.embedding })
+      .from(masterResume)
+      .where(eq(masterResume.id, resumeId))
+      .limit(1);
+
+    if (!found || !found.embedding) {
+      return err(
+        new AppError(
+          "NOT_FOUND",
+          `Master resume ${resumeId} has no embedding generated`
+        )
+      );
+    }
+
+    return searchJobsByCosineSimilarity(found.embedding, options);
+  } catch (error) {
+    return err(
+      new AppError(
+        "DB_ERROR",
+        `Failed to find jobs similar to resume ${resumeId}`,
+        error
+      )
+    );
+  }
+}
+
+/**
+ * Calculate the exact cosine similarity between a job and a resume directly via pgvector's <=> operator.
+ */
+export async function getJobResumeSimilarity(
+  jobId: string,
+  resumeId: string
+): Promise<Result<number | null, AppError>> {
+  try {
+    const [row] = await db
+      .select({
+        similarity: sql<number>`1 - (${job.embedding} <=> ${masterResume.embedding})`,
+      })
+      .from(job)
+      .innerJoin(
+        masterResume,
+        and(
+          eq(job.id, jobId),
+          eq(masterResume.id, resumeId),
+          sql`${job.embedding} IS NOT NULL`,
+          sql`${masterResume.embedding} IS NOT NULL`
+        )
+      )
+      .limit(1);
+
+    if (!row) {
+      return ok(null);
+    }
+
+    return ok(Number(row.similarity));
+  } catch (error) {
+    return err(
+      new AppError(
+        "DB_ERROR",
+        "Failed to compute job-resume cosine similarity",
+        error
+      )
+    );
+  }
+}
+
 export async function searchJobsFullText(
   queryString: string,
   limit: number = 20
@@ -287,10 +407,10 @@ export async function searchJobsFullText(
       .select()
       .from(job)
       .where(
-        sql`description_tsv @@ plainto_tsquery('english', ${queryString})`
+        sql`${job.descriptionTsv} @@ plainto_tsquery('english', ${queryString})`
       )
       .orderBy(
-        sql`ts_rank(description_tsv, plainto_tsquery('english', ${queryString})) DESC`
+        sql`ts_rank(${job.descriptionTsv}, plainto_tsquery('english', ${queryString}), 32) DESC`
       )
       .limit(limit);
 
@@ -298,6 +418,76 @@ export async function searchJobsFullText(
   } catch (error) {
     return err(
       new AppError("DB_ERROR", "Failed full-text search", error)
+    );
+  }
+}
+
+/**
+ * Calculate ts_rank between a job's description_tsv and a query string (or resume keywords).
+ * Uses normalization flag 32 (divides rank by rank + 1) to map the score cleanly to [0, 1).
+ */
+export async function getJobResumeTsRank(
+  jobId: string,
+  queryOrKeywords: string
+): Promise<Result<number | null, AppError>> {
+  try {
+    if (!queryOrKeywords || !queryOrKeywords.trim()) {
+      return ok(0);
+    }
+
+    // Use websearch_to_tsquery for graceful query parsing (supports quotes, OR, without throwing on special chars)
+    const [row] = await db
+      .select({
+        rank: sql<number>`ts_rank(${job.descriptionTsv}, websearch_to_tsquery('english', ${queryOrKeywords}), 32)`,
+      })
+      .from(job)
+      .where(eq(job.id, jobId))
+      .limit(1);
+
+    if (!row) {
+      return ok(null);
+    }
+
+    return ok(row.rank != null ? Number(row.rank) : 0);
+  } catch (error) {
+    return err(
+      new AppError(
+        "DB_ERROR",
+        "Failed to compute job full-text ts_rank",
+        error
+      )
+    );
+  }
+}
+
+/**
+ * Executes both queries (dense cosine similarity and sparse full-text ts_rank) for a job and resume.
+ */
+export async function getJobHybridScores(
+  jobId: string,
+  resumeId: string,
+  queryOrKeywords: string
+): Promise<Result<{ cosineSimilarity: number | null; bm25Rank: number | null }, AppError>> {
+  try {
+    const [cosineRes, bm25Res] = await Promise.all([
+      getJobResumeSimilarity(jobId, resumeId),
+      getJobResumeTsRank(jobId, queryOrKeywords),
+    ]);
+
+    if (!cosineRes.ok) return cosineRes;
+    if (!bm25Res.ok) return bm25Res;
+
+    return ok({
+      cosineSimilarity: cosineRes.value,
+      bm25Rank: bm25Res.value,
+    });
+  } catch (error) {
+    return err(
+      new AppError(
+        "DB_ERROR",
+        "Failed to compute job hybrid scores",
+        error
+      )
     );
   }
 }

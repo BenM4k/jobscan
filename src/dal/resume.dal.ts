@@ -8,7 +8,7 @@ import {
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 import { eq, and, desc, sql } from "drizzle-orm";
-import { generateEmbedding } from "@/services/ai/embeddings";
+import { generateEmbedding } from "@/services/ai/embed";
 
 export type MasterResumeSelect = typeof masterResume.$inferSelect;
 export type MasterResumeInsert = typeof masterResume.$inferInsert;

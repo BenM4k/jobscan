@@ -1,0 +1,2 @@
+ALTER TABLE "idempotency_key" ADD COLUMN IF NOT EXISTS "target_id" text;--> statement-breakpoint
+ALTER TABLE "idempotency_key" ADD COLUMN IF NOT EXISTS "attempt_id" uuid DEFAULT gen_random_uuid() NOT NULL;

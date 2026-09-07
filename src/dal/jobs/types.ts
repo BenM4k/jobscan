@@ -84,3 +84,7 @@ export function pipelineEntryToJobSelect(
     updatedAt: entry.updatedAt,
   };
 }
+
+export interface JobWithSimilarity extends CanonicalJobSelect {
+  similarity: number;
+}

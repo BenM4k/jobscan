@@ -11,6 +11,7 @@ import {
   DEFAULT_SIMHASH_THRESHOLD,
 } from "@/lib/simhash";
 import { getCircuitBreaker, CircuitBreaker } from "@/lib/circuit-breaker";
+import { embedJob } from "@/services/ai/embed";
 
 export abstract class BaseJobSourceAdapter<TRaw = unknown>
   implements JobSourceAdapter<TRaw>
@@ -220,6 +221,18 @@ export abstract class BaseJobSourceAdapter<TRaw = unknown>
       if (!updatePayloadRes.ok) {
         return err(updatePayloadRes.error);
       }
+
+      // Generate and store embedding right after job normalization (DB call 2)
+      embedJob(canonicalJob.id, {
+        title: canonicalJob.title,
+        company: canonicalJob.company,
+        description: canonicalJob.description || "",
+      }).catch((e) =>
+        console.warn(
+          `[Job Normalization] Embedding generation failed for job ${canonicalJob.id}:`,
+          e
+        )
+      );
 
       return ok(canonicalJob);
     } catch (error) {
