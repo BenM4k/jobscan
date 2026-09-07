@@ -4,8 +4,8 @@ import {
   getCircuitBreaker,
   resetAllCircuitBreakers,
 } from "@/lib/circuit-breaker";
-import { BaseJobSourceAdapter } from "./job-sources/base";
-import type { NormalizedJob } from "./job-sources/types";
+import { BaseJobSourceAdapter } from "@/services/adapters/base";
+import type { NormalizedJob } from "@/services/adapters/types";
 
 function assert(condition: boolean, msg: string) {
   if (!condition) {

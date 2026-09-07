@@ -1,8 +1,7 @@
 import "server-only";
 import { db } from "@/services/db";
 import { skill, jobSkill } from "@/services/db/schema/skills";
-import { masterResume, resumeSkill } from "@/services/db/schema/resume";
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 

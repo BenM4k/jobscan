@@ -15,6 +15,7 @@ import { gateway } from "@ai-sdk/gateway";
 
 export class GatewayProvider implements ScoringProvider {
   name: AIProviderName = "gateway";
+  modelId: string = process.env.AI_GATEWAY_MODEL || "openai/gpt-4o";
 
   async scoreJob(
     jobTitle: string,

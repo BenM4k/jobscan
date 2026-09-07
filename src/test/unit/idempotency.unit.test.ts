@@ -1,4 +1,4 @@
-import { runWithIdempotency, type IdempotencyKeySelect } from "./idempotency.service";
+import { runWithIdempotency, type IdempotencyKeySelect } from "@/services/idempotency.service";
 import { ok, err } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 

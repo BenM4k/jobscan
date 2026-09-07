@@ -19,9 +19,9 @@ async function testLocal() {
     const extRes = await client.query("SELECT * FROM pg_available_extensions WHERE name = 'vector';");
     console.log("Vector extension available:", extRes.rows);
 
-    client.release();
-  } catch (e: any) {
-    console.error("Failed to connect to local Postgres:", e.message);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("Failed to connect to local Postgres:", msg);
   } finally {
     await pool.end();
   }

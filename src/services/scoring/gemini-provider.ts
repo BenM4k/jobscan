@@ -16,6 +16,7 @@ import { AI_MODEL } from "@/lib/ai";
 
 export class GeminiProvider implements ScoringProvider {
   name: AIProviderName = "gemini";
+  modelId: string = AI_MODEL;
 
   async scoreJob(
     jobTitle: string,

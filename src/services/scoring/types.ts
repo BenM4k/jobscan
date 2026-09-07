@@ -30,6 +30,7 @@ export type ScoreWithUsage = ScoreResult & { _usage: ScoreUsage };
 
 export interface ScoringProvider {
   name: AIProviderName;
+  modelId: string;
   scoreJob(
     jobTitle: string,
     jobDescription: string,

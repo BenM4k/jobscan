@@ -15,7 +15,7 @@ import { eq, and, sql, or, desc } from "drizzle-orm";
 import { isOlderThanOneMonth } from "@/lib/date-utils";
 import * as pipelineDal from "@/dal/pipeline.dal";
 import * as tailoringDal from "@/dal/tailoring.dal";
-import { getAgeInDays, applyExponentialDecay } from "@/services/ranking/decay";
+import { getAgeInDays, applyExponentialDecay } from "@/lib/decay";
 import type { TailoredResumeData } from "@/lib/ai";
 import {
   CanonicalJobSelect,
@@ -347,6 +347,16 @@ export async function updateJobScoreAndCoverLetter(
 
     const pipelineEntryId = entry.id;
 
+    // Apply exponential decay based on posting age before writing to score table
+    const [jobRow] = await db
+      .select({ postedAt: job.postedAt, createdAt: job.createdAt })
+      .from(job)
+      .where(eq(job.id, entry.jobId))
+      .limit(1);
+
+    const ageInDays = getAgeInDays(jobRow?.postedAt || jobRow?.createdAt || entry.createdAt);
+    const finalScoreWithDecay = applyExponentialDecay(fitScore, ageInDays);
+
     // Atomic append into score to preserve scoring history
     await db.insert(score).values({
       pipelineEntryId,
@@ -360,7 +370,7 @@ export async function updateJobScoreAndCoverLetter(
         bm25Rank !== undefined && bm25Rank !== null
           ? bm25Rank.toString()
           : null,
-      finalScore: fitScore.toString(),
+      finalScore: finalScoreWithDecay.toString(),
       matchedSkills: matchedSkills ?? [],
       missingSkills: missingSkills ?? [],
       explanation: scoreReasoning,
@@ -465,11 +475,20 @@ export async function saveHybridScore(
       );
     }
 
+    const [jobRow] = await db
+      .select({ postedAt: job.postedAt, createdAt: job.createdAt })
+      .from(job)
+      .where(eq(job.id, entry.jobId))
+      .limit(1);
+
+    const ageInDays = getAgeInDays(jobRow?.postedAt || jobRow?.createdAt || entry.createdAt);
+    const finalScoreWithDecay = applyExponentialDecay(data.finalScore, ageInDays);
+
     await db.insert(score).values({
       pipelineEntryId: entry.id,
       resumeVersion: data.resumeVersion ?? 1,
       modelUsed: "hybrid-pgvector-bm25",
-      finalScore: data.finalScore.toString(),
+      finalScore: finalScoreWithDecay.toString(),
       cosineSimilarity: data.cosineSimilarity != null ? data.cosineSimilarity.toString() : null,
       bm25Rank: data.bm25Rank != null ? data.bm25Rank.toString() : null,
       explanation:

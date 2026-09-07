@@ -2,7 +2,7 @@
 
 # Jobpilot
 
-> **Template version:** 1.0 (adapted for Jobpilot) — last reviewed 2026-08-30
+> **Template version:** 1.0 (adapted for Jobpilot) — last reviewed 2026-09-07
 
 ---
 
@@ -60,6 +60,7 @@ Design comes from _(Figma / provided images / an existing design system — fill
 
 - Reproduce layout, spacing, typography, color, and states exactly rather than improvising or "improving" it.
 - If a reference only covers one breakpoint (commonly desktop), make the rest of the range responsive using sensible, standard patterns (stacking columns, collapsing sidebars/nav) without inventing new visual language.
+- **Always use shadcn/ui primitives (`components/ui/`), never handwrite custom dropdowns, overlays, or modals.** Dropdown menus, popovers, and dialogs must strictly compose official shadcn components (`DropdownMenu`, `DropdownMenuTrigger`, `DropdownMenuContent`, `DropdownMenuItem`, `Button`, etc.). Do not build ad-hoc custom dropdowns with raw `useState` or manual floating coordinate math.
 - Reuse existing components and Tailwind patterns already in the project before adding new ones.
 
 ---
@@ -78,11 +79,21 @@ These are settled and should not be re-litigated or quietly changed by an agent:
 - **Ingestion idempotency via atomic upserts:** The unique constraint on `(source, external_id)` in `raw_job_payload`, `job`, and `job_source_ref` is the natural idempotency key for job data. Never do check-then-insert (race condition between overlapping fetch cycles). Always write via `.onConflictDoUpdate({ target: [...], set: { ... } })` so that retrying a fetch converges to the same state safely.
 - **Cross-source SimHash deduplication in DB call 2:** Right after normalization and before the canonical job upsert in DB call 2, compute a 64-bit SimHash of normalized job content (`title + company + description`) via `src/lib/simhash.ts` (`@counterrealist/simhash`, 64-bit SipHash-2-4 with shingling and bit voting). Query existing jobs within Hamming-distance threshold $k \le 3$ via PostgreSQL bitwise XOR and `bit_count` (`bit_count((simhash::bigint # target::bigint)::bit(64)) <= 3`). If a near-duplicate is found, link `job_source_ref` pointing to the existing canonical `job.id` and update `raw_job_payload.normalized_job_id` without creating a duplicate `job` row. Only if no match is found does DB call 2 upsert a new canonical `job` with `simhash` persisted.
 - **Action-level idempotency for paid AI calls:** Expensive AI mutations (`generate_tailored_resume`, `generate_tailored_cover_letter`, `run_scoring`) require client-minted UUID idempotency keys tracked in `idempotency_key` (`userId`, `action`, `key` unique). Double-clicks, network timeouts, and client retries must never trigger duplicate paid AI invocations. Reads and cheap writes (e.g., `pipelineEntry.status`) are naturally idempotent or low-cost and do not use idempotency keys.
-- **Third-party integrations live behind adapters in `src/services/job-sources/` and `src/services/crawler/sources/`.** ATS on-demand adapters live in `src/services/job-sources/` (with compatibility re-exports in `src/services/adapters/`), and crawler/scraper sources live in `src/services/crawler/sources/`. Each job source normalizes into the same internal `Job` shape — don't let source-specific fields leak into components or actions.
+- **Third-party integrations live behind adapters in `src/services/adapters/` and `src/services/crawler/sources/`.** ATS on-demand adapters live in `src/services/adapters/`, and crawler/scraper sources live in `src/services/crawler/sources/`. Each job source normalizes into the same internal `Job` shape — don't let source-specific fields leak into components or actions.
 - **Adapter Circuit Breaker + exponential backoff per adapter:** Each ATS adapter and crawler fetcher call is guarded by an in-memory state machine (`CLOSED` → `OPEN` → `HALF_OPEN`) via `CircuitBreaker` (`src/lib/circuit-breaker.ts`). After consecutive failures reach threshold $N$ (default 3), the breaker trips `OPEN` and fast-fails calls with `CircuitBreakerOpenError` (`CIRCUIT_BREAKER_OPEN`) across an exponential backoff window (1min, 2min, 4min...). When the window expires, it enters `HALF_OPEN` to trial a single probe call before closing or extending backoff.
 - **Background job queue via Inngest (zero blocking in request paths):** Asynchronous background tasks, periodic job crawling/polling, email digests, and AI background scoring run through Inngest (`src/inngest/`). Functions are typed event handlers served at `/api/inngest` with no separate worker infra. Source polling and web scraping must NEVER run synchronously in request paths (e.g. initial dashboard feeds); periodic polling is scheduled in an Inngest cron (`scheduledJobFetch`), and on-demand background ingestion runs via `job.fetch.requested`. Automated user email digests run via `scheduledDigestCron` fanning out to `digest.email.scheduled`.
+- **Hybrid Job Matching (Dense pgvector + Sparse tsvector):** Job matching combines dense vector cosine similarity (`<=>`) over 1536-dim embeddings with HNSW indexing and sparse full-text lexical search (`to_tsvector('english', description)` with GIN index). Hybrid score blending (`blendHybridScores`) calculates $w_1 \cdot \text{cosine} + w_2 \cdot \text{bm25}$ (default $w_1=0.7, w_2=0.3$) mapped to 0–100. Fast hybrid scoring (`scoreJobHybrid`) and weight re-tuning (`tuneScoreWeights`) execute directly in PostgreSQL without incurring third-party LLM latency or cost.
+- **Skill Extraction & Relational Persistence:** AI scoring and the combined skill extractor (`skillsService.extractSkillsCombined`) extract structured candidate and role skills, persisted relationally to `job_skill` and `resume_skill` via `skillsDal` and `resumeDal`. Skill gaps are calculated via `diffSkills` to populate `matchedSkills` and `missingSkills`. Scoring output includes a concise 1–2 sentence "Why this matched" explanation.
+- **Recency Exponential Decay for Ranking:** Job score ranking incorporates exponential recency decay (`src/services/ranking/decay.ts`) with default rate constant $\lambda = 0.05$ (half-life of $\approx 14$ days: $\exp(-\lambda \cdot \text{ageInDays})$), clamping scores to $[0, 100]$.
+- **Fire-and-Forget Ingestion Embeddings:** Right after job normalization (DB call 2) and crawler ingestion, 1536-dimensional embeddings are generated and persisted via `embedJob` asynchronously in the background (`.catch(...)`), ensuring the catalog stays vector-indexed without slowing ingestion throughput.
+- **Redis Provisioning & Client Isolation (`allkeys-lru`):** Fast caching and temporary state storage use Redis Cloud or Upstash provisioned via the Vercel Marketplace (or local Docker Compose). The cache eviction policy is locked to `allkeys-lru`. The Redis client SDK (`ioredis`) is strictly encapsulated in `src/services/cache/redis-client.ts`, which is the **only** file in the codebase permitted to import the Redis SDK. All other modules import high-level cache helpers (`cacheGet`, `cacheSet`, `cacheRemember`, `cacheDel`, `getRedisClient`) from `@/services/cache/redis-client`.
+- **LRU/LFU AI Score Caching (`score:${jobId}:${resumeVersion}:${modelVersion}`):** AI job match scores are cached in Redis via `src/services/ai/score-cache.ts` with a 7-day default TTL and `allkeys-lru` eviction. The cache key isolates by `resumeVersion` (from `masterResume.version`, automatically busting cache on resume updates) and `modelVersion`. `scoreJobWithAI` checks this cache before calling LLM providers; on hit, it logs `cacheHit: true` and 0 tokens to `ai_call_log` without incurring LLM latency or cost.
+- **Token-Bucket Rate Limiter per AI Feature:** AI-calling mutations are protected by an atomic Redis Lua script (`executeTokenBucketRateLimit` in `redis-client.ts`, preserving strict `ioredis` encapsulation). Keyed by `ratelimit:${userId}:${aiFeature}` and checked at the very top of each AI-calling server action (`scoreJobAction`, `generateTailoredResumeAction`, `generateTailoredCoverLetterAction`) *before* the idempotency check. Fails open gracefully if Redis is unconfigured or offline.
+- **Automated AI Cost & Token Usage Tracking:** All AI invocations are wrapped by `withAiTracking` middleware (`src/services/ai/tracker.ts`), which automatically extracts input/output token counts from provider metadata (`_usage` or `usage`), calculates model-specific cost estimates (Gemini 3.8 Flash, 3.7 Flash, 3.7, 3.6 Flash; Claude 3.5 Sonnet; GPT-4o — models below 3.6 Flash are unsupported), and records an entry to `ai_call_log`.
+- **Feature Flags with Per-User Override Precedence:** Feature flag evaluations (`isEnabled(userId, flagKey)` in `src/services/flags/index.ts`) query `featureFlagAssignment` through `src/dal/flags.dal.ts` first to honor user-level overrides (opt-in beta test or kill switch) before falling back to `featureFlag.enabledGlobally`. Direct database access is strictly forbidden in the service layer and confined to the DAL.
+- **Canonical shadcn User Navigation & Settings:** The user settings and experimental feature flag toggles are located at `/dashboard/settings`. The main navbar desktop user section is `NavbarUserDropdown` (`src/components/layout/NavbarUserDropdown.tsx`), composed with official shadcn `DropdownMenu` primitives. Hand-written dropdown controls or raw `NavbarUserSection` replacements are strictly forbidden.
+- **`.agents/` and `skills-lock.json` are Local-Only:** Custom IDE agent configurations, prompt skills, and `skills-lock.json` are local-only developer assets and must remain in `.gitignore`. Never track, stage, or commit `.agents/` or `skills-lock.json` to GitHub.
 - **Never commit or print secret values** (API keys for Anthropic/OpenAI/Gemini/Vercel AI Gateway, DB credentials, better-auth secret, etc.). Reference only by env var name, per §14.
-
 
 ---
 
@@ -97,6 +108,7 @@ These are settled and should not be re-litigated or quietly changed by an agent:
 | Components      | shadcn/ui _(confirm this is in use — check `components.json`)_                                            | Components are copied into `components/ui` via the CLI, not installed as a black-box package — meant to be read and edited directly.                |
 | Auth            | better-auth                                                                                               | Server-side session handling, plugin-based (email/password, OAuth, magic link, 2FA, etc. as needed).                                                |
 | Background Jobs | Inngest (v4)                                                                                              | Typed event-driven serverless background functions, cron schedules, step workflows served at `/api/inngest`.                                        |
+| Cache / KV      | Redis Cloud / Upstash (`ioredis`)                                                                         | Vercel Marketplace, `allkeys-lru` eviction policy, strictly wrapped in `src/services/cache/redis-client.ts`.                                        |
 | ORM             | Drizzle ORM                                                                                               | Schema-first, SQL-like query builder, migrations via `drizzle-kit`.                                                                                 |
 | Database        | Postgres                                                                                                  |                                                                                                                                                     |
 | AI              | Vercel AI SDK, providers: Anthropic, Google Gemini, OpenAI; occasionally routed via the Vercel AI Gateway | Provider/model selection is config, not hardcoded per feature. Never hardcode or print API key values.                                              |
@@ -105,7 +117,7 @@ These are settled and should not be re-litigated or quietly changed by an agent:
 | Forms           | React Hook Form + Zod resolver (or native `useActionState` + server actions for simpler forms)            |                                                                                                                                                     |
 | Package manager | _(confirm — pnpm/npm/bun; check which lockfile is present)_                                               | Be consistent — don't mix lockfiles.                                                                                                                |
 | Deployment      | _(confirm — Vercel is a reasonable default given the AI SDK/Gateway usage, but verify)_                   |                                                                                                                                                     |
-| Testing         | Standalone tsx runners + unit test suites (`*.unit.test.ts`)                                              | Execute with `NODE_OPTIONS='--conditions=react-server' npx tsx <file>`.                                                                             |
+| Testing         | Standalone tsx runners grouped in `src/test/unit/` and `src/test/integration/`                           | Execute with `NODE_OPTIONS='--conditions=react-server' npx tsx <file>`.                                                                             |
 
 ---
 
@@ -122,17 +134,20 @@ src/
       profile/              # Master resume upload/management
       jobs/[jobId]/         # Job detail, tailored resume/cover letter generation
       add-job/              # Manual job addition
+      settings/             # Account settings, feature flags & email preferences
     api/
       auth/[...all]/route.ts# better-auth route handler
       inngest/route.ts      # Inngest serve route exposing all background functions
     layout.tsx
 
   components/
-    ui/                     # shadcn/ui primitives — generated, edit carefully, keep close to upstream
+    ui/                     # shadcn/ui primitives — dropdown-menu, button, dialog, popover, sonner, etc.
     shared/                 # App-specific reusable components (composed from ui/)
+    settings/               # Settings cards: AccountSettingsCard, FeatureFlagsCard, NotificationPreferencesCard
+    layout/                 # App navigation: Navbar, NavbarUserDropdown (shadcn DropdownMenu), NavbarMobileMenu
     {feature}/              # Feature-scoped components colocated by domain (job, profile, auth, etc.)
 
-  actions/                  # Server actions, grouped by domain (e.g. actions/job.actions.ts, actions/profile.actions.ts)
+  actions/                  # Server actions, grouped by domain (job.actions.ts, profile.actions.ts, settings.actions.ts)
                             # Input validation (Zod) + auth checks happen here, before calling into services/
 
   inngest/                  # Inngest background queue, typed events & durable functions
@@ -142,12 +157,18 @@ src/
     functions.ts            # Function re-export index
 
   services/                 # Service layer — BOTH third-party integrations and in-app business logic
-    job-sources/            # ATS on-demand adapters: ashby, greenhouse, lever, remoteok (re-exported via adapters/)
+    adapters/               # ATS on-demand adapters: ashby, greenhouse, lever, remoteok
     crawler/                # Crawler engine and DRC/global scrapers & fetchers
       sources/              # One adapter per source: ashby.ts, greenhouse.ts, remoteok.ts, lever.ts,
                             # congojob.ts, emploicd.ts, fecrdc.ts, unjobs.ts, reliefweb.ts
-    ai/                     # AI provider client(s) via Vercel AI SDK, embeddings.ts, formatting & tailoring prompts
+    ai/                     # AI provider client(s) via Vercel AI SDK, embed.ts, embeddings.ts, score-cache.ts, tracker.ts
     scoring/                # AI job matching providers (returning ScoreWithUsage) and scoring factory
+    ranking/                # Candidate score ranking & recency exponential decay (decay.ts)
+    rate-limit/             # Token-bucket rate limiter service (checked at top of AI actions)
+    flags/                  # Feature flags evaluation service (isEnabled with per-user override priority)
+    cache/
+      redis-client.ts       # Sole importer of ioredis, cache helpers, and token-bucket Lua script
+    skills.service.ts       # Combined skill extraction (LLM + regex) and skill gap diffing
     digest.service.ts       # Digest email generation, Resend sending & audit logging
     dashboard.service.ts    # Dashboard data assembly (zero-blocking, decoupled from crawlers)
     auth/
@@ -158,9 +179,11 @@ src/
       schema/               # Modular Drizzle schemas (pipeline, resume, scoring, ops, auth, growth, etc.)
 
   dal/                      # Data access layer — the only place that talks to Drizzle directly
-    jobs.dal.ts
+    jobs.dal.ts             # Modular jobs DAL (queries, mutations, types, vector similarity, and ts_rank)
+    skills.dal.ts           # DAL for normalized job skills (job_skill)
     pipeline.dal.ts
     resume.dal.ts           # Canonical DAL for master resumes, skills, and pgvector embeddings
+    flags.dal.ts            # DAL for feature_flag and feature_flag_assignment queries
     growth.dal.ts           # DAL for user preferences and digest email dispatch logs
     ops.dal.ts              # DAL for ai_call_log and operational metrics
     idempotency.dal.ts      # DAL for idempotency keys
@@ -175,6 +198,10 @@ src/
 
   hooks/                    # Client-side React hooks
   types/                    # Shared TS types not owned by Drizzle/Zod inference
+
+  test/                     # Standalone test suites
+    unit/                   # Unit test suites (*.unit.test.ts)
+    integration/            # Integration test suites (*.integration.test.ts)
 
 drizzle.config.ts
 components.json             # shadcn/ui config
@@ -241,7 +268,7 @@ Rules of thumb:
 ## 12. Job Sources (ATS fetch + Local Search)
 
 - Two categories of source today:
-  - **ATS/job-board fetch integrations:** Ashby, Greenhouse, RemoteOK, Lever in `src/services/job-sources/` (re-exported via `src/services/adapters/`).
+  - **ATS/job-board fetch integrations:** Ashby, Greenhouse, RemoteOK, Lever in `src/services/adapters/`.
   - **Local search integrations** (currently DRC-focused, expected to expand): CongoJob, Emploi.cd, FECRDC, UNJobs, ReliefWeb in `src/services/crawler/sources/`.
 - Users can also **manually add a job** — this goes through the same internal `Job` shape as fetched jobs, just without a source adapter behind it.
 - **Two-Step Ingestion Pipeline (Two DB Calls):**
@@ -249,12 +276,11 @@ Rules of thumb:
   - **Step 2 (DB call 2 — Normalization & SimHash Dedup):** Normalization runs as a separate step that reads the payload from `raw_job_payload`, maps it into canonical fields, and computes its 64-bit SimHash. Before creating a new `job`, it queries `jobsDal.findJobBySimhash()` ($k \le 3$). If a near-duplicate exists across sources: it links `job_source_ref` to the existing `job.id`, updates `raw_job_payload.normalized_job_id = job.id`, attaches the user pipeline entry if `userId` is present, and skips creating a duplicate canonical row. If no duplicate exists: it writes the canonical `job` (`jobsDal.upsertJob()`) with `simhash` persisted, links `job_source_ref`, and back-references `raw_job_payload`.
   - **Keep these as two DB calls, not one:** Never combine them in a single batch, transaction, or un-sequenced `Promise.all`. That separation is what keeps raw payloads replayable when schemas evolve or normalizations fail.
 - **Ingestion Idempotency (Atomic Upserts):** The natural key `(source, externalId)` is unique in `raw_job_payload`, `job`, and `job_source_ref`. Never do check-then-insert (which creates race conditions during overlapping fetch cycles). Always use atomic upserts (`.onConflictDoUpdate({ target: [...], set: { ... } })`) so running the same fetch twice converges to the same state instead of erroring or duplicating.
-- Adapters inherit from `BaseJobSourceAdapter` in `src/services/job-sources/base.ts`, implementing `saveRaw()`, `normalizeFromStored()`, and `ingest()`.
+- Adapters inherit from `BaseJobSourceAdapter` in `src/services/adapters/base.ts`, implementing `saveRaw()`, `normalizeFromStored()`, and `ingest()`.
 - The list of local sources is expected to grow beyond the DRC. When adding a new one, follow the existing adapter pattern rather than inventing a new shape; if a source needs something the current `Job` type doesn't support, extend the shared type deliberately rather than bolting on a one-off field.
 - Because sources differ wildly in reliability/format (some are proper APIs, some are scraped), each adapter should fail in an ok-err-compatible way (§13) rather than throwing — a broken source shouldn't take down fetching from the others.
 - **Adapter Circuit Breaking:** All adapter (`fetchRaw()`) and crawler invocations are wrapped by `CircuitBreaker`. Repeated failures trip the breaker to `OPEN`, preventing cascading timeouts, crawler hangs on dead boards, or slamming unstable external APIs. Fast failures return `CIRCUIT_BREAKER_OPEN`.
 - **Zero-Blocking Source Polling via Inngest:** Fetching or scraping external job sources takes substantial time (10–30s across multiple external boards). Never invoke source adapters or `runDrcCrawler` synchronously in user request paths (e.g. `getDashboardFeedData` or page renders). Periodic catalog polling is owned exclusively by Inngest cron (`scheduledJobFetch`), and on-demand user ingestion runs asynchronously via Inngest event `job.fetch.requested`.
-
 
 ### Cross-Source SimHash Deduplication
 
@@ -313,16 +339,13 @@ export const idempotencyKey = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [
-    uniqueIndex("idempotency_key_unique_idx").on(
-      t.userId,
-      t.action,
-      t.key
-    ),
-  ]
+    uniqueIndex("idempotency_key_unique_idx").on(t.userId, t.action, t.key),
+  ],
 );
 ```
 
 **Flow in the server action:**
+
 1. **Try inserting `in_progress`:** Right at the top of the action (after auth & Zod validation), attempt inserting `(userId, action, key, status: 'in_progress')`.
 2. **Duplicate check:** If the unique constraint rejects the insert, look up the existing row. If `completed`, return the stored result early (`{ ok: true, value: existingResult }`). If `in_progress`, return an ok-err in-flight response early rather than re-calling the AI provider.
 3. **Execute:** Run the AI call and subsequent DB writes.
@@ -330,6 +353,7 @@ export const idempotencyKey = pgTable(
 5. **Mark `failed` on error:** If the operation fails, update status to `'failed'` so the client can safely retry.
 
 **Where this is needed vs. not needed:**
+
 - **Need it:** Paid AI calls (`generate_tailored_resume`, `generate_tailored_cover_letter`, `run_scoring`).
 - **Do not need it:** Reads, or cheap writes like updating `pipelineEntry.status` (which are naturally idempotent or low-impact).
 
@@ -368,7 +392,10 @@ Background jobs and asynchronous event processing are handled via **Inngest** (`
 
 ## 16. Testing & Quality Gates
 
-- _(Fill in: unit test framework/location, e2e framework/location, if/when configured.)_
+- **Test Organization:** Test suites are centralized under `src/test/` and categorized into:
+  - `src/test/unit/` for fast, zero-dependency/mocked unit tests (`*.unit.test.ts`).
+  - `src/test/integration/` for multi-component or database-backed integration tests (`*.integration.test.ts`).
+- Execute standalone test suites with: `NODE_OPTIONS='--conditions=react-server' npx tsx <file>`.
 - Before considering a task complete: type-check (`tsc --noEmit`), lint, and run the relevant test suite for touched code.
 - Don't skip failing tests to "fix later" without flagging it explicitly.
 - For job-source adapters and AI service functions specifically, prefer tests against recorded/mocked responses rather than live third-party calls, so CI isn't dependent on external uptime or burning AI-provider quota.
@@ -398,8 +425,10 @@ Background jobs and asynchronous event processing are handled via **Inngest** (`
 - **`INNGEST_DEV=1` for local development:** Inngest v4 defaults to Cloud mode. In local dev, ensure `INNGEST_DEV=1` is set (or connect via `pnpm inngest:dev`), otherwise the `/api/inngest` endpoint will expect production signing keys and return 500 errors.
 - **`NODE_OPTIONS='--conditions=react-server'` for standalone test scripts:** Modules importing `server-only` (such as `job.service.ts` or `digest.service.ts`) throw runtime errors when imported by standalone `tsx` test scripts unless executed with `NODE_OPTIONS='--conditions=react-server' npx tsx <file>`.
 - **Inngest v4 `eventType` syntax:** Inngest v4 deprecated `EventSchemas` in favor of `eventType("event.name", { schema: z.object(...) })`. Use `eventCreator.create({ ... })` when sending events or pass `triggers: [eventCreator]` directly for automated type inference.
+- **`websearch_to_tsquery` & `ts_rank` Normalization Flag 32**: When performing sparse lexical full-text scoring, always use PostgreSQL `websearch_to_tsquery('english', query)` rather than `plainto_tsquery` or `to_tsquery` to avoid query parsing errors on complex search phrases or special symbols. Always pass normalization flag `32` (`ts_rank(description_tsv, query, 32)`) to divide rank by `rank + 1`, mapping the lexical score cleanly into the $[0, 1)$ interval.
+- **1536-Dimensional Vectors Across Providers**: Both `master_resume.embedding` and `job.embedding` are configured as `vector(1536)`. When calling `@ai-sdk/google` (`gemini-embedding-2`), ensure `providerOptions: { google: { outputDimensionality: 1536 } }` is provided. For `@ai-sdk/openai`, use `text-embedding-3-small` (outputs 1536 dimensions natively).
+- **Pure Hybrid Scoring vs Paid AI Scoring**: `scoreJobHybrid` in `src/services/job.service.ts` executes entirely within PostgreSQL using dense pgvector similarity (`<=>`) and sparse tsvector `ts_rank`, providing instant 0–100 scores without external LLM cost. Heavy AI scoring (`scoreJobWithAI`) is reserved for generating structured match analysis, tailored resumes, and cover letters, and must always be wrapped with client idempotency keys (`runWithIdempotency`).
 - _(Add more here as they come up — that's the point of this section.)_
-
 
 ---
 

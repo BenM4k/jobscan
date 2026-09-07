@@ -1,4 +1,4 @@
-import { generateEmbedding, embedText, embedResume, embedJob } from "./embed";
+import { generateEmbedding, embedText, embedResume, embedJob } from "@/services/ai/embed";
 
 function assert(condition: boolean, msg: string) {
   if (!condition) {
