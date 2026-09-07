@@ -15,6 +15,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 
 export class ClaudeProvider implements ScoringProvider {
   name: AIProviderName = "claude";
+  modelId: string = "claude-3-5-sonnet-latest";
 
   async scoreJob(
     jobTitle: string,

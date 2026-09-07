@@ -2,7 +2,7 @@ import "dotenv/config";
 import { db } from "@/services/db";
 import { user, idempotencyKey } from "@/services/db/schema";
 import * as idempotencyDal from "@/dal/idempotency.dal";
-import { runWithIdempotency } from "./idempotency.service";
+import { runWithIdempotency } from "@/services/idempotency.service";
 import { ok } from "@/lib/result";
 import { eq } from "drizzle-orm";
 

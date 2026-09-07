@@ -47,7 +47,7 @@ export function JobTailoredResumeSection({ job, onJobUpdated }: JobTailoredResum
       posthog.capture("tailored_resume_generated");
       setEditedResume(tailoredResume);
       onJobUpdated(data);
-      toast.success("Tailored resume generated with Gemini 3.6 Flash!");
+      toast.success("Tailored resume generated with Gemini 3.8 Flash!");
     } catch (err) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Tailoring failed");

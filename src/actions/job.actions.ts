@@ -5,6 +5,7 @@ import * as jobService from "@/services/job.service";
 import { JobStatus } from "@/services/db/schema";
 import { z } from "zod";
 import { runWithIdempotency } from "@/services/idempotency.service";
+import { checkAiRateLimit } from "@/services/rate-limit";
 import { ok } from "@/lib/result";
 
 const triggerFetchSchema = z.object({
@@ -125,6 +126,16 @@ export async function scoreJobAction(
   }
 
   const userId = sessionResult.value.user.id;
+
+  // Rate limiting check before idempotency check (cheaper to reject on)
+  const rateLimitRes = await checkAiRateLimit(userId, "scoring");
+  if (!rateLimitRes.allowed) {
+    return {
+      success: false,
+      error: `Rate limit exceeded for AI scoring. Please wait ${rateLimitRes.retryAfterSeconds}s before retrying.`,
+    };
+  }
+
   const result = await runWithIdempotency({
     userId,
     action: "run_scoring",
@@ -187,6 +198,16 @@ export async function generateTailoredResumeAction(
   }
 
   const userId = sessionResult.value.user.id;
+
+  // Rate limiting check before idempotency check (cheaper to reject on)
+  const rateLimitRes = await checkAiRateLimit(userId, "tailored_resume");
+  if (!rateLimitRes.allowed) {
+    return {
+      success: false,
+      error: `Rate limit exceeded for resume tailoring. Please wait ${rateLimitRes.retryAfterSeconds}s before retrying.`,
+    };
+  }
+
   const { generateTailoredResume } =
     await import("@/services/tailoring.service");
 
@@ -264,6 +285,16 @@ export async function generateTailoredCoverLetterAction(
   }
 
   const userId = sessionResult.value.user.id;
+
+  // Rate limiting check before idempotency check (cheaper to reject on)
+  const rateLimitRes = await checkAiRateLimit(userId, "tailored_cover_letter");
+  if (!rateLimitRes.allowed) {
+    return {
+      success: false,
+      error: `Rate limit exceeded for cover letter generation. Please wait ${rateLimitRes.retryAfterSeconds}s before retrying.`,
+    };
+  }
+
   const { generateTailoredCoverLetter } =
     await import("@/services/tailoring.service");
 

@@ -4,8 +4,8 @@ import { generateText, Output } from "ai";
 import { getGoogleModel, TailoredResumeSchema } from "@/lib/ai";
 import * as jobsDal from "@/dal/jobs.dal";
 import * as resumeDal from "@/dal/resume.dal";
-import * as opsDal from "@/dal/ops.dal";
 import * as tailoringDal from "@/dal/tailoring.dal";
+import { withAiTracking } from "@/services/ai/tracker";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 
@@ -89,26 +89,24 @@ ${job.gaps?.length ? `Identified Skills & Gaps from Evaluation:\n- Matched: ${jo
 
     let object;
     try {
-      const result = await generateText({
-        model,
-        instructions,
-        prompt,
-        output: Output.object({ schema: TailoredResumeSchema }),
-        temperature: 0.2,
-        timeout: 30_000,
-        telemetry: { isEnabled: false },
-      });
+      const result = await withAiTracking(
+        {
+          userId,
+          feature: "tailored_resume",
+          provider: "google",
+          model: model.modelId ?? "gemini",
+        },
+        () =>
+          generateText({
+            model,
+            instructions,
+            prompt,
+            output: Output.object({ schema: TailoredResumeSchema }),
+            timeout: 30_000,
+            telemetry: { isEnabled: false },
+          })
+      );
       object = result.output;
-
-      await opsDal.logAiCall({
-        userId,
-        feature: "tailored_resume",
-        provider: "google",
-        model: model.modelId ?? "gemini",
-        inputTokens: result.usage?.inputTokens,
-        outputTokens: result.usage?.outputTokens,
-        costEstimateUsd: "0.002",
-      });
     } catch (aiError) {
       console.error("AI resume tailoring call failed:", {
         jobId: job.id,
@@ -258,25 +256,23 @@ ${job.description || "No description provided."}
 
     let text = "";
     try {
-      const result = await generateText({
-        model,
-        instructions,
-        prompt,
-        temperature: 0.4,
-        timeout: 30_000,
-        telemetry: { isEnabled: false },
-      });
+      const result = await withAiTracking(
+        {
+          userId,
+          feature: "tailored_cover_letter",
+          provider: "google",
+          model: model.modelId ?? "gemini",
+        },
+        () =>
+          generateText({
+            model,
+            instructions,
+            prompt,
+            timeout: 30_000,
+            telemetry: { isEnabled: false },
+          })
+      );
       text = result.text.trim();
-
-      await opsDal.logAiCall({
-        userId,
-        feature: "tailored_cover_letter",
-        provider: "google",
-        model: model.modelId ?? "gemini",
-        inputTokens: result.usage?.inputTokens,
-        outputTokens: result.usage?.outputTokens,
-        costEstimateUsd: "0.001",
-      });
     } catch (aiError) {
       return err(
         new AppError(

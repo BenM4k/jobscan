@@ -1,7 +1,7 @@
-import { diffSkills, normalizeSkill } from "./skills.service";
-import * as skillsService from "./skills.service";
+import { diffSkills, normalizeSkill } from "@/services/skills.service";
+import * as skillsService from "@/services/skills.service";
 import * as skillsDal from "@/dal/skills.dal";
-import { scoreResultSchema } from "./scoring/types";
+import { scoreResultSchema } from "@/services/scoring/types";
 
 function assert(condition: boolean, msg: string) {
   if (!condition) {

@@ -15,6 +15,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 
 export class OpenAIProvider implements ScoringProvider {
   name: AIProviderName = "openai";
+  modelId: string = "gpt-4o";
 
   async scoreJob(
     jobTitle: string,

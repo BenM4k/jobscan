@@ -1,9 +1,9 @@
 import "server-only";
 import { db } from "@/services/db";
-import { aiCallLog, aiFeatureEnum, featureFlag, featureFlagAssignment } from "@/services/db/schema";
+import { aiCallLog, aiFeatureEnum } from "@/services/db/schema";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
-import { eq, and } from "drizzle-orm";
+import * as flagsDal from "./flags.dal";
 
 export type AiFeature = (typeof aiFeatureEnum.enumValues)[number];
 
@@ -44,31 +44,15 @@ export async function isFeatureEnabled(
   userId?: string
 ): Promise<boolean> {
   try {
-    const [flag] = await db
-      .select()
-      .from(featureFlag)
-      .where(eq(featureFlag.key, key))
-      .limit(1);
-
+    const flag = await flagsDal.getFeatureFlagByKey(key);
     if (!flag) return false;
-    if (flag.enabledGlobally) return true;
 
     if (userId) {
-      const [assignment] = await db
-        .select()
-        .from(featureFlagAssignment)
-        .where(
-          and(
-            eq(featureFlagAssignment.featureFlagId, flag.id),
-            eq(featureFlagAssignment.userId, userId)
-          )
-        )
-        .limit(1);
-
+      const assignment = await flagsDal.getFeatureFlagAssignment(flag.id, userId);
       if (assignment) return assignment.enabled;
     }
 
-    return false;
+    return flag.enabledGlobally;
   } catch {
     return false;
   }

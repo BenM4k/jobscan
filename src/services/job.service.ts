@@ -7,8 +7,11 @@ import * as skillsDal from "@/dal/skills.dal";
 import * as skillsService from "./skills.service";
 import { diffSkills } from "./skills.service";
 
-import { getJobSourceAdapter } from "./job-sources";
+import { getJobSourceAdapter } from "./adapters";
 import { getScoringProvider } from "./scoring/factory";
+import { getCachedScore, setCachedScore } from "./ai/score-cache";
+import { withAiTracking } from "./ai/tracker";
+import type { ScoreResult } from "./scoring/types";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 
@@ -66,7 +69,7 @@ export async function fetchAndUpsertJobs(
 export async function scoreJobWithAI(
   jobId: string,
   userId: string,
-  preferredProvider?: string
+  preferredProvider?: "claude" | "gemini" | "openai" | "gateway"
 ): Promise<Result<jobsDal.JobSelect, AppError>> {
   const jobResult = await jobsDal.getJobById(jobId, userId);
   if (!jobResult.ok) return jobResult;
@@ -94,26 +97,50 @@ export async function scoreJobWithAI(
   }
 
   const provider = getScoringProvider(preferredProvider);
-  const scoreResult = await provider.scoreJob(
-    job.title,
-    job.description || "",
-    resumeText,
-    resumeSkills
-  );
+  const resumeVersion = activeResume.version;
+  const modelVersion = provider.modelId;
 
-  if (!scoreResult.ok) return scoreResult;
+  // 1. Check LRU/LFU score cache before calling provider (per AGENTS.md)
+  const cachedScore = await getCachedScore(job.id, resumeVersion, modelVersion);
+  let score: ScoreResult;
 
-  const { _usage, ...score } = scoreResult.value;
+  if (cachedScore) {
+    score = cachedScore;
+    await opsDal.logAiCall({
+      userId,
+      feature: "scoring",
+      provider: provider.name,
+      model: modelVersion,
+      inputTokens: 0,
+      outputTokens: 0,
+      costEstimateUsd: "0.000000",
+      cacheHit: true,
+    });
+  } else {
+    // 2. Wrap AI call with cost/token tracking decorator
+    const scoreResult = await withAiTracking(
+      {
+        userId,
+        feature: "scoring",
+        provider: provider.name,
+        model: modelVersion,
+      },
+      () =>
+        provider.scoreJob(
+          job.title,
+          job.description || "",
+          resumeText,
+          resumeSkills
+        )
+    );
 
-  // Log AI ops metrics with real token counts from the provider
-  await opsDal.logAiCall({
-    userId,
-    feature: "scoring",
-    provider: provider.name,
-    model: _usage.modelId,
-    inputTokens: _usage.inputTokens,
-    outputTokens: _usage.outputTokens,
-  });
+    if (!scoreResult.ok) return scoreResult;
+
+    score = scoreResult.value;
+
+    // Cache the fresh score in Redis with TTL
+    await setCachedScore(job.id, resumeVersion, modelVersion, score);
+  }
 
   // Extract skills: use the structured JSON output from the scoring LLM call (or fallback to combined extraction)
   let extractedJobSkills = score.jobSkills && score.jobSkills.length > 0 ? score.jobSkills : [];
@@ -165,7 +192,7 @@ export async function scoreJobWithAI(
     matchedSkills,
     missingSkills,
     undefined,
-    _usage.modelId,
+    modelVersion,
     activeResume?.version,
     userId
   );

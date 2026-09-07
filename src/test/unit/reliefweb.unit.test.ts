@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { escapeLuceneQuery } from "./reliefweb";
+import { escapeLuceneQuery } from "@/services/crawler/sources/reliefweb";
 
 function testEscapeLuceneQuery() {
   console.log("Testing escapeLuceneQuery...");

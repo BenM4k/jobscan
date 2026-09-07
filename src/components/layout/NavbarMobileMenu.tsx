@@ -64,6 +64,25 @@ export function NavbarMobileMenu({
                 </Link>
               );
             })}
+
+            <Link
+              href="/dashboard/settings"
+              onClick={onClose}
+              aria-current={pathname === "/dashboard/settings" ? "page" : undefined}
+              className={`px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-between transition ${
+                pathname === "/dashboard/settings"
+                  ? "bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800"
+                  : "text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-zinc-800"
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <span>⚙️</span>
+                <span>{t("settings")}</span>
+              </span>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/60">
+                Flags
+              </span>
+            </Link>
           </div>
 
           <button

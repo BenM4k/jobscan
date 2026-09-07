@@ -4,7 +4,6 @@ import {
   applyExponentialDecay,
   DEFAULT_DECAY_LAMBDA,
 } from "@/services/ranking/decay";
-import * as aliasDecay from "@/service/ranking/decay";
 
 function assert(condition: boolean, msg: string) {
   if (!condition) {
@@ -15,18 +14,18 @@ function assert(condition: boolean, msg: string) {
 async function runDecayUnitTests() {
   console.log("Running Exponential Decay unit tests...");
 
-  // 1. Alias parity test: src/service/ranking/decay.ts matches src/services/ranking/decay.ts
+  // 1. Exports check
   assert(
-    typeof aliasDecay.calculateExponentialDecay === "function",
-    "calculateExponentialDecay should be exported from @/service/ranking/decay"
+    typeof calculateExponentialDecay === "function",
+    "calculateExponentialDecay should be exported from @/services/ranking/decay"
   );
   assert(
-    typeof aliasDecay.applyExponentialDecay === "function",
-    "applyExponentialDecay should be exported from @/service/ranking/decay"
+    typeof applyExponentialDecay === "function",
+    "applyExponentialDecay should be exported from @/services/ranking/decay"
   );
   assert(
-    typeof aliasDecay.getAgeInDays === "function",
-    "getAgeInDays should be exported from @/service/ranking/decay"
+    typeof getAgeInDays === "function",
+    "getAgeInDays should be exported from @/services/ranking/decay"
   );
 
   // 2. Pure function: Math.exp(-lambda * ageInDays)

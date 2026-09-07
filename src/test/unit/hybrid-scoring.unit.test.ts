@@ -1,7 +1,7 @@
-import { blendHybridScores } from "./job.service";
-import * as jobSchema from "./db/schema/job";
+import { blendHybridScores } from "@/services/job.service";
+import * as jobSchema from "@/services/db/schema/job";
 import * as jobsDal from "@/dal/jobs.dal";
-import * as jobService from "./job.service";
+import * as jobService from "@/services/job.service";
 
 function assert(condition: boolean, msg: string) {
   if (!condition) {

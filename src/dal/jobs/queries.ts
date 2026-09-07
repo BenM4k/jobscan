@@ -593,3 +593,18 @@ export async function findJobBySimhash(
   }
 }
 
+export async function getCanonicalJobRowById(
+  id: string
+): Promise<Result<CanonicalJobSelect | null, AppError>> {
+  try {
+    const [found] = await db
+      .select()
+      .from(job)
+      .where(eq(job.id, id))
+      .limit(1);
+    return ok(found || null);
+  } catch (error) {
+    return err(new AppError("DB_ERROR", `Failed to get canonical job ${id}`, error));
+  }
+}
+

@@ -146,3 +146,78 @@ export async function recordDigestEmailLog(
     return err(new AppError("DB_ERROR", "Failed to record digest email log", error));
   }
 }
+
+export interface UserPreferencesData {
+  locale: string;
+  digestEmailEnabled: boolean;
+  digestEmailFrequency: "daily" | "weekly";
+}
+
+export async function getUserPreferences(
+  userId: string
+): Promise<Result<UserPreferencesData, AppError>> {
+  try {
+    const [row] = await db
+      .select({
+        locale: userPreference.locale,
+        digestEmailEnabled: userPreference.digestEmailEnabled,
+        digestEmailFrequency: userPreference.digestEmailFrequency,
+      })
+      .from(userPreference)
+      .where(eq(userPreference.userId, userId))
+      .limit(1);
+
+    if (!row) {
+      return ok({
+        locale: "en",
+        digestEmailEnabled: true,
+        digestEmailFrequency: "weekly",
+      });
+    }
+
+    return ok({
+      locale: row.locale || "en",
+      digestEmailEnabled: row.digestEmailEnabled ?? true,
+      digestEmailFrequency:
+        (row.digestEmailFrequency as "daily" | "weekly") || "weekly",
+    });
+  } catch (error) {
+    console.error("Failed to get user preferences:", error);
+    return err(new AppError("DB_ERROR", "Failed to get user preferences", error));
+  }
+}
+
+export async function upsertUserPreferences(
+  userId: string,
+  data: Partial<UserPreferencesData>
+): Promise<Result<void, AppError>> {
+  try {
+    await db
+      .insert(userPreference)
+      .values({
+        userId,
+        locale: data.locale ?? "en",
+        digestEmailEnabled: data.digestEmailEnabled ?? true,
+        digestEmailFrequency: data.digestEmailFrequency ?? "weekly",
+      })
+      .onConflictDoUpdate({
+        target: [userPreference.userId],
+        set: {
+          ...(data.locale ? { locale: data.locale } : {}),
+          ...(data.digestEmailEnabled !== undefined
+            ? { digestEmailEnabled: data.digestEmailEnabled }
+            : {}),
+          ...(data.digestEmailFrequency
+            ? { digestEmailFrequency: data.digestEmailFrequency }
+            : {}),
+          updatedAt: new Date(),
+        },
+      });
+
+    return ok(undefined);
+  } catch (error) {
+    console.error("Failed to update user preferences:", error);
+    return err(new AppError("DB_ERROR", "Failed to update user preferences", error));
+  }
+}
+

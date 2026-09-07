@@ -8,7 +8,7 @@ import { signOut } from "@/services/auth/auth-client";
 import { PreferencesWidget } from "@/components/PreferencesWidget";
 import { Logo } from "@/components/Logo";
 import { NavbarMobileMenu } from "@/components/layout/NavbarMobileMenu";
-import { NavbarUserSection } from "@/components/layout/NavbarUserSection";
+import { NavbarUserDropdown } from "@/components/layout/NavbarUserDropdown";
 import posthog from "posthog-js";
 
 interface NavbarProps {
@@ -109,7 +109,11 @@ export function Navbar({ userId, userEmail, userName }: NavbarProps) {
 
           <PreferencesWidget />
 
-          <NavbarUserSection userEmail={userEmail} onSignOut={handleSignOut} />
+          <NavbarUserDropdown
+            userEmail={userEmail}
+            userName={userName}
+            onSignOut={handleSignOut}
+          />
         </div>
 
         {/* Mobile Header Right: Unified Widget + Hamburger */}

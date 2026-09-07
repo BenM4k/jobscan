@@ -31,7 +31,7 @@ export function ProfileAiEngineSelect({
           title="AI ENGINE"
           value={aiProvider}
           options={[
-            { id: "gemini", label: "GEMINI 3.6 FLASH" },
+            { id: "gemini", label: "GEMINI 3.8 FLASH" },
             { id: "gateway", label: "GATEWAY" },
             { id: "openai", label: "OPENAI" },
             { id: "claude", label: "CLAUDE" },

@@ -13,7 +13,7 @@ interface ProfileSidebarProps {
 }
 
 const AI_ENGINE_LABELS: Record<string, string> = {
-  gemini: "GEMINI 3.6 FLASH",
+  gemini: "GEMINI 3.8 FLASH",
   gateway: "AI GATEWAY",
   openai: "OPENAI GPT-4O",
   claude: "CLAUDE 3.5 SONNET",
@@ -30,7 +30,7 @@ export function ProfileSidebar({
   const engineLabel =
     AI_ENGINE_LABELS[aiProvider?.toLowerCase()] ||
     aiProvider?.toUpperCase() ||
-    "GEMINI 3.6 FLASH";
+    "GEMINI 3.8 FLASH";
 
   const strengthPercentage = Math.min(
     100,
