@@ -156,7 +156,7 @@ export function JobCoverLetterSection({ job, onJobUpdated }: JobCoverLetterSecti
             rows={12}
             value={coverLetter}
             onChange={(e) => setCoverLetter(e.target.value)}
-            placeholder={isStreaming ? "Streaming live cover letter response from Gemini 3.6 Flash..." : "Your cover letter draft..."}
+            placeholder={isStreaming ? "Streaming live cover letter response from Gemini 3.8 Flash..." : "Your cover letter draft..."}
             className="w-full bg-slate-50 dark:bg-[#0E0E12] border border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 text-xs font-sans rounded-2xl p-5 leading-relaxed focus:outline-none focus:border-purple-500 focus-visible:ring-2 focus-visible:ring-purple-500/20 shadow-inner"
           />
         </div>

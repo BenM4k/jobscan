@@ -109,7 +109,11 @@ export abstract class BaseJobSourceAdapter<TRaw = unknown>
         DEFAULT_SIMHASH_THRESHOLD
       );
 
-      if (existingMatch.ok && existingMatch.value) {
+      if (!existingMatch.ok) {
+        return err(existingMatch.error);
+      }
+
+      if (existingMatch.value) {
         const canonicalJob = existingMatch.value;
 
         // Link jobSourceRef pointing at existing canonical job

@@ -8,8 +8,9 @@ async function verifyHnsw() {
   console.log("Connecting to PostgreSQL...");
   const pool = new Pool({ connectionString });
 
+  let client;
   try {
-    const client = await pool.connect();
+    client = await pool.connect();
     console.log("✓ Connected to PostgreSQL database.");
 
     // 1. Verify extension
@@ -36,7 +37,13 @@ async function verifyHnsw() {
       `);
       console.log("✓ Created HNSW index successfully.");
     } else {
-      console.log("✓ Found HNSW index:", indexRes.rows[0].indexdef);
+      const indexDef = indexRes.rows[0].indexdef || "";
+      if (!indexDef.includes("USING hnsw") || !indexDef.includes("vector_cosine_ops")) {
+        throw new Error(
+          `Index 'job_embedding_hnsw_idx' definition does not contain 'USING hnsw' and 'vector_cosine_ops': ${indexDef}`
+        );
+      }
+      console.log("✓ Found valid HNSW index:", indexDef);
     }
 
     // 3. Confirm with EXPLAIN ANALYZE
@@ -54,13 +61,14 @@ async function verifyHnsw() {
     for (const row of explainRes.rows) {
       console.log(row["QUERY PLAN"]);
     }
-
-    client.release();
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("Verification error:", msg);
     process.exit(1);
   } finally {
+    if (client) {
+      client.release();
+    }
     await pool.end();
   }
 }

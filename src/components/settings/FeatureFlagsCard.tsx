@@ -16,6 +16,7 @@ export function FeatureFlagsCard({ flags: initialFlags }: FeatureFlagsCardProps)
 
   const handleToggle = (flagKey: string, currentEffective: boolean) => {
     const nextVal = !currentEffective;
+    const prevRecord = flags.find((f) => f.key === flagKey);
 
     // Optimistic state update
     setFlags((prev) =>
@@ -30,7 +31,11 @@ export function FeatureFlagsCard({ flags: initialFlags }: FeatureFlagsCardProps)
       const res = await setFeatureFlagOverrideAction(flagKey, nextVal);
       if (!res.success) {
         toast.error(res.error || "Failed to update feature flag");
-        setFlags(initialFlags); // revert
+        if (prevRecord) {
+          setFlags((prev) =>
+            prev.map((f) => (f.key === flagKey ? prevRecord : f))
+          );
+        }
       } else {
         toast.success(
           nextVal
@@ -43,8 +48,8 @@ export function FeatureFlagsCard({ flags: initialFlags }: FeatureFlagsCardProps)
 
   const handleReset = (flagKey: string) => {
     // Find global state to revert to
-    const target = flags.find((f) => f.key === flagKey);
-    const globalState = target?.enabledGlobally ?? false;
+    const prevRecord = flags.find((f) => f.key === flagKey);
+    const globalState = prevRecord?.enabledGlobally ?? false;
 
     setFlags((prev) =>
       prev.map((f) =>
@@ -58,7 +63,11 @@ export function FeatureFlagsCard({ flags: initialFlags }: FeatureFlagsCardProps)
       const res = await setFeatureFlagOverrideAction(flagKey, null);
       if (!res.success) {
         toast.error(res.error || "Failed to reset feature flag");
-        setFlags(initialFlags);
+        if (prevRecord) {
+          setFlags((prev) =>
+            prev.map((f) => (f.key === flagKey ? prevRecord : f))
+          );
+        }
       } else {
         toast.success(`Reset ${flagKey} to system default`);
       }

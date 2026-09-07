@@ -1,9 +1,10 @@
 import "dotenv/config";
-import { db } from "@/services/db";
-import { job, jobSourceRef } from "@/services/db/schema";
-import { upsertCanonicalJobWithSimhashDedup } from "@/dal/jobs/mutations";
+import {
+  upsertCanonicalJobWithSimhashDedup,
+  deleteCanonicalJobAndRefs,
+} from "@/dal/jobs/mutations";
+import { getCanonicalJobRowById } from "@/dal/jobs/queries";
 import { computeSimhash, buildJobSimhashText, DEFAULT_SIMHASH_THRESHOLD } from "@/lib/simhash";
-import { eq } from "drizzle-orm";
 
 function assert(condition: boolean, msg: string) {
   if (!condition) {
@@ -25,39 +26,35 @@ async function runConcurrentDedupTest() {
   const textB = buildJobSimhashText(baseTitle + " ", company + " Inc.", description + "!");
   const simhashB = computeSimhash(textB);
 
-  const extIdA = `ext-gh-${crypto.randomUUID()}`;
-  const extIdB = `ext-lev-${crypto.randomUUID()}`;
-
-  let createdCanonicalId: string | null = null;
-  let secondCanonicalId: string | null = null;
+  let createdCanonicalId: string | undefined;
+  let secondCanonicalId: string | undefined;
 
   try {
     console.log("Simulating concurrent ingestion from two different ATS sources...");
+    // Fire concurrent insertions with overlapping SimHash
     const [resA, resB] = await Promise.all([
       upsertCanonicalJobWithSimhashDedup(
         {
-          source: "greenhouse",
-          externalId: extIdA,
+          source: "ashby",
+          externalId: `ext-${Date.now()}-A`,
           title: baseTitle,
-          company: company,
-          url: "https://greenhouse.io/job/1",
+          company,
+          url: "https://example.com/job/a",
           description,
           status: "active",
-          simhash: simhashA.hashString,
         },
         simhashA.signedBigInt,
         DEFAULT_SIMHASH_THRESHOLD
       ),
       upsertCanonicalJobWithSimhashDedup(
         {
-          source: "lever",
-          externalId: extIdB,
+          source: "greenhouse",
+          externalId: `ext-${Date.now()}-B`,
           title: baseTitle + " ",
           company: company + " Inc.",
-          url: "https://lever.co/job/2",
+          url: "https://example.com/job/b",
           description: description + "!",
           status: "active",
-          simhash: simhashB.hashString,
         },
         simhashB.signedBigInt,
         DEFAULT_SIMHASH_THRESHOLD
@@ -86,16 +83,15 @@ async function runConcurrentDedupTest() {
     assert(dupCount === 1, `Expected exactly 1 detected duplicate, got ${dupCount}`);
     assert(valA.canonicalJob.id === valB.canonicalJob.id, "Both results point to the same canonical job ID");
 
-    // Verify DB count
-    const rows = await db.select().from(job).where(eq(job.id, createdCanonicalId!));
-    assert(rows.length === 1, `Expected exactly 1 job in DB, found ${rows.length}`);
+    // Verify DB record via DAL
+    const jobRes = await getCanonicalJobRowById(createdCanonicalId!);
+    assert(jobRes.ok && jobRes.value !== null, "Expected exactly 1 canonical job in DB via DAL helper");
 
     console.log("✓ Concurrent cross-source ingestion test passed! Exactly one canonical job created.");
   } finally {
     const idsToClean = new Set([createdCanonicalId, secondCanonicalId].filter(Boolean) as string[]);
     for (const cid of idsToClean) {
-      await db.delete(jobSourceRef).where(eq(jobSourceRef.jobId, cid));
-      await db.delete(job).where(eq(job.id, cid));
+      await deleteCanonicalJobAndRefs(cid);
     }
   }
 }

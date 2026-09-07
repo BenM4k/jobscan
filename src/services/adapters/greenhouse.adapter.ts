@@ -11,6 +11,25 @@ export interface GreenhouseJobRaw {
   location?: { name: string };
 }
 
+function decodeHtmlEntities(text: string): string {
+  let prev = text;
+  for (let i = 0; i < 3; i++) {
+    const decoded = prev
+      .replace(/&amp;/gi, "&")
+      .replace(/&lt;/gi, "<")
+      .replace(/&gt;/gi, ">")
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;/gi, "'")
+      .replace(/&apos;/gi, "'")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+      .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+    if (decoded === prev) break;
+    prev = decoded;
+  }
+  return prev;
+}
+
 export class GreenhouseAdapter extends BaseJobSourceAdapter<GreenhouseJobRaw> {
   readonly id = "greenhouse" as const;
 
@@ -41,7 +60,8 @@ export class GreenhouseAdapter extends BaseJobSourceAdapter<GreenhouseJobRaw> {
   }
 
   normalize(raw: GreenhouseJobRaw): NormalizedJob {
-    const cleanDescription = (raw.content || "No description provided.")
+    const decodedContent = decodeHtmlEntities(raw.content || "No description provided.");
+    const cleanDescription = decodedContent
       .replace(/<[^>]*>?/gm, "")
       .replace(/\s+/g, " ")
       .trim();

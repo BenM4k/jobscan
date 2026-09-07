@@ -182,7 +182,7 @@ export async function getUserPreferences(
         (row.digestEmailFrequency as "daily" | "weekly") || "weekly",
     });
   } catch (error) {
-    console.error(`Failed to get preferences for user ${userId}:`, error);
+    console.error("Failed to get user preferences:", error);
     return err(new AppError("DB_ERROR", "Failed to get user preferences", error));
   }
 }
@@ -216,7 +216,7 @@ export async function upsertUserPreferences(
 
     return ok(undefined);
   } catch (error) {
-    console.error(`Failed to update preferences for user ${userId}:`, error);
+    console.error("Failed to update user preferences:", error);
     return err(new AppError("DB_ERROR", "Failed to update user preferences", error));
   }
 }

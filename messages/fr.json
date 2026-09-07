@@ -26,7 +26,7 @@
     "signOut": "Se déconnecter"
   },
   "landing": {
-    "stickyNote": "Évaluez automatiquement les offres par rapport à votre CV avec Gemini 3.6 Flash !",
+    "stickyNote": "Évaluez automatiquement les offres par rapport à votre CV avec Gemini 3.8 Flash !",
     "scheduledIngest": "Collecte programmée",
     "scheduledSources": "Greenhouse & RemoteOK",
     "scheduledTime": "Chaque jour à 09h00",
@@ -89,7 +89,7 @@
   },
   "dashboard": {
     "title": "Pipeline Job Pilot",
-    "subtitle": "Suivez, évaluez et personnalisez vos candidatures avec Gemini 3.6 Flash",
+    "subtitle": "Suivez, évaluez et personnalisez vos candidatures avec Gemini 3.8 Flash",
     "heroTitle": "Découvrez les opportunités correspondant à vos compétences",
     "heroSubtitle": "Trouvez d'abord les offres locales pertinentes, avec un accès aux opportunités internationales selon vos besoins.",
     "localJobsDrc": "Offres Locales (RDC)",
@@ -201,7 +201,7 @@
     "replaceSubtitle": "Téléversez un nouveau PDF ou DOCX pour ré-extraire et remplacer les détails actuels de votre CV.",
     "chooseFile": "Choisir un fichier PDF / DOCX",
     "defaultAiEngine": "Moteur de scoring IA par défaut",
-    "defaultAiSubtitle": "Propulsé par Google Gemini 3.6 Flash.",
+    "defaultAiSubtitle": "Propulsé par Google Gemini 3.8 Flash.",
     "masterDetailsTitle": "Détails du CV Principal",
     "structuredView": "Vue Structurée",
     "rawMarkdown": "Markdown Brut",
@@ -237,7 +237,7 @@
     "generatingResume": "Génération du CV...",
     "reTailor": "Re-personnaliser ↻",
     "coverLetterHeading": "Lettre de Motivation Sur-Mesure",
-    "coverLetterSubtitle": "Argumentaire généré et diffusé en direct avec Gemini 3.6 Flash.",
+    "coverLetterSubtitle": "Argumentaire généré et diffusé en direct avec Gemini 3.8 Flash.",
     "generateCoverLetter": "Générer la lettre de motivation",
     "streamingCoverLetter": "Diffusion en direct de la lettre...",
     "reStream": "Re-diffuser ↻",

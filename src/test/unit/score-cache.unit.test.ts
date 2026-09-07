@@ -6,6 +6,7 @@ import {
   DEFAULT_SCORE_CACHE_TTL_SECONDS,
 } from "@/services/ai/score-cache";
 import type { ScoreResult } from "@/services/scoring/types";
+import { closeRedisConnection } from "@/services/cache/redis-client";
 
 function assert(condition: boolean, msg: string) {
   if (!condition) {
@@ -17,10 +18,10 @@ async function runScoreCacheUnitTests() {
   console.log("Running AI Score Cache unit tests...\n");
 
   // 1. Key format verification
-  const key1 = getScoreCacheKey("job-abc", 1, "gemini-3.6-flash");
+  const key1 = getScoreCacheKey("job-abc", 1, "gemini-3.8-flash");
   assert(
-    key1 === "score:job-abc:1:gemini-3.6-flash",
-    `Expected 'score:job-abc:1:gemini-3.6-flash', got '${key1}'`
+    key1 === "score:job-abc:1:gemini-3.8-flash",
+    `Expected 'score:job-abc:1:gemini-3.8-flash', got '${key1}'`
   );
   console.log("✓ Key format matches score:${jobId}:${resumeVersion}:${modelVersion}");
 
@@ -35,7 +36,7 @@ async function runScoreCacheUnitTests() {
   console.log("✓ Cache busting: resumeVersion isolates scores across master resume updates");
 
   // 3. Model version isolation
-  const keyGemini = getScoreCacheKey("job-100", 1, "gemini-3.6-flash");
+  const keyGemini = getScoreCacheKey("job-100", 1, "gemini-3.8-flash");
   const keyClaude = getScoreCacheKey("job-100", 1, "claude-3-5-sonnet-latest");
   assert(
     keyGemini !== keyClaude,
@@ -63,14 +64,24 @@ async function runScoreCacheUnitTests() {
     missingSkills: ["Next.js"],
   };
 
-  // Should not throw even when Redis is offline / unconfigured
-  await setCachedScore("job-test", 1, "test-model", mockScore);
-  const fetched = await getCachedScore("job-test", 1, "test-model");
-  // In offline mode, get returns null gracefully
-  assert(fetched === null || fetched.fitScore === 88, "getCachedScore must return ScoreResult or null gracefully");
+  const originalRedisUrl = process.env.REDIS_URL;
+  try {
+    delete process.env.REDIS_URL;
+    await closeRedisConnection();
 
-  await invalidateCachedScore("job-test", 1, "test-model");
-  console.log("✓ Graceful operations: set, get, invalidate operate safely offline");
+    // Should not throw even when Redis is offline / unconfigured
+    await setCachedScore("job-test", 1, "test-model", mockScore);
+    const fetched = await getCachedScore("job-test", 1, "test-model");
+    // In offline mode, get returns null gracefully
+    assert(fetched === null, "getCachedScore must return null when Redis is offline / unconfigured");
+
+    await invalidateCachedScore("job-test", 1, "test-model");
+    console.log("✓ Graceful operations: set, get, invalidate operate safely offline");
+  } finally {
+    if (originalRedisUrl !== undefined) {
+      process.env.REDIS_URL = originalRedisUrl;
+    }
+  }
 
   console.log("\nAll AI Score Cache tests passed successfully! 🎉");
 }

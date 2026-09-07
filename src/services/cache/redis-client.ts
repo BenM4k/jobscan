@@ -42,6 +42,8 @@ function getRedisOptions(): RedisOptions {
   return baseOptions;
 }
 
+let localRedisClient: Redis | null = null;
+
 /**
  * Initializes or retrieves the Redis client singleton instance.
  * Returns null if REDIS_URL is not configured.
@@ -55,6 +57,9 @@ export function getRedisClient(): Redis | null {
   if (globalThis.__redisClientSingleton) {
     return globalThis.__redisClientSingleton;
   }
+  if (localRedisClient) {
+    return localRedisClient;
+  }
 
   const options = getRedisOptions();
   const client = new Redis(redisUrl, options);
@@ -64,9 +69,8 @@ export function getRedisClient(): Redis | null {
     console.error("[Redis] Client error:", err.message);
   });
 
-  if (process.env.NODE_ENV !== "production") {
-    globalThis.__redisClientSingleton = client;
-  }
+  localRedisClient = client;
+  globalThis.__redisClientSingleton = client;
 
   return client;
 }
@@ -252,7 +256,7 @@ export async function getRedisHealth(): Promise<{
  * Gracefully close the Redis connection (useful in test teardown or process shutdown).
  */
 export async function closeRedisConnection(): Promise<void> {
-  const client = globalThis.__redisClientSingleton;
+  const client = globalThis.__redisClientSingleton || localRedisClient;
   if (client) {
     try {
       await client.quit();
@@ -260,6 +264,7 @@ export async function closeRedisConnection(): Promise<void> {
       client.disconnect();
     }
     globalThis.__redisClientSingleton = undefined;
+    localRedisClient = null;
   }
 }
 

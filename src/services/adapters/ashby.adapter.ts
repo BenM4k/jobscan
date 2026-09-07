@@ -8,8 +8,10 @@ export interface AshbyJobRaw {
   jobUrl: string;
   descriptionHtml?: string;
   publishedAt?: string;
+  location?: string;
   locationName?: string;
   isRemote?: boolean;
+  isListed?: boolean;
   address?: {
     postalAddress?: {
       addressCountry?: string;
@@ -28,12 +30,13 @@ export class AshbyAdapter extends BaseJobSourceAdapter<AshbyJobRaw> {
   protected async fetchRawInternal(category = "software"): Promise<AshbyJobRaw[]> {
     const organization = "notion";
     const url = `https://api.ashbyhq.com/posting-api/job-board/${organization}`;
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) {
       throw new Error(`Ashby API request failed with status ${res.status}`);
     }
     const data = await res.json();
-    const jobsList: AshbyJobRaw[] = data.jobs || [];
+    const rawList: AshbyJobRaw[] = data.jobs || [];
+    const jobsList = rawList.filter((j) => j.isListed !== false);
 
     if (category && category.trim()) {
       const term = category.trim().toLowerCase();
@@ -49,25 +52,32 @@ export class AshbyAdapter extends BaseJobSourceAdapter<AshbyJobRaw> {
 
   normalize(raw: AshbyJobRaw): NormalizedJob {
     const isRemote =
-      raw.isRemote ||
-      (raw.locationName ? /remote/i.test(raw.locationName) : false) ||
-      /remote/i.test(raw.title);
+      Boolean(raw.isRemote) ||
+      (raw.location ? /remote/i.test(raw.location) : false);
     const workplaceType = isRemote
       ? "remote"
-      : raw.locationName
+      : raw.location
       ? "on-site"
       : undefined;
     const city =
       raw.address?.postalAddress?.addressLocality ||
-      (raw.locationName && !/remote/i.test(raw.locationName)
-        ? raw.locationName.split(",")[0]?.trim()
+      (raw.location && !/remote/i.test(raw.location)
+        ? raw.location.split(",")[0]?.trim()
         : undefined);
     const rawCountry =
       raw.address?.postalAddress?.addressCountry ||
-      (raw.locationName && raw.locationName.includes(",")
-        ? raw.locationName.split(",").pop()?.trim()
+      (raw.location && raw.location.includes(",")
+        ? raw.location.split(",").pop()?.trim()
         : undefined);
     const country = isValidCountry(rawCountry) ? rawCountry : undefined;
+
+    let postedAt: Date | undefined;
+    if (raw.publishedAt) {
+      const parsed = new Date(raw.publishedAt);
+      if (!isNaN(parsed.getTime())) {
+        postedAt = parsed;
+      }
+    }
 
     return {
       externalId: raw.id,
@@ -76,7 +86,7 @@ export class AshbyAdapter extends BaseJobSourceAdapter<AshbyJobRaw> {
       company: "Notion",
       url: raw.jobUrl,
       description: raw.descriptionHtml || "",
-      postedAt: raw.publishedAt ? new Date(raw.publishedAt) : new Date(),
+      postedAt,
       city,
       country,
       workplaceType,

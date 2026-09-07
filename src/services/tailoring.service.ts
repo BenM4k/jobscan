@@ -95,7 +95,6 @@ ${job.gaps?.length ? `Identified Skills & Gaps from Evaluation:\n- Matched: ${jo
           feature: "tailored_resume",
           provider: "google",
           model: model.modelId ?? "gemini",
-          costEstimateUsd: "0.002",
         },
         () =>
           generateText({
@@ -103,7 +102,6 @@ ${job.gaps?.length ? `Identified Skills & Gaps from Evaluation:\n- Matched: ${jo
             instructions,
             prompt,
             output: Output.object({ schema: TailoredResumeSchema }),
-            temperature: 0.2,
             timeout: 30_000,
             telemetry: { isEnabled: false },
           })
@@ -264,14 +262,12 @@ ${job.description || "No description provided."}
           feature: "tailored_cover_letter",
           provider: "google",
           model: model.modelId ?? "gemini",
-          costEstimateUsd: "0.001",
         },
         () =>
           generateText({
             model,
             instructions,
             prompt,
-            temperature: 0.4,
             timeout: 30_000,
             telemetry: { isEnabled: false },
           })

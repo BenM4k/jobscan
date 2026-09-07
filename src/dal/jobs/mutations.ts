@@ -874,3 +874,15 @@ export async function setJobEmbedding(
     );
   }
 }
+
+export async function deleteCanonicalJobAndRefs(
+  jobId: string
+): Promise<Result<void, AppError>> {
+  try {
+    await db.delete(jobSourceRef).where(eq(jobSourceRef.jobId, jobId));
+    await db.delete(job).where(eq(job.id, jobId));
+    return ok(undefined);
+  } catch (error) {
+    return err(new AppError("DB_ERROR", `Failed to delete canonical job ${jobId}`, error));
+  }
+}

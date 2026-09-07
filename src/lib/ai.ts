@@ -4,9 +4,9 @@ import { z } from "zod";
 /**
  * Pinned AI Model Constant for Job Pilot
  * All Gemini calls (extraction, scoring, resume tailoring, cover letter generation)
- * must use this centralized constant.
+ * must use this centralized constant. Configurable via GEMINI_MODEL env var.
  */
-export const AI_MODEL = "gemini-3.8-flash";
+export const AI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
 
 export function getGoogleModel() {
   const apiKey =

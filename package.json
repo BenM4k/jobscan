@@ -55,7 +55,6 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/ioredis": "^5.0.0",
     "@types/node": "^20",
     "@types/pg": "^8.20.3",
     "@types/react": "^19",
@@ -68,5 +67,8 @@
     "tsx": "^4.23.7",
     "typescript": "^5"
   },
-  "packageManager": "pnpm@11.13.1"
+  "packageManager": "pnpm@11.13.1",
+  "engines": {
+    "node": ">=20.9.0"
+  }
 }

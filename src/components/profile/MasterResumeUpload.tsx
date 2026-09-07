@@ -41,7 +41,7 @@ export function MasterResumeUpload({ onExtracted, disabled, isReplacing }: Maste
       }
 
       const { text: rawText } = await parseRes.json();
-      setStepLabel("Extracting structured profile with Gemini 3.6 Flash...");
+      setStepLabel("Extracting structured profile with Gemini 3.8 Flash...");
 
       // 2. Call /api/resume/extract
       const extractRes = await fetch("/api/resume/extract", {

@@ -46,7 +46,7 @@ export function JobScoreSection({
             </h3>
           </div>
           <p className="text-xs text-gray-600 dark:text-zinc-400 max-w-xl leading-relaxed">
-            Run Gemini 3.6 Flash to evaluate your Master Resume against this job posting,
+            Run Gemini 3.8 Flash to evaluate your Master Resume against this job posting,
             identify matched/missing skill keywords, and compute a qualification fit score.
           </p>
         </div>

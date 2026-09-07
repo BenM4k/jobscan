@@ -9,8 +9,9 @@ async function testLocal() {
     connectionString: localUrl,
   });
 
+  let client;
   try {
-    const client = await pool.connect();
+    client = await pool.connect();
     console.log("✓ Connected successfully to local Postgres!");
     const versionRes = await client.query("SELECT version();");
     console.log("Version:", versionRes.rows[0]);
@@ -23,6 +24,9 @@ async function testLocal() {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("Failed to connect to local Postgres:", msg);
   } finally {
+    if (client) {
+      client.release();
+    }
     await pool.end();
   }
 }

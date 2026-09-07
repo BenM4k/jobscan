@@ -26,14 +26,6 @@ export default async function SettingsPage() {
     growthDal.getUserPreferences(user.id),
   ]);
 
-  const preferences = prefResult.ok
-    ? prefResult.value
-    : {
-        locale: "en",
-        digestEmailEnabled: true,
-        digestEmailFrequency: "weekly" as const,
-      };
-
   return (
     <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 w-full space-y-8">
       {/* Header */}
@@ -54,7 +46,13 @@ export default async function SettingsPage() {
       <div className="space-y-6">
         <AccountSettingsCard user={user} />
         <FeatureFlagsCard flags={flags} />
-        <NotificationPreferencesCard initialPreferences={preferences} />
+        {prefResult.ok ? (
+          <NotificationPreferencesCard initialPreferences={prefResult.value} />
+        ) : (
+          <div className="rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50/50 dark:bg-red-950/20 p-6 text-sm text-red-600 dark:text-red-400">
+            Failed to load notification preferences. Please refresh the page to retry.
+          </div>
+        )}
       </div>
     </main>
   );

@@ -212,7 +212,7 @@ Rules of thumb:
 - **Colocate by feature**, not by technical type, once a feature grows past 2–3 files.
 - `src/app/` holds routing and composition only. Fetch data in Server Components / Server Actions, not in `app/` glue that's hard to reuse or test.
 - Anything imported by both a Server and a Client Component must not import server-only code (env secrets, DB client, AI provider clients) — mark server-only modules with `import "server-only"` at the top.
-- A new job source (ATS or local board) gets a new file in `src/services/crawler/sources`, not inline logic in an action or component.
+- A new job source gets a dedicated file: crawlers live in `src/services/crawler/sources/`, while new ATS or local job-board integrations live in the canonical `src/services/adapters/` path, not inline logic in an action or component.
 
 ---
 

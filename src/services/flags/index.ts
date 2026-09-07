@@ -82,7 +82,7 @@ export async function setUserFeatureFlagOverride(
     console.error(`[Flags] Failed to set override for flag "${flagKey}":`, err);
     return {
       success: false,
-      error: err instanceof Error ? err.message : "Failed to update feature flag",
+      error: "Failed to update feature flag",
     };
   }
 }

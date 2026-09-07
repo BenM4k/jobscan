@@ -124,7 +124,7 @@ export async function getUserFeatureFlagsWithAssignments(
       };
     });
   } catch (error) {
-    console.error(`[Flags DAL] Failed to get flags for user ${userId}:`, error);
+    console.error("[Flags DAL] Failed to get user flags:", error);
     return [];
   }
 }
