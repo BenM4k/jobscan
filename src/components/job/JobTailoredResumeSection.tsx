@@ -1,11 +1,9 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React from "react";
 import { JobSelect } from "@/dal/jobs.dal";
-import { toast } from "sonner";
-import { useTranslations } from "next-intl";
-import posthog from "posthog-js";
-import { downloadTextAsPdf } from "@/lib/pdf-export";
+import { FileText, RotateCcw, Copy, Download, Edit3, Check } from "lucide-react";
+import { useTailoredResume } from "./useTailoredResume";
 
 interface JobTailoredResumeSectionProps {
   job: JobSelect;
@@ -13,161 +11,141 @@ interface JobTailoredResumeSectionProps {
 }
 
 export function JobTailoredResumeSection({ job, onJobUpdated }: JobTailoredResumeSectionProps) {
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedResume, setEditedResume] = useState(job.tailoredResume || "");
-  const [isCopied, setIsCopied] = useState(false);
-  const pendingIdempotencyKeyRef = useRef<string | null>(null);
-  const t = useTranslations("jobDetail");
-  const tCommon = useTranslations("common");
-
-  const handleGenerate = async () => {
-    try {
-      setIsGenerating(true);
-      if (!pendingIdempotencyKeyRef.current) {
-        pendingIdempotencyKeyRef.current = crypto.randomUUID();
-      }
-      const idempotencyKey = pendingIdempotencyKeyRef.current;
-      const res = await fetch(`/api/jobs/${job.id}/tailor-resume`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": idempotencyKey,
-        },
-        body: JSON.stringify({ idempotencyKey }),
-      });
-
-      if (!res.ok) {
-        const errJson = await res.json();
-        throw new Error(errJson.error || "Failed to generate tailored resume");
-      }
-
-      const { data, tailoredResume } = await res.json();
-      pendingIdempotencyKeyRef.current = null;
-      posthog.capture("tailored_resume_generated");
-      setEditedResume(tailoredResume);
-      onJobUpdated(data);
-      toast.success("Tailored resume generated with Gemini 3.8 Flash!");
-    } catch (err) {
-      console.error(err);
-      toast.error(err instanceof Error ? err.message : "Tailoring failed");
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleDownloadPdf = async (content: string) => {
-    try {
-      const filename = `Tailored_Resume_${job.company.replace(/\s+/g, "_")}.pdf`;
-      await downloadTextAsPdf(filename, content, 10.5, 5.5);
-      toast.success("PDF downloaded!");
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to download PDF");
-    }
-  };
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(editedResume || job.tailoredResume || "");
-    setIsCopied(true);
-    toast.success("Tailored resume copied to clipboard!");
-    setTimeout(() => setIsCopied(false), 2000);
-  };
+  const {
+    isGenerating,
+    isEditing,
+    setIsEditing,
+    editedResume,
+    setEditedResume,
+    isCopied,
+    hasResume,
+    parsedResume,
+    handleGenerate,
+    handleDownloadPdf,
+    handleCopy,
+  } = useTailoredResume({ job, onJobUpdated });
 
   return (
-    <section aria-labelledby="tailored-resume-heading" className="space-y-4">
-      {/* Main Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="text-base text-gray-700 dark:text-zinc-300">📄</span>
-            <h3
-              id="tailored-resume-heading"
-              className="text-sm sm:text-base font-bold text-gray-900 dark:text-white"
-            >
-              {t("tailoredResumeHeading")}
-            </h3>
+    <section aria-label="Tailored resume" className="py-4 border-b border-border/40 space-y-3">
+      {/* Header Row: Icon (18px) + Title (text-sm font-medium) + Description (text-sm text-muted) */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <FileText className="size-[18px] text-muted-foreground dark:text-zinc-400 shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <h2 className="text-sm font-medium text-foreground dark:text-zinc-100 font-sans">
+              Tailored resume
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-zinc-400 font-normal leading-normal font-sans">
+              Align experience bullets and keywords to this role
+            </p>
           </div>
-          <p className="text-xs text-gray-600 dark:text-zinc-400 max-w-xl leading-relaxed">
-            {t("tailoredResumeSubtitle")}
-          </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {job.tailoredResume ? (
-            <>
-              <button
-                type="button"
-                onClick={() => setIsEditing(!isEditing)}
-                className="bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-gray-700 dark:text-slate-200 text-xs font-semibold px-3 py-1.5 rounded-xl transition border border-slate-200 dark:border-zinc-700 cursor-pointer"
-              >
-                {isEditing ? tCommon("save") : `✏️ ${tCommon("edit")}`}
-              </button>
+        {/* Idle State Action (Header Row Right) */}
+        {!hasResume && !isGenerating && (
+          <div className="shrink-0 pt-0.5">
+            <button
+              type="button"
+              onClick={handleGenerate}
+              className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors p-0 bg-transparent border-0 cursor-pointer font-sans"
+            >
+              Generate resume
+            </button>
+          </div>
+        )}
+      </div>
 
-              <button
-                type="button"
-                onClick={handleCopy}
-                className="bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-gray-700 dark:text-slate-200 text-xs font-semibold px-3 py-1.5 rounded-xl transition border border-slate-200 dark:border-zinc-700 cursor-pointer"
-              >
-                {isCopied ? `✓ ${tCommon("copied")}` : `📋 ${tCommon("copy")}`}
-              </button>
+      {/* Loading State: 3 lines low-contrast pulsing block, indented under title, no spinner icon */}
+      {isGenerating && (
+        <div className="ml-[30px] border-l-2 border-border dark:border-zinc-800 pl-[14px] py-1 space-y-2">
+          <div className="h-3.5 w-full bg-muted dark:bg-zinc-800 animate-pulse rounded-sm" />
+          <div className="h-3.5 w-5/6 bg-muted dark:bg-zinc-800 animate-pulse rounded-sm" />
+          <div className="h-3.5 w-3/4 bg-muted dark:bg-zinc-800 animate-pulse rounded-sm" />
+        </div>
+      )}
 
-              <button
-                type="button"
-                onClick={() => handleDownloadPdf(editedResume || job.tailoredResume!)}
-                className="bg-[#0e4d64] hover:bg-[#0a3849] text-white text-xs font-semibold px-3.5 py-1.5 rounded-xl transition shadow-xs cursor-pointer"
-              >
-                📥 {tCommon("downloadPdf")}
-              </button>
+      {/* Generated Content Block & Actions (natural auto-height, no fixed height or scroll container) */}
+      {hasResume && !isGenerating && (
+        <div className="space-y-3">
+          {/* Content Block: indented ~30px under title, 2px border, 14px padding, text-sm font, leading-relaxed */}
+          <div className="ml-[30px] border-l-2 border-border dark:border-zinc-800 pl-[14px] text-sm leading-relaxed text-gray-600 dark:text-zinc-300 font-sans">
+            {isEditing ? (
+              <textarea
+                rows={12}
+                value={editedResume}
+                onChange={(e) => setEditedResume(e.target.value)}
+                className="w-full bg-transparent border border-border/40 dark:border-zinc-800 text-foreground dark:text-zinc-100 p-3 rounded-none text-base sm:text-sm leading-relaxed font-sans focus:outline-none focus:border-border dark:focus:border-zinc-700"
+              />
+            ) : (
+              <div className="space-y-3">
+                {/* Summary sub-block */}
+                <div>
+                  <div className="text-sm font-medium text-foreground dark:text-zinc-100 font-sans">
+                    Summary
+                  </div>
+                  <p>{parsedResume.summary}</p>
+                </div>
 
-              <button
-                type="button"
-                onClick={handleGenerate}
-                disabled={isGenerating}
-                className="bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-800 dark:text-zinc-200 text-xs font-semibold px-3 py-1.5 rounded-xl transition disabled:opacity-50 cursor-pointer"
-              >
-                {isGenerating ? "..." : t("reTailor")}
-              </button>
-            </>
-          ) : (
+                {/* Relevant experience sub-block */}
+                {parsedResume.experience.length > 0 && (
+                  <div>
+                    <div className="text-sm font-medium text-foreground dark:text-zinc-100 font-sans">
+                      Relevant experience
+                    </div>
+                    <div className="space-y-1">
+                      {parsedResume.experience.map((sentence, idx) => (
+                        <p key={idx}>{sentence}</p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Action Row: same left indent, responsive wrapping gaps, plain text in accent color, text-sm medium, 14px icon */}
+          <div className="ml-[30px] flex flex-wrap items-center gap-x-4 gap-y-2.5 sm:gap-[16px]">
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer font-sans"
+            >
+              {isCopied ? (
+                <Check className="size-[14px] shrink-0" />
+              ) : (
+                <Copy className="size-[14px] shrink-0" />
+              )}
+              <span>{isCopied ? "Copied" : "Copy text"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleDownloadPdf(editedResume || job.tailoredResume!)}
+              className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer font-sans"
+            >
+              <Download className="size-[14px] shrink-0" />
+              <span>Download PDF</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsEditing(!isEditing)}
+              className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer font-sans"
+            >
+              <Edit3 className="size-[14px] shrink-0" />
+              <span>{isEditing ? "Save draft" : "Edit resume"}</span>
+            </button>
+
             <button
               type="button"
               onClick={handleGenerate}
               disabled={isGenerating}
-              className="bg-[#0e4d64] hover:bg-[#0a3849] text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition shadow-xs disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer shrink-0"
+              className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer disabled:opacity-50 font-sans"
             >
-              {isGenerating ? (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-white animate-ping" />
-                  <span>{t("generatingResume")}</span>
-                </>
-              ) : (
-                <>
-                  <span>+</span>
-                  <span>Generate Tailored Resume</span>
-                </>
-              )}
+              <RotateCcw className="size-[14px] shrink-0" />
+              <span>Regenerate resume</span>
             </button>
-          )}
-        </div>
-      </div>
-
-      {job.tailoredResume && (
-        <div className="space-y-3 pt-2">
-          {isEditing ? (
-            <textarea
-              rows={16}
-              value={editedResume}
-              onChange={(e) => setEditedResume(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-[#18181D] border border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 p-4 rounded-2xl text-xs font-mono leading-relaxed focus:outline-none focus:border-cyan-600"
-            />
-          ) : (
-            <div className="p-5 sm:p-6 bg-slate-50/80 dark:bg-[#141418] border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl">
-              <pre className="text-xs sm:text-sm text-gray-800 dark:text-zinc-200 whitespace-pre-wrap font-mono leading-relaxed selection:bg-cyan-600 selection:text-white">
-                {editedResume || job.tailoredResume}
-              </pre>
-            </div>
-          )}
+          </div>
         </div>
       )}
     </section>

@@ -130,10 +130,13 @@ export function JobList({
       <ul
         role="list"
         aria-label="Available job opportunities"
-        className="divide-y divide-slate-200/70 dark:divide-zinc-800/80"
+        className="space-y-4"
       >
         {jobsList.map((job) => (
-          <li key={job.id}>
+          <li
+            key={job.id}
+            className="p-5 sm:p-6 rounded-2xl bg-slate-100/60 dark:bg-zinc-900/40 hover:bg-slate-100/90 dark:hover:bg-zinc-900/60 transition-colors"
+          >
             <JobCardItem
               job={job}
               onStatusChange={handleStatusChange}

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useTranslations } from "next-intl";
+import { RotateCcw, Copy, Download, Save, Check } from "lucide-react";
 
 interface CoverLetterToolbarProps {
   hasContent: boolean;
@@ -24,66 +24,57 @@ export function CoverLetterToolbar({
   onSave,
   onGenerateStream,
 }: CoverLetterToolbarProps) {
-  const t = useTranslations("jobDetail");
-  const tCommon = useTranslations("common");
-
   if (!hasContent) {
     return (
       <button
         type="button"
         onClick={onGenerateStream}
         disabled={isStreaming}
-        className="bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition shadow-xs disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer shrink-0"
+        className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer disabled:opacity-50 shrink-0 font-sans"
       >
-        {isStreaming ? (
-          <>
-            <span className="w-2 h-2 rounded-full bg-white animate-ping" />
-            <span>{t("streamingCoverLetter")}</span>
-          </>
-        ) : (
-          <>
-            <span>+</span>
-            <span>Generate Cover Letter</span>
-          </>
-        )}
+        <span>Generate letter</span>
       </button>
     );
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 shrink-0">
+    <div className="flex flex-wrap items-center gap-4 shrink-0 font-sans">
+      <button
+        type="button"
+        onClick={onSave}
+        disabled={isSaving || isStreaming}
+        className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer disabled:opacity-50 font-sans"
+      >
+        <Save className="size-[18px] shrink-0" />
+        <span>{isSaving ? "Saving" : "Save draft"}</span>
+      </button>
+
       <button
         type="button"
         onClick={onCopy}
-        className="bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-gray-700 dark:text-slate-200 text-xs font-semibold px-3 py-1.5 rounded-xl transition border border-slate-200 dark:border-zinc-700 cursor-pointer"
+        className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer font-sans"
       >
-        {isCopied ? `✓ ${tCommon("copied")}` : `📋 ${tCommon("copy")}`}
+        {isCopied ? <Check className="size-[18px] shrink-0" /> : <Copy className="size-[18px] shrink-0" />}
+        <span>{isCopied ? "Copied" : "Copy text"}</span>
       </button>
 
       <button
         type="button"
         onClick={onDownloadPdf}
-        className="bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-xs font-semibold px-3.5 py-1.5 rounded-xl transition shadow-xs cursor-pointer"
+        className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer font-sans"
       >
-        📥 {tCommon("downloadPdf")}
-      </button>
-
-      <button
-        type="button"
-        onClick={onSave}
-        disabled={isSaving || isStreaming}
-        className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3.5 py-1.5 rounded-xl transition disabled:opacity-50 cursor-pointer"
-      >
-        {isSaving ? t("saving") : `💾 ${t("saveCoverLetter")}`}
+        <Download className="size-[18px] shrink-0" />
+        <span>Download PDF</span>
       </button>
 
       <button
         type="button"
         onClick={onGenerateStream}
         disabled={isStreaming}
-        className="bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-800 dark:text-zinc-200 text-xs font-semibold px-3.5 py-1.5 rounded-xl transition disabled:opacity-50 cursor-pointer"
+        className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer disabled:opacity-50 font-sans"
       >
-        {isStreaming ? "..." : t("reStream")}
+        <RotateCcw className="size-[18px] shrink-0" />
+        <span>Regenerate letter</span>
       </button>
     </div>
   );

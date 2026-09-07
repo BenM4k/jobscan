@@ -70,14 +70,19 @@ export function DateRangeFilter() {
     <Popover>
       <PopoverTrigger
         aria-label={t("filterByDate")}
-        className={`appearance-none bg-white dark:bg-[#18181B] border ${
+        className={`appearance-none rounded-xl px-3.5 py-1.5 sm:px-4 sm:py-2 transition cursor-pointer text-xs focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500 flex items-center gap-1 font-medium border ${
           isFiltered
-            ? "border-blue-500 text-blue-600 dark:text-blue-400 font-medium"
-            : "border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 font-medium"
-        } rounded-xl px-3.5 py-1.5 sm:px-4 sm:py-2 hover:border-slate-300 dark:hover:border-zinc-700 transition cursor-pointer text-xs focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500 flex items-center gap-1`}
+            ? "bg-blue-50 dark:bg-blue-950/60 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300"
+            : "bg-white dark:bg-[#18181B] border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 hover:border-slate-300 dark:hover:border-zinc-700"
+        }`}
       >
         <span className="truncate max-w-[160px] sm:max-w-[200px]">{label}</span>
-        <span className="text-[10px] text-gray-400 dark:text-zinc-500 ml-0.5" aria-hidden="true">
+        <span
+          className={`text-[10px] ml-0.5 ${
+            isFiltered ? "text-blue-600 dark:text-blue-400" : "text-gray-400 dark:text-zinc-500"
+          }`}
+          aria-hidden="true"
+        >
           ▾
         </span>
       </PopoverTrigger>
@@ -146,7 +151,7 @@ export function DateRangeFilter() {
                 type="date"
                 value={tempStart}
                 onChange={(e) => setTempStart(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-zinc-900 border border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 text-xs rounded-xl p-2 focus:outline-none focus:border-blue-500"
+                className="w-full bg-slate-50 dark:bg-zinc-900 border border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 text-base sm:text-xs rounded-xl p-2 focus:outline-none focus:border-blue-500"
               />
             </div>
             <div>
@@ -161,7 +166,7 @@ export function DateRangeFilter() {
                 type="date"
                 value={tempEnd}
                 onChange={(e) => setTempEnd(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-zinc-900 border border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 text-xs rounded-xl p-2 focus:outline-none focus:border-blue-500"
+                className="w-full bg-slate-50 dark:bg-zinc-900 border border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 text-base sm:text-xs rounded-xl p-2 focus:outline-none focus:border-blue-500"
               />
             </div>
             <button

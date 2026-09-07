@@ -106,7 +106,7 @@ export function ProfileForm({
 
   if (!isEditing && resumeText.trim()) {
     return (
-      <div className="space-y-8 max-w-5xl mx-auto py-2">
+      <div className="space-y-8 w-full py-2">
         <ProfileViewMode
           userName={userName}
           userEmail={userEmail}
@@ -130,7 +130,7 @@ export function ProfileForm({
   }
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto py-2">
+    <div className="space-y-8 w-full py-2">
       <ProfileEditHeader
         hasResume={Boolean(resumeText.trim())}
         isSaving={isSaving}

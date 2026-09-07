@@ -28,7 +28,9 @@ async function runAiUsageUnitTests() {
     };
 
     const res = await getUserAiUsage("test-user-1", 50);
-    assert(res.ok === true, "Service must return ok Result");
+    if (!res.ok) {
+      throw new Error("Service must return ok Result");
+    }
     assert(res.value.usedCount === 20, "usedCount must match DAL summary");
     assert(res.value.monthlyLimit === 50, "monthlyLimit must be 50");
     assert(res.value.remainingCount === 30, "remainingCount must be 50 - 20 = 30");
@@ -50,7 +52,9 @@ async function runAiUsageUnitTests() {
     };
 
     const overQuotaRes = await getUserAiUsage("test-user-2", 50);
-    assert(overQuotaRes.ok === true, "Over-quota calculation returns ok Result");
+    if (!overQuotaRes.ok) {
+      throw new Error("Over-quota calculation returns ok Result");
+    }
     assert(overQuotaRes.value.remainingCount === 0, "remainingCount must clamp to 0 when over quota");
     assert(overQuotaRes.value.percentUsed === 100, "percentUsed must clamp to 100%");
     console.log("✓ Over-quota clamping: clamps remainingCount to 0 and percentUsed to 100%");
@@ -61,7 +65,9 @@ async function runAiUsageUnitTests() {
     };
 
     const errRes = await getUserAiUsage("test-user-err", 50);
-    assert(errRes.ok === false, "DAL error must propagate as err Result");
+    if (errRes.ok) {
+      throw new Error("DAL error must propagate as err Result");
+    }
     assert(errRes.error.code === "DB_ERROR", "Error code must be preserved");
     console.log("✓ Error propagation: safely returns error Result on DAL failure");
 

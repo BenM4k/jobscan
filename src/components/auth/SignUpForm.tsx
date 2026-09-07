@@ -74,7 +74,7 @@ export function SignUpForm() {
             placeholder={t("fullNamePlaceholder")}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-800 dark:text-slate-200 text-xs font-medium rounded-xl p-3 focus:ring-2 focus:ring-blue-500 transition"
+            className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-800 dark:text-slate-200 text-base sm:text-xs font-medium rounded-xl p-3 focus:ring-2 focus:ring-blue-500 transition"
           />
         </div>
 
@@ -89,7 +89,7 @@ export function SignUpForm() {
             placeholder={t("emailPlaceholder")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-800 dark:text-slate-200 text-xs font-medium rounded-xl p-3 focus:ring-2 focus:ring-blue-500 transition"
+            className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-800 dark:text-slate-200 text-base sm:text-xs font-medium rounded-xl p-3 focus:ring-2 focus:ring-blue-500 transition"
           />
         </div>
 

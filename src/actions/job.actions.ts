@@ -388,7 +388,10 @@ export async function fetchMoreJobsAction(
 const addManualJobSchema = z.object({
   title: z.string().min(1, "Job title is required"),
   company: z.string().min(1, "Company name is required"),
-  url: z.url("Please provide a valid job posting URL"),
+  location: z.string().optional(),
+  workplaceType: z.string().optional(),
+  rawSalaryText: z.string().optional(),
+  url: z.string().optional(),
   description: z
     .string()
     .min(10, "Job description must be at least 10 characters"),
@@ -402,11 +405,23 @@ export async function addManualJobAction(formData: FormData) {
       error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message,
     };
 
+  const rawUrl = formData.get("url")?.toString()?.trim() || "";
+  let validatedUrl = rawUrl;
+  if (validatedUrl && !/^https?:\/\//i.test(validatedUrl)) {
+    validatedUrl = `https://${validatedUrl}`;
+  }
+
   const parsed = addManualJobSchema.safeParse({
-    title: formData.get("title")?.toString() || "",
-    company: formData.get("company")?.toString() || "",
-    url: formData.get("url")?.toString() || "",
-    description: formData.get("description")?.toString() || "",
+    title: formData.get("title")?.toString()?.trim() || "",
+    company: formData.get("company")?.toString()?.trim() || "",
+    location: formData.get("location")?.toString()?.trim() || undefined,
+    workplaceType: formData.get("workplaceType")?.toString()?.trim() || undefined,
+    rawSalaryText:
+      formData.get("salary")?.toString()?.trim() ||
+      formData.get("rawSalaryText")?.toString()?.trim() ||
+      undefined,
+    url: validatedUrl || undefined,
+    description: formData.get("description")?.toString()?.trim() || "",
   });
 
   if (!parsed.success) {
@@ -424,6 +439,10 @@ export async function addManualJobAction(formData: FormData) {
     externalId,
     title: parsed.data.title,
     company: parsed.data.company,
+    location: parsed.data.location,
+    city: parsed.data.location,
+    workplaceType: parsed.data.workplaceType,
+    rawSalaryText: parsed.data.rawSalaryText,
     url: parsed.data.url,
     description: parsed.data.description,
     postedAt: new Date(),

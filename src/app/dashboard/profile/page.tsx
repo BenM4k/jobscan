@@ -39,7 +39,7 @@ async function ProfileFormContent() {
 
 function ProfileSkeleton() {
   return (
-    <div className="space-y-8 max-w-5xl mx-auto py-2 animate-pulse">
+    <div className="space-y-8 w-full py-2 animate-pulse">
       {/* Candidate Hero Header Skeleton */}
       <div className="flex flex-col lg:flex-row items-start gap-12 lg:gap-16 pt-2">
         <div className="flex-1 min-w-0 divide-y divide-slate-200/90 dark:divide-zinc-800">
@@ -57,7 +57,7 @@ function ProfileSkeleton() {
                   </div>
                 </div>
               </div>
-              <div className="h-8 w-36 bg-slate-200 dark:bg-zinc-800 rounded-xl shrink-0" />
+              <div className="h-8 w-36 bg-slate-200 dark:bg-zinc-800 rounded-lg shrink-0" />
             </div>
           </div>
 
@@ -156,7 +156,7 @@ export default async function ProfilePage() {
   }
 
   return (
-    <main className="flex-1 max-w-6xl w-full mx-auto p-6 space-y-8 z-10">
+    <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-8 z-10">
       <Suspense fallback={<ProfileSkeleton />}>
         <ProfileFormContent />
       </Suspense>

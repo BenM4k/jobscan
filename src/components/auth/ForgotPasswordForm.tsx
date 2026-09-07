@@ -105,7 +105,7 @@ export function ForgotPasswordForm() {
               placeholder={t("emailPlaceholder")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-800 dark:text-slate-200 text-xs font-medium rounded-xl py-3 pl-3 pr-10 focus:ring-2 focus:ring-blue-500 transition"
+              className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-800 dark:text-slate-200 text-base sm:text-xs font-medium rounded-xl py-3 pl-3 pr-10 focus:ring-2 focus:ring-blue-500 transition"
             />
             <Mail className="absolute right-3.5 w-4 h-4 text-gray-400 pointer-events-none" />
           </div>

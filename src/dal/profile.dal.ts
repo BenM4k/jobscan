@@ -99,13 +99,19 @@ export function parseResumeContent(content: string): ParsedResumeSections {
         }
       }
 
-      const dates = period ? period.split(/\s*[—–-]\s*/) : [];
+      let cleanPeriod = period;
+      if (cleanPeriod && /ENDDATE:/i.test(cleanPeriod)) {
+        cleanPeriod = cleanPeriod.replace(/ENDDATE:\s*/i, " — ").trim();
+      }
+      cleanPeriod = cleanPeriod ? cleanPeriod.replace(/(?:STARTDATE|START_DATE|START)\s*:\s*/gi, "").trim() : "";
+
+      const dates = cleanPeriod ? cleanPeriod.split(/\s*(?:—|–|-|\bto\b|\buntil\b)\s*/i).filter(Boolean) : [];
 
       experience.push({
         company: company || "Company",
         title: title || "Role",
         startDate: dates[0]?.trim() || undefined,
-        endDate: dates.length > 1 ? dates[1]?.trim() : (period || undefined),
+        endDate: dates.length > 1 ? dates[1]?.trim() : undefined,
         bullets: bullets.length > 0 ? bullets : [lines.slice(bulletStartIndex).join(" ")].filter(Boolean),
       });
     }
@@ -146,14 +152,20 @@ export function parseResumeContent(content: string): ParsedResumeSections {
         field = inMatch[2].trim();
       }
 
-      const dates = period ? period.split(/\s*[—–-]\s*/) : [];
+      let cleanEduPeriod = period;
+      if (cleanEduPeriod && /ENDDATE:/i.test(cleanEduPeriod)) {
+        cleanEduPeriod = cleanEduPeriod.replace(/ENDDATE:\s*/i, " — ").trim();
+      }
+      cleanEduPeriod = cleanEduPeriod ? cleanEduPeriod.replace(/(?:STARTDATE|START_DATE|START)\s*:\s*/gi, "").trim() : "";
+
+      const eduDates = cleanEduPeriod ? cleanEduPeriod.split(/\s*(?:—|–|-|\bto\b|\buntil\b)\s*/i).filter(Boolean) : [];
 
       education.push({
         institution: institution || "Institution",
         degree: degree || "Degree",
         field,
-        startDate: dates[0]?.trim() || undefined,
-        endDate: dates.length > 1 ? dates[1]?.trim() : (period || undefined),
+        startDate: eduDates[0]?.trim() || undefined,
+        endDate: eduDates.length > 1 ? eduDates[1]?.trim() : undefined,
       });
     }
   }

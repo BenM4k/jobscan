@@ -54,11 +54,11 @@ export function NotificationPreferencesCard({
   };
 
   return (
-    <div className="bg-white dark:bg-[#121216] rounded-3xl border border-slate-200 dark:border-zinc-800/80 p-6 shadow-sm transition-all">
+    <div className="bg-white dark:bg-[#121216] rounded-2xl border border-slate-200 dark:border-zinc-800/80 p-6 shadow-2xs transition-all">
       <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800/80 pb-5">
         <div>
           <h2 className="text-base font-bold text-gray-900 dark:text-zinc-100 flex items-center gap-2">
-            <Bell className="w-4 h-4 text-purple-500" />
+            <Bell className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
             <span>Opportunity Digests & Email Alerts</span>
           </h2>
           <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
@@ -71,11 +71,11 @@ export function NotificationPreferencesCard({
         {/* Enable / Disable Digest */}
         <div className="flex items-center justify-between gap-4">
           <div className="space-y-1">
-            <p className="text-xs font-bold text-gray-900 dark:text-zinc-200 flex items-center gap-2">
-              <Mail className="w-3.5 h-3.5 text-gray-400 dark:text-zinc-500" />
+            <p className="text-xs font-semibold text-gray-900 dark:text-zinc-200 flex items-center gap-2">
+              <Mail className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500" />
               <span>Personalized Opportunity Digest</span>
             </p>
-            <p className="text-xs text-gray-500 dark:text-zinc-400">
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
               Summarizes freshly scraped listings that match your skills profile.
             </p>
           </div>
@@ -84,10 +84,11 @@ export function NotificationPreferencesCard({
             type="button"
             onClick={handleToggleEnabled}
             disabled={isPending}
+            aria-label="Toggle Personalized Opportunity Digest"
             aria-pressed={enabled}
-            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus-visible:ring-2 focus-visible:ring-purple-600 ${
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600 ${
               enabled
-                ? "bg-purple-600 dark:bg-purple-500"
+                ? "bg-blue-600"
                 : "bg-slate-200 dark:bg-zinc-800"
             } ${isPending ? "opacity-60" : ""}`}
           >
@@ -103,11 +104,11 @@ export function NotificationPreferencesCard({
         {enabled && (
           <div className="pt-4 border-t border-slate-100 dark:border-zinc-800/60 flex items-center justify-between gap-4">
             <div className="space-y-1">
-              <p className="text-xs font-bold text-gray-900 dark:text-zinc-200 flex items-center gap-2">
-                <Clock className="w-3.5 h-3.5 text-gray-400 dark:text-zinc-500" />
-                <span>Delivery Frequency</span>
+              <p className="text-xs font-semibold text-gray-900 dark:text-zinc-200 flex items-center gap-2">
+                <Clock className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500" />
+                <span>Delivery frequency</span>
               </p>
-              <p className="text-xs text-gray-500 dark:text-zinc-400">
+              <p className="text-xs text-slate-500 dark:text-zinc-400">
                 Choose how often Inngest compiles and dispatches your digest.
               </p>
             </div>
@@ -117,10 +118,10 @@ export function NotificationPreferencesCard({
                 type="button"
                 onClick={() => handleChangeFrequency("daily")}
                 disabled={isPending}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   frequency === "daily"
-                    ? "bg-white dark:bg-zinc-800 text-purple-600 dark:text-purple-400 shadow-xs"
-                    : "text-gray-600 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-white"
+                    ? "bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-400 shadow-xs"
+                    : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
                 }`}
               >
                 Daily
@@ -129,10 +130,10 @@ export function NotificationPreferencesCard({
                 type="button"
                 onClick={() => handleChangeFrequency("weekly")}
                 disabled={isPending}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   frequency === "weekly"
-                    ? "bg-white dark:bg-zinc-800 text-purple-600 dark:text-purple-400 shadow-xs"
-                    : "text-gray-600 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-white"
+                    ? "bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-400 shadow-xs"
+                    : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
                 }`}
               >
                 Weekly

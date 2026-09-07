@@ -6,6 +6,7 @@ import { JobStatus } from "@/services/db/schema";
 import { CardGridSelect } from "@/components/ui/card-grid-select";
 import { getScoreBadgeStyle } from "@/lib/score-style";
 import { useTranslations } from "next-intl";
+import { ArrowRight } from "lucide-react";
 
 interface JobCardActionsProps {
   jobId: string;
@@ -25,11 +26,11 @@ export function JobCardActions({
   const t = useTranslations("dashboard");
 
   return (
-    <div className="mt-5 pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="mt-5 pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-slate-200/50 dark:border-zinc-800/50">
       {/* Status selector */}
       <div className="flex items-center text-xs">
         <CardGridSelect
-          title="STATUS"
+          title="Status"
           value={status}
           options={[
             { id: "new", label: t("statusNew") },
@@ -45,16 +46,16 @@ export function JobCardActions({
       </div>
 
       {/* Score Badge (if scored) and View Link */}
-      <div className="flex items-center justify-between sm:justify-end gap-3">
+      <div className="flex items-center justify-between sm:justify-end gap-4">
         {fitScore !== null &&
           fitScore !== undefined &&
           (() => {
             const scoreStyle = getScoreBadgeStyle(fitScore);
             return (
               <span
-                className={`text-xs font-extrabold px-3 py-1.5 rounded-xl border shrink-0 ${scoreStyle.bgColor} ${scoreStyle.borderColor} ${scoreStyle.textColor}`}
+                className={`text-xs font-semibold px-2.5 py-1 rounded-lg border shrink-0 ${scoreStyle.bgColor} ${scoreStyle.borderColor} ${scoreStyle.textColor}`}
               >
-                {t("score")}: {fitScore}/100
+                {t("score")}: {fitScore}%
               </span>
             );
           })()}
@@ -62,14 +63,14 @@ export function JobCardActions({
         <Link
           href={`/dashboard/jobs/${jobId}`}
           aria-label={`View details for ${jobTitle}`}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold px-5 py-2 rounded-xl transition duration-150 shadow-xs cursor-pointer whitespace-nowrap inline-flex items-center gap-1.5"
+          className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1 cursor-pointer whitespace-nowrap font-sans p-0 bg-transparent border-0 group"
         >
           <span>
             {fitScore !== null && fitScore !== undefined
               ? t("viewJob")
               : t("viewAndScore")}
           </span>
-          <span aria-hidden="true">→</span>
+          <ArrowRight className="size-4 shrink-0 transition-transform group-hover:translate-x-0.5" />
         </Link>
       </div>
     </div>

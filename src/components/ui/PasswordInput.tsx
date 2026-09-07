@@ -35,7 +35,7 @@ export function PasswordInput({
           type={showPassword ? "text" : "password"}
           disabled={disabled}
           className={cn(
-            "w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-800 dark:text-slate-200 text-xs font-medium rounded-xl py-3 pl-3 pr-10 focus:ring-2 focus:ring-blue-500 focus:outline-none transition disabled:opacity-50",
+            "w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-800 dark:text-slate-200 text-base sm:text-xs font-medium rounded-xl py-3 pl-3 pr-10 focus:ring-2 focus:ring-blue-500 focus:outline-none transition disabled:opacity-50",
             error && "border-rose-500 focus:ring-rose-500",
             className
           )}

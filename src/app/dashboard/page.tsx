@@ -63,7 +63,7 @@ export default async function DashboardPage({
         <ClientShell>
           <Suspense
             fallback={
-              <div className="divide-y divide-slate-200/70 dark:divide-zinc-800/80">
+              <div className="space-y-4">
                 <JobCardSkeleton />
                 <JobCardSkeleton />
                 <JobCardSkeleton />

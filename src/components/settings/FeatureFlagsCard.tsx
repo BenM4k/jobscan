@@ -75,11 +75,11 @@ export function FeatureFlagsCard({ flags: initialFlags }: FeatureFlagsCardProps)
   };
 
   return (
-    <div className="bg-white dark:bg-[#121216] rounded-3xl border border-slate-200 dark:border-zinc-800/80 p-6 shadow-sm transition-all">
+    <div className="bg-white dark:bg-[#121216] rounded-2xl border border-slate-200 dark:border-zinc-800/80 p-6 shadow-2xs transition-all">
       <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800/80 pb-5">
         <div>
           <h2 className="text-base font-bold text-gray-900 dark:text-zinc-100 flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-indigo-500" />
+            <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
             <span>Feature Flags & Experimental Previews</span>
           </h2>
           <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
@@ -105,12 +105,12 @@ export function FeatureFlagsCard({ flags: initialFlags }: FeatureFlagsCardProps)
                   </span>
 
                   {hasOverride ? (
-                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/60">
-                      Personal Override: {flag.userOverride ? "Active" : "Disabled"}
+                    <span className="text-xs font-medium px-2.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60">
+                      Personal override: {flag.userOverride ? "Active" : "Disabled"}
                     </span>
                   ) : (
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400 border border-slate-200 dark:border-zinc-700/60">
-                      System Default ({flag.enabledGlobally ? "On" : "Off"})
+                    <span className="text-xs font-medium px-2.5 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border border-slate-200 dark:border-zinc-700/60">
+                      System default ({flag.enabledGlobally ? "On" : "Off"})
                     </span>
                   )}
                 </div>
@@ -127,7 +127,8 @@ export function FeatureFlagsCard({ flags: initialFlags }: FeatureFlagsCardProps)
                     onClick={() => handleReset(flag.key)}
                     disabled={isPending}
                     title="Reset to system default"
-                    className="p-1.5 text-xs text-gray-400 hover:text-gray-700 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-xl transition cursor-pointer"
+                    aria-label={`Reset ${flag.key} to system default`}
+                    className="p-1.5 text-xs text-gray-400 hover:text-gray-700 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg transition cursor-pointer"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                   </button>
@@ -137,10 +138,11 @@ export function FeatureFlagsCard({ flags: initialFlags }: FeatureFlagsCardProps)
                   type="button"
                   onClick={() => handleToggle(flag.key, isEnabled)}
                   disabled={isPending}
+                  aria-label={`Toggle ${flag.key}`}
                   aria-pressed={isEnabled}
                   className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 ${
                     isEnabled
-                      ? "bg-blue-600 dark:bg-indigo-600"
+                      ? "bg-blue-600"
                       : "bg-slate-200 dark:bg-zinc-800"
                   } ${isPending ? "opacity-60" : ""}`}
                 >

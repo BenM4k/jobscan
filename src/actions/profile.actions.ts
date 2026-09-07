@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/auth-guard";
 import * as profileService from "@/services/profile.service";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { formatProfileDateRange } from "@/lib/date-format";
 
 const updateProfileSchema = z.object({
   resumeText: z.string().min(10, "Resume text must be at least 10 characters"),
@@ -69,20 +70,20 @@ export async function saveMasterResumeAction(data: {
     const expBlock = data.experience?.length
       ? `## Work Experience\n\n` +
         data.experience
-          .map(
-            (exp) =>
-              `### ${exp.title} — ${exp.company}${exp.startDate || exp.endDate ? ` (${[exp.startDate, exp.endDate].filter(Boolean).join(" - ")})` : ""}\n` +
-              exp.bullets.map((b) => `• ${b}`).join("\n")
-          )
+          .map((exp) => {
+            const dateRange = formatProfileDateRange(exp.startDate, exp.endDate);
+            return `### ${exp.title} — ${exp.company}${dateRange ? ` (${dateRange})` : ""}\n` +
+              exp.bullets.map((b) => `• ${b}`).join("\n");
+          })
           .join("\n\n")
       : "";
     const eduBlock = data.education?.length
       ? `## Education\n\n` +
         data.education
-          .map(
-            (edu) =>
-              `• ${edu.degree}${edu.field ? ` in ${edu.field}` : ""} — ${edu.institution}${edu.startDate || edu.endDate ? ` (${[edu.startDate, edu.endDate].filter(Boolean).join(" - ")})` : ""}`
-          )
+          .map((edu) => {
+            const dateRange = formatProfileDateRange(edu.startDate, edu.endDate);
+            return `• ${edu.degree}${edu.field ? ` in ${edu.field}` : ""} — ${edu.institution}${dateRange ? ` (${dateRange})` : ""}`;
+          })
           .join("\n")
       : "";
 

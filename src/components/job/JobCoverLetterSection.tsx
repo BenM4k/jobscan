@@ -1,12 +1,9 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React from "react";
 import { JobSelect } from "@/dal/jobs.dal";
-import { toast } from "sonner";
-import { useTranslations } from "next-intl";
-import posthog from "posthog-js";
-import { CoverLetterToolbar } from "@/components/job/CoverLetterToolbar";
-import { downloadTextAsPdf } from "@/lib/pdf-export";
+import { Mail, RotateCcw, Copy, Download, Edit3, Save, Check } from "lucide-react";
+import { useCoverLetter } from "./useCoverLetter";
 
 interface JobCoverLetterSectionProps {
   job: JobSelect;
@@ -14,151 +11,134 @@ interface JobCoverLetterSectionProps {
 }
 
 export function JobCoverLetterSection({ job, onJobUpdated }: JobCoverLetterSectionProps) {
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [coverLetter, setCoverLetter] = useState(job.coverLetterDraft || "");
-  const [isSaving, setIsSaving] = useState(false);
-  const [isCopied, setIsCopied] = useState(false);
-  const pendingIdempotencyKeyRef = useRef<string | null>(null);
-  const t = useTranslations("jobDetail");
-  const tCommon = useTranslations("common");
+  const {
+    isStreaming,
+    coverLetter,
+    setCoverLetter,
+    isSaving,
+    isEditing,
+    setIsEditing,
+    isCopied,
+    hasContent,
+    handleGenerateStream,
+    handleSave,
+    handleDownloadPdf,
+    handleCopy,
+  } = useCoverLetter({ job, onJobUpdated });
 
-  const handleGenerateStream = async () => {
-    try {
-      setIsStreaming(true);
-      setCoverLetter("");
-      if (!pendingIdempotencyKeyRef.current) {
-        pendingIdempotencyKeyRef.current = crypto.randomUUID();
-      }
-      const idempotencyKey = pendingIdempotencyKeyRef.current;
-
-      const res = await fetch(`/api/jobs/${job.id}/cover-letter`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": idempotencyKey,
-        },
-        body: JSON.stringify({ idempotencyKey }),
-      });
-
-      if (!res.ok) {
-        const errJson = await res.json();
-        throw new Error(errJson.error || "Failed to generate cover letter stream");
-      }
-
-      if (!res.body) throw new Error("No readable stream response received");
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let accumulated = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        accumulated += chunk;
-        setCoverLetter(accumulated);
-      }
-
-      pendingIdempotencyKeyRef.current = null;
-      posthog.capture("cover_letter_generated");
-      toast.success("Cover letter generated! Feel free to edit and save.");
-      onJobUpdated({ ...job, coverLetterDraft: accumulated });
-    } catch (err) {
-      console.error(err);
-      toast.error(err instanceof Error ? err.message : "Cover letter streaming failed");
-    } finally {
-      setIsStreaming(false);
-    }
-  };
-
-  const handleSave = async () => {
-    try {
-      setIsSaving(true);
-      const res = await fetch(`/api/jobs/${job.id}/cover-letter`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ coverLetter }),
-      });
-
-      if (!res.ok) {
-        const errJson = await res.json();
-        throw new Error(errJson.error || "Failed to save cover letter");
-      }
-
-      const { data } = await res.json();
-      posthog.capture("cover_letter_saved");
-      onJobUpdated(data);
-      toast.success("Cover letter saved successfully!");
-    } catch (err) {
-      console.error(err);
-      toast.error(err instanceof Error ? err.message : "Save failed");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleDownloadPdf = async () => {
-    try {
-      const filename = `Cover_Letter_${job.company.replace(/\s+/g, "_")}.pdf`;
-      await downloadTextAsPdf(filename, coverLetter, 11, 6);
-      toast.success("Cover letter PDF downloaded!");
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to generate PDF");
-    }
-  };
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(coverLetter);
-    setIsCopied(true);
-    toast.success("Cover letter copied to clipboard!");
-    setTimeout(() => setIsCopied(false), 2000);
-  };
+  const isIdle = !hasContent && !isStreaming;
+  const isLoading = isStreaming && !coverLetter;
+  const isGeneratedOrStreaming = hasContent || (isStreaming && Boolean(coverLetter));
 
   return (
-    <section aria-labelledby="cover-letter-heading" className="space-y-3">
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="text-base text-purple-600 dark:text-purple-400">✉</span>
-            <h3
-              id="cover-letter-heading"
-              className="text-sm sm:text-base font-bold text-gray-900 dark:text-white"
-            >
-              {t("coverLetterHeading")}
-            </h3>
-          </div>
-          <p className="text-xs text-gray-600 dark:text-zinc-400 max-w-xl leading-relaxed">
-            {t("coverLetterSubtitle")}
-          </p>
-
-          <div className="inline-flex items-center gap-1.5 p-1.5 px-3 rounded-md bg-[#fef2f2] dark:bg-rose-950/30 border border-[#fecaca] dark:border-rose-900/50 text-[#dc2626] dark:text-rose-300 font-mono text-[11px] mt-1.5">
-            <span>⚠</span>
-            <span>{tCommon("aiNotice")}</span>
+    <section aria-label="Tailored cover letter" className="py-4 border-b border-border/40 space-y-3">
+      {/* Header Row: Icon (18px) + Title (text-sm font-medium) + Description (text-sm text-muted) */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <Mail className="size-[18px] text-muted-foreground dark:text-zinc-400 shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <h2 className="text-sm font-medium text-foreground dark:text-zinc-100 font-sans">
+              Tailored cover letter
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-zinc-400 font-normal leading-normal font-sans">
+              Draft a targeted letter tailored to this position
+            </p>
           </div>
         </div>
 
-        <CoverLetterToolbar
-          hasContent={Boolean(coverLetter)}
-          isCopied={isCopied}
-          isSaving={isSaving}
-          isStreaming={isStreaming}
-          onCopy={handleCopy}
-          onDownloadPdf={handleDownloadPdf}
-          onSave={handleSave}
-          onGenerateStream={handleGenerateStream}
-        />
+        {/* Idle State Action (Header Row Right) */}
+        {isIdle && (
+          <div className="shrink-0 pt-0.5">
+            <button
+              type="button"
+              onClick={handleGenerateStream}
+              className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors p-0 bg-transparent border-0 cursor-pointer font-sans"
+            >
+              Generate cover letter
+            </button>
+          </div>
+        )}
       </div>
 
-      {(coverLetter || isStreaming) && (
-        <div className="pt-2">
-          <textarea
-            rows={12}
-            value={coverLetter}
-            onChange={(e) => setCoverLetter(e.target.value)}
-            placeholder={isStreaming ? "Streaming live cover letter response from Gemini 3.8 Flash..." : "Your cover letter draft..."}
-            className="w-full bg-slate-50 dark:bg-[#0E0E12] border border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 text-xs font-sans rounded-2xl p-5 leading-relaxed focus:outline-none focus:border-purple-500 focus-visible:ring-2 focus-visible:ring-purple-500/20 shadow-inner"
-          />
+      {/* Loading State: 3 lines low-contrast pulsing block, indented under title, no spinner icon */}
+      {isLoading && (
+        <div className="ml-[30px] border-l-2 border-border dark:border-zinc-800 pl-[14px] py-1 space-y-2">
+          <div className="h-3.5 w-full bg-muted dark:bg-zinc-800 animate-pulse rounded-sm" />
+          <div className="h-3.5 w-5/6 bg-muted dark:bg-zinc-800 animate-pulse rounded-sm" />
+          <div className="h-3.5 w-3/4 bg-muted dark:bg-zinc-800 animate-pulse rounded-sm" />
+        </div>
+      )}
+
+      {/* Generated or Live Streaming Content Block & Actions */}
+      {isGeneratedOrStreaming && (
+        <div className="space-y-3">
+          {/* Content Block: indented ~30px under title, 2px border, 14px padding, text-sm font, leading-relaxed, single paragraph */}
+          <div className="ml-[30px] border-l-2 border-border dark:border-zinc-800 pl-[14px] text-sm leading-relaxed text-gray-600 dark:text-zinc-300 font-sans">
+            {isEditing ? (
+              <textarea
+                rows={10}
+                value={coverLetter}
+                onChange={(e) => setCoverLetter(e.target.value)}
+                className="w-full bg-transparent border border-border/40 dark:border-zinc-800 text-foreground dark:text-zinc-100 p-3 rounded-none text-base sm:text-sm leading-relaxed font-sans focus:outline-none focus:border-border dark:focus:border-zinc-700"
+              />
+            ) : (
+              <p className="whitespace-pre-line leading-relaxed font-sans">{coverLetter}</p>
+            )}
+          </div>
+
+          {/* Action Row: same left indent, responsive wrapping gaps, plain text in accent color, text-sm medium, 14px icon */}
+          <div className="ml-[30px] flex flex-wrap items-center gap-x-4 gap-y-2.5 sm:gap-[16px]">
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer font-sans"
+            >
+              {isCopied ? (
+                <Check className="size-[14px] shrink-0" />
+              ) : (
+                <Copy className="size-[14px] shrink-0" />
+              )}
+              <span>{isCopied ? "Copied" : "Copy text"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer font-sans"
+            >
+              <Download className="size-[14px] shrink-0" />
+              <span>Download PDF</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (isEditing) {
+                  handleSave();
+                }
+                setIsEditing(!isEditing);
+              }}
+              disabled={isSaving}
+              className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer disabled:opacity-50 font-sans"
+            >
+              {isEditing ? (
+                <Save className="size-[14px] shrink-0" />
+              ) : (
+                <Edit3 className="size-[14px] shrink-0" />
+              )}
+              <span>{isEditing ? (isSaving ? "Saving" : "Save draft") : "Edit draft"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleGenerateStream}
+              disabled={isStreaming}
+              className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer disabled:opacity-50 font-sans"
+            >
+              <RotateCcw className="size-[14px] shrink-0" />
+              <span>Regenerate letter</span>
+            </button>
+          </div>
         </div>
       )}
     </section>

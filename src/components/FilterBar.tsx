@@ -20,6 +20,26 @@ export type Source =
 export type SourceOption = "all" | Source;
 export type StatusOption = "all" | PipelineStatus;
 
+const SOURCE_OPTIONS: { value: Source; label: string }[] = [
+  { value: "reliefweb", label: "🇨🇩 ReliefWeb" },
+  { value: "emploicd", label: "🇨🇩 Emploi.cd" },
+  { value: "congojob", label: "🇨🇩 CongoJob" },
+  { value: "unjobs", label: "🇨🇩 UNJobs" },
+  { value: "greenhouse", label: "Greenhouse" },
+  { value: "ashby", label: "Ashby" },
+  { value: "lever", label: "Lever" },
+  { value: "remoteok", label: "RemoteOK" },
+];
+
+const STATUS_OPTIONS: { value: PipelineStatus; key: string }[] = [
+  { value: "saved", key: "statusSaved" },
+  { value: "applied", key: "statusApplied" },
+  { value: "interviewing", key: "statusInterviewing" },
+  { value: "offer", key: "statusOffer" },
+  { value: "rejected", key: "statusRejected" },
+  { value: "withdrawn", key: "statusWithdrawn" },
+];
+
 export function FilterBar() {
   const t = useTranslations("dashboard");
   const [statusFilter, setStatusFilter] = useQueryState(
@@ -46,6 +66,14 @@ export function FilterBar() {
     ]).withDefault("all"),
   );
 
+  const isSourceActive = sourceFilter !== "all";
+  const isStatusActive = statusFilter !== "all";
+
+  const formatStatus = (key: string) => {
+    const raw = t(key);
+    return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+  };
+
   return (
     <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 text-xs font-normal">
       {/* Source Dropdown Filter Pill */}
@@ -56,20 +84,27 @@ export function FilterBar() {
             setSourceFilter(e.target.value as SourceOption, { shallow: false })
           }
           aria-label="Filter jobs by source platform"
-          className="appearance-none bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 rounded-xl px-3.5 py-1.5 sm:px-4 sm:py-2 pr-7 hover:border-slate-300 dark:hover:border-zinc-700 transition cursor-pointer text-xs focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500 font-medium"
+          className={`appearance-none rounded-xl px-3.5 py-1.5 sm:px-4 sm:py-2 pr-7 transition cursor-pointer text-base sm:text-xs focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500 font-medium border ${
+            isSourceActive
+              ? "bg-blue-50 dark:bg-blue-950/60 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300"
+              : "bg-white dark:bg-[#18181B] border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 hover:border-slate-300 dark:hover:border-zinc-700"
+          }`}
         >
           <option value="all">{t("sourceAll")}</option>
-          <option value="reliefweb">🇨🇩 ReliefWeb</option>
-          <option value="emploicd">🇨🇩 Emploi.cd</option>
-          <option value="congojob">🇨🇩 CongoJob</option>
-          <option value="unjobs">🇨🇩 UNJobs</option>
-          <option value="greenhouse">Greenhouse</option>
-          <option value="ashby">Ashby</option>
-          <option value="lever">Lever</option>
-          <option value="remoteok">RemoteOK</option>
+          {SOURCE_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {isSourceActive && sourceFilter === opt.value
+                ? `Source: ${opt.label}`
+                : opt.label}
+            </option>
+          ))}
         </select>
         <span
-          className="absolute right-2.5 top-2 sm:top-2.5 pointer-events-none text-[10px] text-gray-400 dark:text-zinc-500"
+          className={`absolute right-2.5 top-2 sm:top-2.5 pointer-events-none text-[10px] ${
+            isSourceActive
+              ? "text-blue-600 dark:text-blue-400"
+              : "text-gray-400 dark:text-zinc-500"
+          }`}
           aria-hidden="true"
         >
           ▾
@@ -84,18 +119,30 @@ export function FilterBar() {
             setStatusFilter(e.target.value as StatusOption, { shallow: false })
           }
           aria-label="Filter jobs by status"
-          className="appearance-none bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 rounded-xl px-3.5 py-1.5 sm:px-4 sm:py-2 pr-7 hover:border-slate-300 dark:hover:border-zinc-700 transition cursor-pointer text-xs focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500 font-medium"
+          className={`appearance-none rounded-xl px-3.5 py-1.5 sm:px-4 sm:py-2 pr-7 transition cursor-pointer text-base sm:text-xs focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500 font-medium border ${
+            isStatusActive
+              ? "bg-blue-50 dark:bg-blue-950/60 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300"
+              : "bg-white dark:bg-[#18181B] border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 hover:border-slate-300 dark:hover:border-zinc-700"
+          }`}
         >
           <option value="all">{t("statusAll")}</option>
-          <option value="saved">{t("statusSaved")}</option>
-          <option value="applied">{t("statusApplied")}</option>
-          <option value="interviewing">{t("statusInterviewing")}</option>
-          <option value="offer">{t("statusOffer")}</option>
-          <option value="rejected">{t("statusRejected")}</option>
-          <option value="withdrawn">{t("statusWithdrawn")}</option>
+          {STATUS_OPTIONS.map((opt) => {
+            const label = formatStatus(opt.key);
+            return (
+              <option key={opt.value} value={opt.value}>
+                {isStatusActive && statusFilter === opt.value
+                  ? `Status: ${label}`
+                  : label}
+              </option>
+            );
+          })}
         </select>
         <span
-          className="absolute right-2.5 top-2 sm:top-2.5 pointer-events-none text-[10px] text-gray-400 dark:text-zinc-500"
+          className={`absolute right-2.5 top-2 sm:top-2.5 pointer-events-none text-[10px] ${
+            isStatusActive
+              ? "text-blue-600 dark:text-blue-400"
+              : "text-gray-400 dark:text-zinc-500"
+          }`}
           aria-hidden="true"
         >
           ▾

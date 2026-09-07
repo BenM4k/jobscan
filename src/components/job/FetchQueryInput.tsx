@@ -46,7 +46,7 @@ export function FetchQueryInput({
             ? "e.g. software developer, react, accountant..."
             : "e.g. vercel, stripe, figma, airbnb..."
         }
-        className="w-full bg-transparent border-b border-slate-300 dark:border-zinc-700 text-gray-900 dark:text-slate-100 text-sm py-1.5 focus:outline-none focus:border-blue-500 transition placeholder:text-gray-400 dark:placeholder:text-zinc-500 font-medium"
+        className="w-full bg-transparent border-b border-slate-300 dark:border-zinc-700 text-gray-900 dark:text-slate-100 text-base sm:text-sm py-1.5 focus:outline-none focus:border-blue-500 transition placeholder:text-gray-400 dark:placeholder:text-zinc-500 font-medium"
       />
       {isKeywordSource && (
         <div className="pt-2 flex flex-wrap gap-1.5 items-center">

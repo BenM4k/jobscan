@@ -28,16 +28,16 @@ export function ProfileAiEngineSelect({
 
       <div className="self-start sm:self-auto">
         <CardGridSelect
-          title="AI ENGINE"
+          title="AI engine"
           value={aiProvider}
           options={[
-            { id: "gemini", label: "GEMINI 3.8 FLASH" },
-            { id: "gateway", label: "GATEWAY" },
-            { id: "openai", label: "OPENAI" },
-            { id: "claude", label: "CLAUDE" },
+            { id: "gemini", label: "Gemini 3.8 Flash" },
+            { id: "gateway", label: "AI Gateway" },
+            { id: "openai", label: "OpenAI" },
+            { id: "claude", label: "Claude" },
           ]}
           onChange={onAiProviderChange}
-          accentColor="indigo"
+          accentColor="blue"
         />
       </div>
     </div>
