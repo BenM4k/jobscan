@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import * as profileService from "@/services/profile.service";
+import { getUserAiUsage } from "@/services/ai/usage.service";
 import { requireSession } from "@/lib/auth-guard";
 import { redirect } from "next/navigation";
 import { ProfileForm } from "@/components/ProfileForm";
@@ -13,8 +14,12 @@ async function ProfileFormContent() {
     redirect("/sign-in");
   }
 
-  const profileResult = await profileService.getUserProfile(sessionResult.value.user.id);
+  const [profileResult, aiUsageResult] = await Promise.all([
+    profileService.getUserProfile(sessionResult.value.user.id),
+    getUserAiUsage(sessionResult.value.user.id),
+  ]);
   const userProfile = profileResult.ok ? profileResult.value : null;
+  const aiUsage = aiUsageResult.ok ? aiUsageResult.value : null;
 
   return (
     <ProfileForm
@@ -27,6 +32,7 @@ async function ProfileFormContent() {
       initialSummary={userProfile?.summary || ""}
       initialEducation={userProfile?.education ?? []}
       initialExperience={userProfile?.experience ?? []}
+      initialAiUsage={aiUsage}
     />
   );
 }

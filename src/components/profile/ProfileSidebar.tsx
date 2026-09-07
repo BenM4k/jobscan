@@ -3,6 +3,8 @@
 import React from "react";
 import { FileText, Briefcase, GraduationCap, Zap, Bot } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { AiUsageProgress } from "@/components/shared/AiUsageProgress";
+import type { UserAiUsage } from "@/services/ai/usage.service";
 
 interface ProfileSidebarProps {
   aiProvider: string;
@@ -10,6 +12,7 @@ interface ProfileSidebarProps {
   resumeLength: number;
   experienceCount?: number;
   educationCount?: number;
+  aiUsage?: UserAiUsage | null;
 }
 
 const AI_ENGINE_LABELS: Record<string, string> = {
@@ -25,6 +28,7 @@ export function ProfileSidebar({
   resumeLength,
   experienceCount = 0,
   educationCount = 0,
+  aiUsage,
 }: ProfileSidebarProps) {
   const t = useTranslations("profile");
   const engineLabel =
@@ -141,6 +145,9 @@ export function ProfileSidebar({
           />
         </div>
       </div>
+
+      {/* AI USAGE PROGRESS */}
+      <AiUsageProgress variant="sidebar" usage={aiUsage} />
     </aside>
   );
 }

@@ -4,6 +4,7 @@ import React from "react";
 import { ProfileOverview } from "@/components/profile/ProfileOverview";
 import { ProfileSidebar } from "@/components/profile/ProfileSidebar";
 import { EducationItem, ExperienceItem } from "@/lib/ai";
+import type { UserAiUsage } from "@/services/ai/usage.service";
 
 interface ProfileViewModeProps {
   userName: string;
@@ -14,6 +15,7 @@ interface ProfileViewModeProps {
   resumeText: string;
   parsedSkillsList: string[];
   aiProvider: string;
+  aiUsage?: UserAiUsage | null;
   onEditClick: () => void;
   onDeleteClick: () => void;
 }
@@ -27,6 +29,7 @@ export function ProfileViewMode({
   resumeText,
   parsedSkillsList,
   aiProvider,
+  aiUsage,
   onEditClick,
   onDeleteClick,
 }: ProfileViewModeProps) {
@@ -63,6 +66,7 @@ export function ProfileViewMode({
         resumeLength={resumeText.length}
         experienceCount={experience.length}
         educationCount={education.length}
+        aiUsage={aiUsage}
       />
     </div>
   );

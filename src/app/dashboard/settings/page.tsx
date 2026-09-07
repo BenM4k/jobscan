@@ -1,10 +1,12 @@
 import { requireSession } from "@/lib/auth-guard";
 import { redirect } from "next/navigation";
 import { getUserFeatureFlags } from "@/services/flags";
+import { getUserAiUsage } from "@/services/ai/usage.service";
 import * as growthDal from "@/dal/growth.dal";
 import { AccountSettingsCard } from "@/components/settings/AccountSettingsCard";
 import { FeatureFlagsCard } from "@/components/settings/FeatureFlagsCard";
 import { NotificationPreferencesCard } from "@/components/settings/NotificationPreferencesCard";
+import { AiUsageProgress } from "@/components/shared/AiUsageProgress";
 import { Sliders } from "lucide-react";
 
 export const metadata = {
@@ -20,10 +22,11 @@ export default async function SettingsPage() {
 
   const user = sessionResult.value.user;
 
-  // Fetch user flags and preferences concurrently
-  const [flags, prefResult] = await Promise.all([
+  // Fetch user flags, preferences, and AI usage concurrently
+  const [flags, prefResult, aiUsageResult] = await Promise.all([
     getUserFeatureFlags(user.id),
     growthDal.getUserPreferences(user.id),
+    getUserAiUsage(user.id),
   ]);
 
   return (
@@ -45,6 +48,10 @@ export default async function SettingsPage() {
       {/* Cards Section */}
       <div className="space-y-6">
         <AccountSettingsCard user={user} />
+        <AiUsageProgress
+          variant="card"
+          usage={aiUsageResult.ok ? aiUsageResult.value : null}
+        />
         <FeatureFlagsCard flags={flags} />
         {prefResult.ok ? (
           <NotificationPreferencesCard initialPreferences={prefResult.value} />

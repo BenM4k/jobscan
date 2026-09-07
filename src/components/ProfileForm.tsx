@@ -9,6 +9,7 @@ import { ProfileEditHeader } from "@/components/profile/ProfileEditHeader";
 import { ProfileAiEngineSelect } from "@/components/profile/ProfileAiEngineSelect";
 import { DeleteResumeModal } from "@/components/profile/DeleteResumeModal";
 import { EducationItem, ExperienceItem, ResumeProfileData } from "@/lib/ai";
+import type { UserAiUsage } from "@/services/ai/usage.service";
 import { toast } from "sonner";
 import posthog from "posthog-js";
 
@@ -21,6 +22,7 @@ export interface ProfileFormProps {
   initialSummary?: string;
   initialEducation?: EducationItem[];
   initialExperience?: ExperienceItem[];
+  initialAiUsage?: UserAiUsage | null;
 }
 
 export function ProfileForm({
@@ -32,6 +34,7 @@ export function ProfileForm({
   initialSummary = "",
   initialEducation = [],
   initialExperience = [],
+  initialAiUsage,
 }: ProfileFormProps) {
   const [resumeText, setResumeText] = useState(initialResumeText);
   const [summary, setSummary] = useState(initialSummary);
@@ -113,6 +116,7 @@ export function ProfileForm({
           resumeText={resumeText}
           parsedSkillsList={parsedSkillsList}
           aiProvider={aiProvider}
+          aiUsage={initialAiUsage}
           onEditClick={() => setIsEditing(true)}
           onDeleteClick={() => setDeleteConfirmOpen(true)}
         />
