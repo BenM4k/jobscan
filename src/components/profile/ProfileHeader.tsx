@@ -50,10 +50,17 @@ export function ProfileHeader({
     .join("")
     .toUpperCase();
 
-  const handleCopyLink = () => {
+  const handleCopyLink = async () => {
     if (typeof window !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(window.location.href);
-      toast.success("Profile link copied to clipboard");
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        toast.success("Profile link copied to clipboard");
+      } catch (err) {
+        console.error("Failed to copy profile link:", err);
+        toast.error("Failed to copy profile link");
+      }
+    } else {
+      toast.error("Clipboard access not available");
     }
   };
 

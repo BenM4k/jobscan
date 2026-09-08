@@ -20,6 +20,7 @@ async function ProfileFormContent() {
   ]);
   const userProfile = profileResult.ok ? profileResult.value : null;
   const aiUsage = aiUsageResult.ok ? aiUsageResult.value : null;
+  const aiUsageError = !aiUsageResult.ok;
 
   return (
     <ProfileForm
@@ -33,6 +34,7 @@ async function ProfileFormContent() {
       initialEducation={userProfile?.education ?? []}
       initialExperience={userProfile?.experience ?? []}
       initialAiUsage={aiUsage}
+      aiUsageError={aiUsageError}
     />
   );
 }

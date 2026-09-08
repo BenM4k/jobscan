@@ -391,7 +391,7 @@ const addManualJobSchema = z.object({
   location: z.string().optional(),
   workplaceType: z.string().optional(),
   rawSalaryText: z.string().optional(),
-  url: z.string().optional(),
+  url: z.url("Invalid application URL format").optional().or(z.literal("")),
   description: z
     .string()
     .min(10, "Job description must be at least 10 characters"),
@@ -415,7 +415,8 @@ export async function addManualJobAction(formData: FormData) {
     title: formData.get("title")?.toString()?.trim() || "",
     company: formData.get("company")?.toString()?.trim() || "",
     location: formData.get("location")?.toString()?.trim() || undefined,
-    workplaceType: formData.get("workplaceType")?.toString()?.trim() || undefined,
+    workplaceType:
+      formData.get("workplaceType")?.toString()?.trim() || undefined,
     rawSalaryText:
       formData.get("salary")?.toString()?.trim() ||
       formData.get("rawSalaryText")?.toString()?.trim() ||

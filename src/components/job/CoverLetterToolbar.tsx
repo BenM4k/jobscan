@@ -2,6 +2,7 @@
 
 import React from "react";
 import { RotateCcw, Copy, Download, Save, Check } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface CoverLetterToolbarProps {
   hasContent: boolean;
@@ -24,6 +25,9 @@ export function CoverLetterToolbar({
   onSave,
   onGenerateStream,
 }: CoverLetterToolbarProps) {
+  const t = useTranslations("jobDetail");
+  const tCommon = useTranslations("common");
+
   if (!hasContent) {
     return (
       <button
@@ -32,7 +36,7 @@ export function CoverLetterToolbar({
         disabled={isStreaming}
         className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer disabled:opacity-50 shrink-0 font-sans"
       >
-        <span>Generate letter</span>
+        <span>{t("generateLetter")}</span>
       </button>
     );
   }
@@ -45,8 +49,8 @@ export function CoverLetterToolbar({
         disabled={isSaving || isStreaming}
         className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer disabled:opacity-50 font-sans"
       >
-        <Save className="size-[18px] shrink-0" />
-        <span>{isSaving ? "Saving" : "Save draft"}</span>
+        <Save className="size-4.5 shrink-0" />
+        <span>{isSaving ? t("saving") : t("saveDraft")}</span>
       </button>
 
       <button
@@ -54,8 +58,12 @@ export function CoverLetterToolbar({
         onClick={onCopy}
         className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer font-sans"
       >
-        {isCopied ? <Check className="size-[18px] shrink-0" /> : <Copy className="size-[18px] shrink-0" />}
-        <span>{isCopied ? "Copied" : "Copy text"}</span>
+        {isCopied ? (
+          <Check className="size-4.5 shrink-0" />
+        ) : (
+          <Copy className="size-4.5 shrink-0" />
+        )}
+        <span>{isCopied ? tCommon("copied") : t("copyText")}</span>
       </button>
 
       <button
@@ -63,8 +71,8 @@ export function CoverLetterToolbar({
         onClick={onDownloadPdf}
         className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer font-sans"
       >
-        <Download className="size-[18px] shrink-0" />
-        <span>Download PDF</span>
+        <Download className="size-4.5 shrink-0" />
+        <span>{tCommon("downloadPdf")}</span>
       </button>
 
       <button
@@ -73,8 +81,8 @@ export function CoverLetterToolbar({
         disabled={isStreaming}
         className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer disabled:opacity-50 font-sans"
       >
-        <RotateCcw className="size-[18px] shrink-0" />
-        <span>Regenerate letter</span>
+        <RotateCcw className="size-4.5 shrink-0" />
+        <span>{t("regenerateLetter")}</span>
       </button>
     </div>
   );

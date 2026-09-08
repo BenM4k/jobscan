@@ -21,12 +21,15 @@ import {
 } from "@/components/ui/dialog";
 import { FileText, Info } from "lucide-react";
 import posthog from "posthog-js";
+import { useTranslations } from "next-intl";
 
 interface JobDetailViewProps {
   initialJob: JobSelect;
 }
 
 export function JobDetailView({ initialJob }: JobDetailViewProps) {
+  const tCommon = useTranslations("common");
+  const tDash = useTranslations("dashboard");
   const [job, setJob] = useState<JobSelect>(initialJob);
   const [isScoring, setIsScoring] = useState(false);
   const [scoringError, setScoringError] = useState<string | null>(null);
@@ -41,7 +44,10 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
       toast.error(res.error || "Failed to update status");
       setJob((prev) => ({ ...prev, status: job.status }));
     } else {
-      posthog.capture("job_status_updated", { status: newStatus, location: "detail" });
+      posthog.capture("job_status_updated", {
+        status: newStatus,
+        location: "detail",
+      });
       toast.success(`Status updated to ${newStatus}`);
     }
   };
@@ -111,8 +117,8 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
 
       {/* AI Toolkit Area Disclaimer (single instance) */}
       <div className="py-3.5 flex items-center gap-2 text-sm text-muted-foreground font-normal font-sans">
-        <Info className="size-[18px] text-muted-foreground/70 shrink-0" />
-        <span>AI-generated content — review before submitting to employers</span>
+        <Info className="size-4.5 text-muted-foreground/70 shrink-0" />
+        <span>{tCommon("aiNotice")}</span>
       </div>
 
       <JobDescriptionSection description={job.description} />
@@ -122,13 +128,13 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
         <DialogContent className="sm:max-w-md p-6 space-y-4">
           <DialogHeader>
             <div className="flex items-center gap-2">
-              <FileText className="size-[18px] text-muted-foreground shrink-0" />
+              <FileText className="size-4.5 text-muted-foreground shrink-0" />
               <DialogTitle className="text-sm font-medium text-foreground">
-                Master resume required
+                {tDash("missingResumeTitle")}
               </DialogTitle>
             </div>
             <DialogDescription className="text-xs text-muted-foreground font-normal leading-relaxed pt-1">
-              Upload or configure your master resume in profile settings before evaluating and scoring jobs.
+              {tDash("missingResumeDescription")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex flex-row items-center justify-end gap-3 pt-3 border-t border-border/40">
@@ -137,7 +143,7 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
               onClick={() => setMissingResumeOpen(false)}
               className="text-xs font-normal text-muted-foreground hover:text-foreground transition-colors cursor-pointer p-0 bg-transparent border-0"
             >
-              Cancel
+              {tCommon("cancel")}
             </button>
             <button
               type="button"
@@ -147,7 +153,7 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
               }}
               className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors cursor-pointer p-0 bg-transparent border-0"
             >
-              Set up resume
+              {tDash("goToProfile")}
             </button>
           </DialogFooter>
         </DialogContent>

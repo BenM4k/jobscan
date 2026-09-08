@@ -13,6 +13,7 @@ interface ProfileSidebarProps {
   experienceCount?: number;
   educationCount?: number;
   aiUsage?: UserAiUsage | null;
+  aiUsageError?: boolean;
 }
 
 const AI_ENGINE_LABELS: Record<string, string> = {
@@ -29,6 +30,7 @@ export function ProfileSidebar({
   experienceCount = 0,
   educationCount = 0,
   aiUsage,
+  aiUsageError = false,
 }: ProfileSidebarProps) {
   const t = useTranslations("profile");
   const engineLabel =
@@ -146,7 +148,7 @@ export function ProfileSidebar({
       </div>
 
       {/* AI Usage Progress */}
-      <AiUsageProgress variant="sidebar" usage={aiUsage} />
+      <AiUsageProgress variant="sidebar" usage={aiUsage} error={aiUsageError} />
     </aside>
   );
 }

@@ -23,6 +23,7 @@ export interface ProfileFormProps {
   initialEducation?: EducationItem[];
   initialExperience?: ExperienceItem[];
   initialAiUsage?: UserAiUsage | null;
+  aiUsageError?: boolean;
 }
 
 export function ProfileForm({
@@ -35,6 +36,7 @@ export function ProfileForm({
   initialEducation = [],
   initialExperience = [],
   initialAiUsage,
+  aiUsageError = false,
 }: ProfileFormProps) {
   const [resumeText, setResumeText] = useState(initialResumeText);
   const [summary, setSummary] = useState(initialSummary);
@@ -117,6 +119,7 @@ export function ProfileForm({
           parsedSkillsList={parsedSkillsList}
           aiProvider={aiProvider}
           aiUsage={initialAiUsage}
+          aiUsageError={aiUsageError}
           onEditClick={() => setIsEditing(true)}
           onDeleteClick={() => setDeleteConfirmOpen(true)}
         />

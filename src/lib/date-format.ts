@@ -84,7 +84,7 @@ export function formatProfileDateRange(
 
   // If only start is present but contains a range separator, split it
   if (start && !end) {
-    const sepParts = start.split(/\s*(?:—|–|-|\bto\b|\buntil\b)\s*/i).filter(Boolean);
+    const sepParts = start.split(/\s*(?:—|–|\bto\b|\buntil\b)\s*|\s+-\s+/i).filter(Boolean);
     if (sepParts.length >= 2) {
       start = sepParts[0].trim();
       end = sepParts[1].trim();

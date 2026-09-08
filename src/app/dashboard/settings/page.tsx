@@ -109,10 +109,16 @@ async function SettingsContent() {
   return (
     <div className="space-y-6">
       <AccountSettingsCard user={user} />
-      <AiUsageProgress
-        variant="card"
-        usage={aiUsageResult.ok ? aiUsageResult.value : null}
-      />
+      {aiUsageResult.ok ? (
+        <AiUsageProgress
+          variant="card"
+          usage={aiUsageResult.value}
+        />
+      ) : (
+        <div className="rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50/50 dark:bg-red-950/20 p-6 text-sm text-red-600 dark:text-red-400">
+          Failed to load AI usage details. Please refresh the page to retry.
+        </div>
+      )}
       <FeatureFlagsCard flags={flags} />
       {prefResult.ok ? (
         <NotificationPreferencesCard initialPreferences={prefResult.value} />

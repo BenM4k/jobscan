@@ -105,7 +105,7 @@ export function parseResumeContent(content: string): ParsedResumeSections {
       }
       cleanPeriod = cleanPeriod ? cleanPeriod.replace(/(?:STARTDATE|START_DATE|START)\s*:\s*/gi, "").trim() : "";
 
-      const dates = cleanPeriod ? cleanPeriod.split(/\s*(?:—|–|-|\bto\b|\buntil\b)\s*/i).filter(Boolean) : [];
+      const dates = cleanPeriod ? cleanPeriod.split(/\s*(?:—|–|\bto\b|\buntil\b)\s*|\s+-\s+/i).filter(Boolean) : [];
 
       experience.push({
         company: company || "Company",
@@ -158,7 +158,7 @@ export function parseResumeContent(content: string): ParsedResumeSections {
       }
       cleanEduPeriod = cleanEduPeriod ? cleanEduPeriod.replace(/(?:STARTDATE|START_DATE|START)\s*:\s*/gi, "").trim() : "";
 
-      const eduDates = cleanEduPeriod ? cleanEduPeriod.split(/\s*(?:—|–|-|\bto\b|\buntil\b)\s*/i).filter(Boolean) : [];
+      const eduDates = cleanEduPeriod ? cleanEduPeriod.split(/\s*(?:—|–|\bto\b|\buntil\b)\s*|\s+-\s+/i).filter(Boolean) : [];
 
       education.push({
         institution: institution || "Institution",

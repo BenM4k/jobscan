@@ -25,7 +25,10 @@ function getCompanyInitials(companyName: string): string {
   return companyName.trim().slice(0, 2).toUpperCase();
 }
 
-function extractRoleSnippet(rawDescription?: string | null, company?: string): string {
+function extractRoleSnippet(
+  rawDescription?: string | null,
+  company?: string,
+): string {
   if (!rawDescription) return "No role preview available.";
 
   // 1. Strip HTML tags and normalize whitespace
@@ -47,13 +50,21 @@ function extractRoleSnippet(rawDescription?: string | null, company?: string): s
     const match = clean.match(marker);
     if (match && match[1] && match[1].trim().length > 30) {
       const snippet = match[1].trim();
-      return snippet.length > 220 ? `${snippet.slice(0, 220).trim()}...` : snippet;
+      return snippet.length > 220
+        ? `${snippet.slice(0, 220).trim()}...`
+        : snippet;
     }
   }
 
   // 3. If no marker, strip repetitive company boilerplate paragraph
-  const companyPattern = company
-    ? new RegExp(`^(?:about\\s+${company}|${company}\\s+is|at\\s+${company})[^.!?]+[.!?]\\s*`, "i")
+  const escapedCompany = company
+    ? company.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    : "";
+  const companyPattern = escapedCompany
+    ? new RegExp(
+        `^(?:about\\s+${escapedCompany}|${escapedCompany}\\s+is|at\\s+${escapedCompany})[^.!?]+[.!?]\\s*`,
+        "i",
+      )
     : null;
   let text = clean;
   if (companyPattern && companyPattern.test(text)) {
@@ -61,7 +72,12 @@ function extractRoleSnippet(rawDescription?: string | null, company?: string): s
   }
 
   // Generic boilerplate: "About Us: ...", "Who We Are: ..."
-  text = text.replace(/^(?:about us|who we are|company overview)\s*[:\-–—]?\s*[^.!?]+[.!?]\s*/i, "").trim();
+  text = text
+    .replace(
+      /^(?:about us|who we are|company overview)\s*[:\-–—]?\s*[^.!?]+[.!?]\s*/i,
+      "",
+    )
+    .trim();
 
   if (!text) {
     text = clean;
@@ -99,7 +115,7 @@ export function JobCardItem({
       ? t("remote")
       : job.workplaceType === "hybrid"
         ? t("hybrid")
-        : job.workplaceType === "onsite"
+        : job.workplaceType === "onsite" || job.workplaceType === "on-site"
           ? t("onSite")
           : job.workplaceType || undefined;
 
@@ -122,7 +138,7 @@ export function JobCardItem({
             <div className="min-w-0 flex-1">
               <h3
                 id={`job-title-${job.id}`}
-                className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-slate-100 leading-snug tracking-tight font-sans break-words"
+                className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-slate-100 leading-snug tracking-tight font-sans wrap-break-word"
               >
                 <Link
                   href={`/dashboard/jobs/${job.id}`}
@@ -131,7 +147,7 @@ export function JobCardItem({
                   {job.title}
                 </Link>
               </h3>
-              <p className="text-sm text-gray-500 dark:text-zinc-400 font-normal mt-0.5 font-sans break-words">
+              <p className="text-sm text-gray-500 dark:text-zinc-400 font-normal mt-0.5 font-sans wrap-break-word">
                 {job.company}
               </p>
             </div>
@@ -141,7 +157,9 @@ export function JobCardItem({
               <button
                 type="button"
                 onClick={() => setIsBookmarked(!isBookmarked)}
-                aria-label={isBookmarked ? "Remove saved opportunity" : "Save opportunity"}
+                aria-label={
+                  isBookmarked ? "Remove saved opportunity" : "Save opportunity"
+                }
                 className="size-8 min-w-8 min-h-8 flex items-center justify-center text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400 hover:bg-slate-200/50 dark:hover:bg-zinc-800/60 rounded-lg transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
               >
                 <Bookmark
@@ -161,7 +179,7 @@ export function JobCardItem({
             </div>
           </div>
 
-          <p className="mt-2 text-sm text-gray-600 dark:text-zinc-300 leading-relaxed max-w-4xl font-sans break-words">
+          <p className="mt-2 text-sm text-gray-600 dark:text-zinc-300 leading-relaxed max-w-4xl font-sans wrap-break-word">
             {descriptionSnippet}
           </p>
 

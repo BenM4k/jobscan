@@ -30,7 +30,7 @@ export function JobCardActions({
       {/* Status selector */}
       <div className="flex items-center text-xs">
         <CardGridSelect
-          title="Status"
+          title={t("status")}
           value={status}
           options={[
             { id: "new", label: t("statusNew") },

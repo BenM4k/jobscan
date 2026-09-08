@@ -16,6 +16,7 @@ interface ProfileViewModeProps {
   parsedSkillsList: string[];
   aiProvider: string;
   aiUsage?: UserAiUsage | null;
+  aiUsageError?: boolean;
   onEditClick: () => void;
   onDeleteClick: () => void;
 }
@@ -30,6 +31,7 @@ export function ProfileViewMode({
   parsedSkillsList,
   aiProvider,
   aiUsage,
+  aiUsageError = false,
   onEditClick,
   onDeleteClick,
 }: ProfileViewModeProps) {
@@ -67,6 +69,7 @@ export function ProfileViewMode({
         experienceCount={experience.length}
         educationCount={education.length}
         aiUsage={aiUsage}
+        aiUsageError={aiUsageError}
       />
     </div>
   );

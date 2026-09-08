@@ -95,6 +95,7 @@ interface UseTailoredResumeOptions {
 
 export function useTailoredResume({ job, onJobUpdated }: UseTailoredResumeOptions) {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editedResume, setEditedResume] = useState(job.tailoredResume || "");
   const [isCopied, setIsCopied] = useState(false);
@@ -135,6 +136,32 @@ export function useTailoredResume({ job, onJobUpdated }: UseTailoredResumeOption
     }
   };
 
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      const res = await fetch(`/api/jobs/${job.id}/tailor-resume`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tailoredResume: editedResume }),
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json();
+        throw new Error(errJson.error || "Failed to save tailored resume");
+      }
+
+      const { data } = await res.json();
+      posthog.capture("tailored_resume_saved");
+      onJobUpdated(data);
+      toast.success("Tailored resume saved");
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleDownloadPdf = async (content: string) => {
     try {
       const filename = `Tailored_Resume_${job.company.replace(/\s+/g, "_")}.pdf`;
@@ -146,11 +173,16 @@ export function useTailoredResume({ job, onJobUpdated }: UseTailoredResumeOption
     }
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(editedResume || job.tailoredResume || "");
-    setIsCopied(true);
-    toast.success("Copied to clipboard");
-    setTimeout(() => setIsCopied(false), 2000);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(editedResume || job.tailoredResume || "");
+      setIsCopied(true);
+      toast.success("Copied to clipboard");
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+      toast.error("Failed to copy to clipboard");
+    }
   };
 
   const parsedResume = parseTailoredResume(
@@ -160,6 +192,7 @@ export function useTailoredResume({ job, onJobUpdated }: UseTailoredResumeOption
 
   return {
     isGenerating,
+    isSaving,
     isEditing,
     setIsEditing,
     editedResume,
@@ -168,6 +201,7 @@ export function useTailoredResume({ job, onJobUpdated }: UseTailoredResumeOption
     hasResume: Boolean(job.tailoredResume),
     parsedResume,
     handleGenerate,
+    handleSave,
     handleDownloadPdf,
     handleCopy,
   };

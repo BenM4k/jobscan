@@ -61,9 +61,19 @@ async function runDateFormatUnitTests() {
   const res7 = formatProfileDateRange("2022", undefined);
   assert(res7 === "2022", `Expected "2022", got "${res7}"`);
 
-  // 8. Empty / undefined inputs
-  const res8 = formatProfileDateRange(undefined, undefined);
-  assert(res8 === "", `Expected "", got "${res8}"`);
+  // 8. ISO format single dates (YYYY-MM and YYYY-MM-DD must not be split internally)
+  const resIsoMonth = formatProfileDateRange("2020-01", undefined);
+  assert(resIsoMonth === "2020-01", `Expected "2020-01", got "${resIsoMonth}"`);
+
+  const resIsoDay = formatProfileDateRange("2021-04-15", undefined);
+  assert(resIsoDay === "2021-04-15", `Expected "2021-04-15", got "${resIsoDay}"`);
+
+  const resIsoRange = formatProfileDateRange("2020-01 - 2022-05", undefined);
+  assert(resIsoRange === "2020-01 – 2022-05", `Expected "2020-01 – 2022-05", got "${resIsoRange}"`);
+
+  // 9. Empty / undefined inputs
+  const res9 = formatProfileDateRange(undefined, undefined);
+  assert(res9 === "", `Expected "", got "${res9}"`);
 
   console.log("All date-format unit tests passed successfully!");
 }

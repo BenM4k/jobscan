@@ -3,7 +3,14 @@
 import React from "react";
 import { JobSelect } from "@/dal/jobs.dal";
 import { JobStatus } from "@/services/db/schema";
-import { Globe, Calendar, MapPin, ArrowUpRight, ChevronDown } from "lucide-react";
+import {
+  Globe,
+  Calendar,
+  MapPin,
+  ArrowUpRight,
+  ChevronDown,
+} from "lucide-react";
+import { useTranslations } from "next-intl";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -16,23 +23,27 @@ interface JobDetailHeaderProps {
   onStatusChange: (status: JobStatus) => void;
 }
 
-const statusOptions: { id: JobStatus; label: string }[] = [
-  { id: "new", label: "New" },
-  { id: "scored", label: "Scored" },
-  { id: "applied", label: "Applied" },
-  { id: "interviewing", label: "Interviewing" },
-  { id: "rejected", label: "Rejected" },
-  { id: "offer", label: "Offer" },
-];
-
 export function JobDetailHeader({ job, onStatusChange }: JobDetailHeaderProps) {
+  const t = useTranslations("jobDetail");
+  const tDash = useTranslations("dashboard");
+
+  const statusOptions: { id: JobStatus; label: string }[] = [
+    { id: "new", label: tDash("statusNew") },
+    { id: "scored", label: tDash("statusScored") },
+    { id: "applied", label: tDash("statusApplied") },
+    { id: "interviewing", label: tDash("statusInterviewing") },
+    { id: "rejected", label: tDash("statusRejected") },
+    { id: "offer", label: tDash("statusOffer") },
+  ];
+
   const currentStatusLabel =
     statusOptions.find((o) => o.id === job.status)?.label ||
     job.status.charAt(0).toUpperCase() + job.status.slice(1);
 
-  const locationText = Array.isArray(job.remoteRegions) && job.remoteRegions.length > 0
-    ? job.remoteRegions.join(", ")
-    : [job.city, job.countryCode || job.country].filter(Boolean).join(", ");
+  const locationText =
+    Array.isArray(job.remoteRegions) && job.remoteRegions.length > 0
+      ? job.remoteRegions.join(", ")
+      : [job.city, job.countryCode || job.country].filter(Boolean).join(", ");
 
   return (
     <header className="pb-6">
@@ -40,14 +51,14 @@ export function JobDetailHeader({ job, onStatusChange }: JobDetailHeaderProps) {
         {/* Left: Job & Company Details */}
         <div className="space-y-2 min-w-0 flex-1">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-slate-100 leading-snug tracking-tight font-sans break-words">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-slate-100 leading-snug tracking-tight font-sans wrap-break-word">
               {job.title}
             </h1>
-            <p className="text-sm font-normal text-gray-500 dark:text-zinc-400 mt-0.5 font-sans break-words">
+            <p className="text-sm font-normal text-gray-500 dark:text-zinc-400 mt-0.5 font-sans wrap-break-word">
               {job.company}
               {job.source && (
                 <span className="text-muted-foreground/60 dark:text-zinc-500 ml-2 font-mono text-xs uppercase tracking-wider">
-                  via {job.source}
+                  {t("via")} {job.source}
                 </span>
               )}
             </p>
@@ -57,16 +68,26 @@ export function JobDetailHeader({ job, onStatusChange }: JobDetailHeaderProps) {
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground font-normal pt-1 font-sans">
             {job.workplaceType && (
               <span className="inline-flex items-center gap-1.5">
-                <Globe className="size-[18px] shrink-0 text-muted-foreground" />
-                <span className="capitalize">{job.workplaceType}</span>
+                <Globe className="size-4.5 shrink-0 text-muted-foreground" />
+                <span className="capitalize">
+                  {job.workplaceType === "remote"
+                    ? tDash("remote")
+                    : job.workplaceType === "hybrid"
+                      ? tDash("hybrid")
+                      : job.workplaceType === "onsite" ||
+                          job.workplaceType === "on-site"
+                        ? tDash("onSite")
+                        : job.workplaceType}
+                </span>
               </span>
             )}
 
             {job.postedAt && (
               <span className="inline-flex items-center gap-1.5">
-                <Calendar className="size-[18px] shrink-0 text-muted-foreground" />
+                <Calendar className="size-4.5 shrink-0 text-muted-foreground" />
                 <span>
-                  Posted {new Date(job.postedAt).toLocaleDateString("en-US", {
+                  {t("posted")}{" "}
+                  {new Date(job.postedAt).toLocaleDateString("en-US", {
                     month: "short",
                     day: "numeric",
                     year: "numeric",
@@ -78,7 +99,7 @@ export function JobDetailHeader({ job, onStatusChange }: JobDetailHeaderProps) {
 
             {locationText && (
               <span className="inline-flex items-center gap-1.5">
-                <MapPin className="size-[18px] shrink-0 text-muted-foreground" />
+                <MapPin className="size-4.5 shrink-0 text-muted-foreground" />
                 <span>{locationText}</span>
               </span>
             )}
@@ -87,20 +108,24 @@ export function JobDetailHeader({ job, onStatusChange }: JobDetailHeaderProps) {
 
         {/* Right: Solid Primary Action & Pipeline Status */}
         <div className="flex items-center sm:flex-col sm:items-end gap-3 sm:gap-2.5 shrink-0 pt-1 sm:pt-0">
-          <a
-            href={job.url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-md text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors cursor-pointer"
-          >
-            <span>Apply</span>
-            <ArrowUpRight className="size-[18px] shrink-0" />
-          </a>
+          {job.url && (
+            <a
+              href={job.url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-md text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors cursor-pointer"
+            >
+              <span>{t("apply")}</span>
+              <ArrowUpRight className="size-4.5 shrink-0" />
+            </a>
+          )}
 
           <DropdownMenu>
             <DropdownMenuTrigger className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground font-normal transition-colors cursor-pointer">
-              <span>Status: {currentStatusLabel}</span>
-              <ChevronDown className="size-[18px] shrink-0 opacity-70" />
+              <span>
+                {t("statusLabel")}: {currentStatusLabel}
+              </span>
+              <ChevronDown className="size-4.5 shrink-0 opacity-70" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-36">
               {statusOptions.map((opt) => (
@@ -108,7 +133,9 @@ export function JobDetailHeader({ job, onStatusChange }: JobDetailHeaderProps) {
                   key={opt.id}
                   onClick={() => onStatusChange(opt.id)}
                   className={`text-xs font-normal cursor-pointer ${
-                    job.status === opt.id ? "font-medium text-foreground" : "text-muted-foreground"
+                    job.status === opt.id
+                      ? "font-medium text-foreground"
+                      : "text-muted-foreground"
                   }`}
                 >
                   {opt.label}

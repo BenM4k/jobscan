@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 
 interface JobCardBadgesProps {
   locationText?: string;
@@ -9,7 +10,7 @@ interface JobCardBadgesProps {
   postedDate?: string | null;
 }
 
-function formatSource(source?: string | null): string | null {
+function formatSource(source?: string | null, viaPrefix: string = "via"): string | null {
   if (!source) return null;
   const map: Record<string, string> = {
     remoteok: "RemoteOK",
@@ -20,10 +21,12 @@ function formatSource(source?: string | null): string | null {
     unjobs: "UNJobs",
     ashby: "Ashby",
     lever: "Lever",
+    manual: "Manual",
   };
   const clean = source.toLowerCase();
   const name = map[clean] || (source.charAt(0).toUpperCase() + source.slice(1));
-  return `Via ${name}`;
+  const prefix = viaPrefix.charAt(0).toUpperCase() + viaPrefix.slice(1);
+  return `${prefix} ${name}`;
 }
 
 function formatWorkplace(workplace?: string): string | null {
@@ -32,7 +35,7 @@ function formatWorkplace(workplace?: string): string | null {
   if (lower === "remote") return "Remote";
   if (lower === "hybrid") return "Hybrid";
   if (lower === "onsite" || lower === "on-site") return "On-site";
-  return workplace.charAt(0).toUpperCase() + workplace.slice(1).toLowerCase();
+  return workplace;
 }
 
 export function JobCardBadges({
@@ -41,8 +44,9 @@ export function JobCardBadges({
   source,
   postedDate,
 }: JobCardBadgesProps) {
-  const workplace = formatWorkplace(workplaceLabel);
-  const sourceText = formatSource(source);
+  const t = useTranslations("dashboard");
+  const workplace = workplaceLabel ? formatWorkplace(workplaceLabel) : null;
+  const sourceText = formatSource(source, t("via") || "via");
   const hasGroup1 = Boolean(locationText || workplace);
   const hasGroup2 = Boolean(sourceText || postedDate);
 

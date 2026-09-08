@@ -6,7 +6,7 @@ export function AddJobSkeleton() {
       <div className="space-y-2">
         <div className="h-5 w-32 bg-slate-200 dark:bg-zinc-800 rounded-md" />
         <div className="h-8 w-64 bg-slate-200 dark:bg-zinc-800 rounded-lg" />
-        <div className="h-4 w-96 bg-slate-200 dark:bg-zinc-800 rounded-md" />
+        <div className="h-4 w-full max-w-96 bg-slate-200 dark:bg-zinc-800 rounded-md" />
       </div>
       <div className="border-t border-slate-200/80 dark:border-zinc-800/80 pt-6 space-y-7">
         {/* Row 1: Title & Company */}

@@ -1,7 +1,7 @@
 import "server-only";
 import * as opsDal from "@/dal/ops.dal";
 import { ok, err, type Result } from "@/lib/result";
-import type { AppError } from "@/lib/errors";
+import { AppError } from "@/lib/errors";
 
 export interface UserAiUsage {
   usedCount: number;
@@ -12,14 +12,26 @@ export interface UserAiUsage {
   totalCostEstimateUsd: string;
 }
 
+export interface UserAiUsageDeps {
+  getUserAiUsageSummary?: typeof opsDal.getUserAiUsageSummary;
+}
+
 /**
  * Retrieves the user's monthly AI usage statistics and computes remaining limits.
  */
 export async function getUserAiUsage(
   userId: string,
-  monthlyLimit = 50
+  monthlyLimit = 50,
+  deps: UserAiUsageDeps = {}
 ): Promise<Result<UserAiUsage, AppError>> {
-  const summaryRes = await opsDal.getUserAiUsageSummary(userId, monthlyLimit);
+  if (monthlyLimit <= 0) {
+    return err(
+      new AppError("VALIDATION_ERROR", "monthlyLimit must be greater than zero")
+    );
+  }
+
+  const getSummary = deps.getUserAiUsageSummary ?? opsDal.getUserAiUsageSummary;
+  const summaryRes = await getSummary(userId, monthlyLimit);
   if (!summaryRes.ok) {
     return err(summaryRes.error);
   }

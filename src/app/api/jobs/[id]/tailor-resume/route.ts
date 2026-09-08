@@ -129,3 +129,51 @@ export async function POST(
     );
   }
 }
+
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const sessionResult = await requireSession();
+    if (!sessionResult.ok || !sessionResult.value) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const body = await req.json();
+    const tailoredResume = body.tailoredResume;
+
+    if (typeof tailoredResume !== "string") {
+      return NextResponse.json(
+        { error: "Invalid tailored resume content" },
+        { status: 400 },
+      );
+    }
+
+    const updateRes = await jobsDal.updateJobTailoredResume(
+      id,
+      tailoredResume,
+      null,
+      sessionResult.value.user.id
+    );
+    if (!updateRes.ok) {
+      console.error("Failed to save tailored resume:", { jobId: id });
+      return NextResponse.json(
+        { error: "Failed to save tailored resume" },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({ success: true, data: updateRes.value });
+  } catch (error) {
+    console.error("Save tailored resume error:", {
+      name: error instanceof Error ? error.name : "Unknown",
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return NextResponse.json(
+      { error: "Failed to save tailored resume" },
+      { status: 500 },
+    );
+  }
+}

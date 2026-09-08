@@ -29,6 +29,7 @@ const SOURCE_OPTIONS: { value: Source; label: string }[] = [
   { value: "ashby", label: "Ashby" },
   { value: "lever", label: "Lever" },
   { value: "remoteok", label: "RemoteOK" },
+  { value: "manual", label: "Manual" },
 ];
 
 const STATUS_OPTIONS: { value: PipelineStatus; key: string }[] = [

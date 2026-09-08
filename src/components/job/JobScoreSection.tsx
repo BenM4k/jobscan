@@ -4,6 +4,7 @@ import React from "react";
 import { JobSelect } from "@/dal/jobs.dal";
 import { Sparkles, Check, AlertCircle, RotateCcw } from "lucide-react";
 import { getScoreBadgeStyle } from "@/lib/score-style";
+import { useTranslations } from "next-intl";
 
 interface JobScoreSectionProps {
   job: JobSelect;
@@ -18,22 +19,23 @@ export function JobScoreSection({
   scoringError,
   onScoreJob,
 }: JobScoreSectionProps) {
+  const t = useTranslations("jobDetail");
   const isScored = job.fitScore !== null && job.fitScore !== undefined;
   const scoreStyle = isScored ? getScoreBadgeStyle(job.fitScore!) : null;
 
   return (
-    <section aria-label="Qualification match" className="py-4 space-y-3">
+    <section aria-label={t("qualificationMatch")} className="py-4 space-y-3">
       {/* Trigger Row */}
       {/* Header Row: Icon (18px) + Title (text-sm font-medium) + Description (text-sm text-muted) */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
-          <Sparkles className="size-[18px] text-muted-foreground dark:text-zinc-400 shrink-0 mt-0.5" />
+          <Sparkles className="size-4.5 text-muted-foreground dark:text-zinc-400 shrink-0 mt-0.5" />
           <div className="space-y-0.5">
             <h2 className="text-sm font-medium text-foreground dark:text-zinc-100 font-sans">
-              Qualification match
+              {t("qualificationMatch")}
             </h2>
             <p className="text-sm text-gray-500 dark:text-zinc-400 font-normal leading-relaxed max-w-xl font-sans">
-              Evaluate your master resume against requirements and keywords.
+              {t("scoreSubtitle")}
             </p>
           </div>
         </div>
@@ -41,11 +43,13 @@ export function JobScoreSection({
         <div className="shrink-0 pt-0.5">
           {isScoring ? (
             <span className="text-sm font-normal text-muted-foreground inline-flex items-center gap-1.5 font-sans">
-              <Sparkles className="size-[18px] animate-spin text-blue-600 dark:text-blue-400 shrink-0" />
-              <span>Scoring</span>
+              <Sparkles className="size-4.5 animate-spin text-blue-600 dark:text-blue-400 shrink-0" />
+              <span>{t("scoring")}</span>
             </span>
           ) : isScored && scoreStyle ? (
-            <span className={`text-base sm:text-lg font-semibold font-sans ${scoreStyle.textColor}`}>
+            <span
+              className={`text-base sm:text-lg font-semibold font-sans ${scoreStyle.textColor}`}
+            >
               {job.fitScore}% match
             </span>
           ) : (
@@ -54,7 +58,7 @@ export function JobScoreSection({
               onClick={onScoreJob}
               className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer font-sans"
             >
-              <span>Score match</span>
+              <span>{t("scoreMatch")}</span>
             </button>
           )}
         </div>
@@ -63,7 +67,7 @@ export function JobScoreSection({
       {/* Warning/Error Notice */}
       {scoringError && (
         <div className="flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400 font-normal pt-1">
-          <AlertCircle className="size-[18px] shrink-0" />
+          <AlertCircle className="size-4.5 shrink-0" />
           <span>{scoringError}</span>
         </div>
       )}
@@ -94,21 +98,29 @@ export function JobScoreSection({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1 text-sm font-normal">
             <div className="space-y-1">
               <div className="flex items-center gap-1.5 text-foreground dark:text-zinc-100 font-medium">
-                <Check className="size-[18px] text-muted-foreground dark:text-zinc-400 shrink-0" />
-                <span>Matched skills ({job.matchedSkills?.length || 0})</span>
+                <Check className="size-4.5 text-muted-foreground dark:text-zinc-400 shrink-0" />
+                <span>
+                  {t("matchedSkills")} ({job.matchedSkills?.length || 0})
+                </span>
               </div>
               <p className="text-gray-600 dark:text-zinc-300 leading-relaxed pl-6">
-                {job.matchedSkills?.length ? job.matchedSkills.join(", ") : "None identified"}
+                {job.matchedSkills?.length
+                  ? job.matchedSkills.join(", ")
+                  : t("noneIdentified")}
               </p>
             </div>
 
             <div className="space-y-1">
               <div className="flex items-center gap-1.5 text-foreground dark:text-zinc-100 font-medium">
-                <AlertCircle className="size-[18px] text-muted-foreground dark:text-zinc-400 shrink-0" />
-                <span>Missing skills ({job.missingSkills?.length || 0})</span>
+                <AlertCircle className="size-4.5 text-muted-foreground dark:text-zinc-400 shrink-0" />
+                <span>
+                  {t("missingSkills")} ({job.missingSkills?.length || 0})
+                </span>
               </div>
               <p className="text-gray-600 dark:text-zinc-300 leading-relaxed pl-6">
-                {job.missingSkills?.length ? job.missingSkills.join(", ") : "None identified"}
+                {job.missingSkills?.length
+                  ? job.missingSkills.join(", ")
+                  : t("noneIdentified")}
               </p>
             </div>
           </div>
@@ -116,7 +128,9 @@ export function JobScoreSection({
           {/* Gaps Analysis */}
           {Array.isArray(job.gaps) && job.gaps.length > 0 && (
             <div className="pt-1 space-y-1 text-sm font-normal">
-              <div className="text-foreground dark:text-zinc-100 font-medium">Gaps analysis</div>
+              <div className="text-foreground dark:text-zinc-100 font-medium">
+                {t("gapsAnalysis")}
+              </div>
               <ul className="space-y-1 text-gray-600 dark:text-zinc-300 pl-4">
                 {job.gaps.map((gap, i) => (
                   <li key={i} className="list-disc leading-relaxed">
@@ -135,8 +149,8 @@ export function JobScoreSection({
               disabled={isScoring}
               className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer disabled:opacity-50 font-sans"
             >
-              <RotateCcw className="size-[18px] shrink-0" />
-              <span>Rescore</span>
+              <RotateCcw className="size-4.5 shrink-0" />
+              <span>{t("reScore")}</span>
             </button>
           </div>
         </div>

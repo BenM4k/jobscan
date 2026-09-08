@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { JobSelect } from "@/dal/jobs.dal";
 import { toast } from "sonner";
 import posthog from "posthog-js";
@@ -18,6 +18,15 @@ export function useCoverLetter({ job, onJobUpdated }: UseCoverLetterOptions) {
   const [isEditing, setIsEditing] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const pendingIdempotencyKeyRef = useRef<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   const handleGenerateStream = async () => {
     try {
@@ -28,8 +37,13 @@ export function useCoverLetter({ job, onJobUpdated }: UseCoverLetterOptions) {
       }
       const idempotencyKey = pendingIdempotencyKeyRef.current;
 
+      abortControllerRef.current?.abort();
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+
       const res = await fetch(`/api/jobs/${job.id}/cover-letter`, {
         method: "POST",
+        signal: abortController.signal,
         headers: {
           "Content-Type": "application/json",
           "Idempotency-Key": idempotencyKey,
@@ -61,6 +75,9 @@ export function useCoverLetter({ job, onJobUpdated }: UseCoverLetterOptions) {
       toast.success("Cover letter generated");
       onJobUpdated({ ...job, coverLetterDraft: accumulated });
     } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        return;
+      }
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Cover letter streaming failed");
     } finally {
@@ -105,11 +122,16 @@ export function useCoverLetter({ job, onJobUpdated }: UseCoverLetterOptions) {
     }
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(coverLetter);
-    setIsCopied(true);
-    toast.success("Copied to clipboard");
-    setTimeout(() => setIsCopied(false), 2000);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(coverLetter);
+      setIsCopied(true);
+      toast.success("Copied to clipboard");
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+      toast.error("Failed to copy to clipboard");
+    }
   };
 
   return {
