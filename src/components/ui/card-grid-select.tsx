@@ -29,7 +29,8 @@ export function CardGridSelect<T extends string>({
 }: CardGridSelectProps<T>) {
   const [open, setOpen] = useState(false);
   const selectedLabel =
-    options.find((o) => o.id === value)?.label || value.toUpperCase();
+    options.find((o) => o.id === value)?.label ||
+    (value.charAt(0).toUpperCase() + value.slice(1));
 
   const activeStyles =
     accentColor === "indigo"
@@ -40,24 +41,24 @@ export function CardGridSelect<T extends string>({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         aria-label={`Select ${title}, currently ${selectedLabel}`}
-        className="inline-flex items-center gap-1.5 text-xs hover:opacity-80 transition cursor-pointer font-mono select-none"
+        className="inline-flex items-center gap-1.5 text-xs hover:opacity-80 transition cursor-pointer font-sans select-none"
       >
-        <span className="font-bold text-slate-500 dark:text-zinc-400 uppercase text-[11px] tracking-wider">
-          {title} :
+        <span className="font-medium text-slate-500 dark:text-zinc-400 text-xs">
+          {title}:
         </span>
-        <span className="font-bold text-blue-600 dark:text-blue-400 uppercase text-[11px] tracking-wider">
+        <span className="font-medium text-blue-600 dark:text-blue-400 text-xs">
           {selectedLabel}
         </span>
-        <span className="text-[10px] text-blue-600 dark:text-blue-400" aria-hidden="true">
+        <span className="text-[11px] text-blue-600 dark:text-blue-400" aria-hidden="true">
           ▾
         </span>
       </PopoverTrigger>
 
       <PopoverContent
         align="start"
-        className="w-72 p-3 bg-white dark:bg-[#121215] border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xl space-y-2"
+        className="w-72 p-3 bg-white dark:bg-[#121215] border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xl space-y-2 font-sans"
       >
-        <div className="text-[11px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">
+        <div className="text-xs font-medium text-gray-500 dark:text-slate-400">
           Select {title}
         </div>
         {/* 3 cards per row grid */}

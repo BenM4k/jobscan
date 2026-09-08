@@ -47,11 +47,11 @@ export function MasterResumeEditor({
           </p>
         </div>
 
-        <div className="flex items-center gap-1 bg-slate-100 dark:bg-zinc-800/80 p-1 rounded-xl border border-slate-200 dark:border-zinc-700/60 self-start sm:self-auto font-mono">
+        <div className="flex items-center gap-1 bg-slate-100 dark:bg-zinc-800/80 p-1 rounded-xl border border-slate-200 dark:border-zinc-700/60 self-start sm:self-auto">
           <button
             type="button"
             onClick={() => setActiveTab("structured")}
-            className={`text-xs font-bold px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
+            className={`text-xs font-semibold px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
               activeTab === "structured"
                 ? "bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-2xs"
                 : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
@@ -62,7 +62,7 @@ export function MasterResumeEditor({
           <button
             type="button"
             onClick={() => setActiveTab("raw")}
-            className={`text-xs font-bold px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
+            className={`text-xs font-semibold px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
               activeTab === "raw"
                 ? "bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-2xs"
                 : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
@@ -77,7 +77,7 @@ export function MasterResumeEditor({
         <div className="space-y-6 pt-2">
           {/* Executive Summary */}
           <div className="space-y-1.5">
-            <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-400">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 font-sans">
               {t("executiveSummary")}
             </label>
             <textarea
@@ -85,13 +85,13 @@ export function MasterResumeEditor({
               value={summary}
               onChange={(e) => onSummaryChange(e.target.value)}
               placeholder="e.g. Accomplished and innovative Software Engineer specializing in Frontend Development..."
-              className="w-full bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-slate-900 dark:text-zinc-100 text-xs sm:text-[13px] p-4 rounded-xl focus:outline-none focus:border-blue-500 transition shadow-2xs leading-relaxed"
+              className="w-full bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-slate-900 dark:text-zinc-100 text-base sm:text-[13px] p-4 rounded-xl focus:outline-none focus:border-blue-500 transition shadow-2xs leading-relaxed"
             />
           </div>
 
           {/* Technical Skills */}
           <div className="space-y-1.5">
-            <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-400">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 font-sans">
               {t("technicalSkillsLabel")}
             </label>
             <input
@@ -99,7 +99,7 @@ export function MasterResumeEditor({
               value={skills}
               onChange={(e) => onSkillsChange(e.target.value)}
               placeholder="JavaScript, React, Redux, Jest, HTML, CSS, RESTful APIs, Node.js..."
-              className="w-full bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-slate-900 dark:text-zinc-100 text-xs sm:text-[13px] p-3 rounded-xl focus:outline-none focus:border-blue-500 transition shadow-2xs"
+              className="w-full bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-slate-900 dark:text-zinc-100 text-base sm:text-[13px] p-3 rounded-xl focus:outline-none focus:border-blue-500 transition shadow-2xs"
             />
           </div>
 
@@ -118,7 +118,7 @@ export function MasterResumeEditor({
       ) : (
         /* Raw Markdown Tab */
         <div className="space-y-2 pt-2">
-          <label className="block text-[10px] font-mono font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-400">
+          <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 font-sans">
             {t("rawMarkdown")}
           </label>
           <textarea
@@ -126,7 +126,7 @@ export function MasterResumeEditor({
             value={resumeText}
             onChange={(e) => onResumeTextChange(e.target.value)}
             placeholder="Paste your complete raw CV/resume in markdown or plain text format here..."
-            className="w-full bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-slate-900 dark:text-zinc-100 p-4 rounded-xl text-xs font-mono leading-relaxed focus:outline-none focus:border-blue-500 shadow-2xs"
+            className="w-full bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-slate-900 dark:text-zinc-100 p-4 rounded-xl text-base sm:text-xs font-mono leading-relaxed focus:outline-none focus:border-blue-500 shadow-2xs"
           />
         </div>
       )}

@@ -61,7 +61,7 @@ export function NavbarUserDropdown({
             >
               <div
                 aria-hidden="true"
-                className="size-8 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 text-white font-bold text-xs flex items-center justify-center uppercase shadow-xs"
+                className="size-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center uppercase shadow-xs"
               >
                 {initials}
               </div>
@@ -70,14 +70,14 @@ export function NavbarUserDropdown({
           }
         />
 
-        <DropdownMenuContent className="w-56" align="end">
+        <DropdownMenuContent className="w-60 p-1.5" align="end">
           <DropdownMenuGroup>
-            <DropdownMenuLabel className="font-normal">
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none truncate">
+            <DropdownMenuLabel className="font-normal px-3 py-3.5">
+              <div className="flex flex-col space-y-2">
+                <p className="text-sm font-semibold leading-none text-foreground">
                   {userName || "User"}
                 </p>
-                <p className="text-xs text-muted-foreground leading-none truncate">
+                <p className="text-xs text-muted-foreground leading-none">
                   {userEmail}
                 </p>
               </div>
@@ -86,20 +86,20 @@ export function NavbarUserDropdown({
 
           <DropdownMenuSeparator />
 
-          <DropdownMenuGroup>
+          <DropdownMenuGroup className="space-y-0.5">
             <DropdownMenuItem
               render={<Link href="/dashboard/profile" />}
-              className="cursor-pointer"
+              className="cursor-pointer px-3 py-2.5"
             >
-              <User className="mr-2 size-4" />
+              <User className="size-4 text-muted-foreground" />
               <span>{t("profile")}</span>
             </DropdownMenuItem>
 
             <DropdownMenuItem
               render={<Link href="/dashboard/settings" />}
-              className="cursor-pointer"
+              className="cursor-pointer px-3 py-2.5"
             >
-              <Settings className="mr-2 size-4" />
+              <Settings className="size-4 text-muted-foreground" />
               <span>{t("settings")}</span>
             </DropdownMenuItem>
           </DropdownMenuGroup>
@@ -109,9 +109,9 @@ export function NavbarUserDropdown({
           <DropdownMenuItem
             variant="destructive"
             onClick={onSignOut}
-            className="cursor-pointer"
+            className="cursor-pointer px-3 py-2.5"
           >
-            <LogOut className="mr-2 size-4" />
+            <LogOut className="size-4" />
             <span>{t("signOut")}</span>
           </DropdownMenuItem>
         </DropdownMenuContent>

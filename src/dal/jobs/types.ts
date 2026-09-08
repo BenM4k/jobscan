@@ -6,6 +6,7 @@ import {
 } from "@/services/db/schema";
 import * as pipelineDal from "@/dal/pipeline.dal";
 import type { TailoredResumeData } from "@/lib/ai";
+export type { TailoredResumeData };
 
 export type CanonicalJobInsert = typeof job.$inferInsert;
 export type CanonicalJobSelect = typeof job.$inferSelect;
@@ -26,6 +27,8 @@ export interface JobSelect {
   country?: string | null;
   countryCode?: string | null;
   city?: string | null;
+  location?: string | null;
+  rawSalaryText?: string | null;
   workplaceType?: string | null;
   remoteRegions?: string[] | null;
   fitScore: number | null;

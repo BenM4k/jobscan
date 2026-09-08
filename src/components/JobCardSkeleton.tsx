@@ -2,7 +2,7 @@ import React from "react";
 
 export function JobCardSkeleton() {
   return (
-    <div className="py-8 sm:py-9 animate-pulse space-y-5">
+    <div className="p-5 sm:p-6 rounded-2xl bg-slate-100/60 dark:bg-zinc-900/40 animate-pulse space-y-5">
       {/* Top Header: Avatar + Info */}
       <div className="flex items-start gap-4 sm:gap-5">
         {/* Company Initial Box Skeleton */}

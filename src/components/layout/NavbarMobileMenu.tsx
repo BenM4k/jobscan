@@ -36,7 +36,7 @@ export function NavbarMobileMenu({
       {userEmail ? (
         <>
           <div className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-zinc-900 rounded-xl border border-gray-200/60 dark:border-zinc-800">
-            <div className="w-8 h-8 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 text-white font-bold text-xs flex items-center justify-center uppercase">
+            <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center uppercase shadow-xs">
               {userEmail.slice(0, 2)}
             </div>
             <div className="truncate text-xs font-semibold text-gray-800 dark:text-zinc-200">

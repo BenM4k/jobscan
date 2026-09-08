@@ -9,6 +9,7 @@ import { ProfileEditHeader } from "@/components/profile/ProfileEditHeader";
 import { ProfileAiEngineSelect } from "@/components/profile/ProfileAiEngineSelect";
 import { DeleteResumeModal } from "@/components/profile/DeleteResumeModal";
 import { EducationItem, ExperienceItem, ResumeProfileData } from "@/lib/ai";
+import type { UserAiUsage } from "@/services/ai/usage.service";
 import { toast } from "sonner";
 import posthog from "posthog-js";
 
@@ -21,6 +22,8 @@ export interface ProfileFormProps {
   initialSummary?: string;
   initialEducation?: EducationItem[];
   initialExperience?: ExperienceItem[];
+  initialAiUsage?: UserAiUsage | null;
+  aiUsageError?: boolean;
 }
 
 export function ProfileForm({
@@ -32,6 +35,8 @@ export function ProfileForm({
   initialSummary = "",
   initialEducation = [],
   initialExperience = [],
+  initialAiUsage,
+  aiUsageError = false,
 }: ProfileFormProps) {
   const [resumeText, setResumeText] = useState(initialResumeText);
   const [summary, setSummary] = useState(initialSummary);
@@ -103,7 +108,7 @@ export function ProfileForm({
 
   if (!isEditing && resumeText.trim()) {
     return (
-      <div className="space-y-8 max-w-5xl mx-auto py-2">
+      <div className="space-y-8 w-full py-2">
         <ProfileViewMode
           userName={userName}
           userEmail={userEmail}
@@ -113,6 +118,8 @@ export function ProfileForm({
           resumeText={resumeText}
           parsedSkillsList={parsedSkillsList}
           aiProvider={aiProvider}
+          aiUsage={initialAiUsage}
+          aiUsageError={aiUsageError}
           onEditClick={() => setIsEditing(true)}
           onDeleteClick={() => setDeleteConfirmOpen(true)}
         />
@@ -126,7 +133,7 @@ export function ProfileForm({
   }
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto py-2">
+    <div className="space-y-8 w-full py-2">
       <ProfileEditHeader
         hasResume={Boolean(resumeText.trim())}
         isSaving={isSaving}

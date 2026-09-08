@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth-guard";
 import { runWithIdempotency } from "@/services/idempotency.service";
 import { generateTailoredResume } from "@/services/tailoring.service";
+import * as jobService from "@/services/job.service";
 import * as jobsDal from "@/dal/jobs.dal";
 import { ok } from "@/lib/result";
 
@@ -125,6 +126,66 @@ export async function POST(
     console.error("Tailor resume error:", error);
     return NextResponse.json(
       { error: "Failed to tailor resume" },
+      { status: 500 },
+    );
+  }
+}
+
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const sessionResult = await requireSession();
+    if (!sessionResult.ok || !sessionResult.value) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json(
+        { error: "Request body must be an object" },
+        { status: 400 },
+      );
+    }
+
+    const tailoredResume = (body as Record<string, unknown>).tailoredResume;
+    if (typeof tailoredResume !== "string") {
+      return NextResponse.json(
+        { error: "Invalid tailored resume content" },
+        { status: 400 },
+      );
+    }
+
+    const updateRes = await jobService.updateTailoredResume(
+      id,
+      tailoredResume,
+      sessionResult.value.user.id
+    );
+    if (!updateRes.ok) {
+      console.error("Failed to save tailored resume:", { jobId: id });
+      return NextResponse.json(
+        { error: "Failed to save tailored resume" },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({ success: true, data: updateRes.value });
+  } catch (error) {
+    console.error("Save tailored resume error:", {
+      name: error instanceof Error ? error.name : "Unknown",
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return NextResponse.json(
+      { error: "Failed to save tailored resume" },
       { status: 500 },
     );
   }

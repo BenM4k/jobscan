@@ -4,7 +4,33 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { addManualJobAction } from "@/actions/job.actions";
+import { AddJobHeader } from "@/components/AddJobHeader";
+import { cn } from "@/lib/utils";
 import posthog from "posthog-js";
+
+/**
+ * Standard button styles for form actions:
+ * - formPrimaryButtonClass: primary solid action (matches "Fetch Jobs" & "Apply")
+ * - formSecondaryButtonClass: secondary outline action (no fill, sized to match primary)
+ * - formGhostButtonClass: ghost/text-only action (no fill, no border)
+ */
+export const formPrimaryButtonClass =
+  "inline-flex items-center justify-center font-medium text-xs sm:text-sm px-6 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition shadow-xs disabled:opacity-50 cursor-pointer";
+
+export const formSecondaryButtonClass =
+  "inline-flex items-center justify-center font-medium text-xs sm:text-sm px-6 py-2.5 rounded-lg border border-slate-300 dark:border-zinc-800 bg-transparent hover:bg-slate-100 dark:hover:bg-zinc-800/60 text-slate-700 dark:text-zinc-300 transition disabled:opacity-50 cursor-pointer";
+
+export const formGhostButtonClass =
+  "inline-flex items-center justify-center font-medium text-xs sm:text-sm px-6 py-2.5 rounded-lg bg-transparent hover:bg-slate-100 dark:hover:bg-zinc-800/50 text-slate-600 dark:text-zinc-400 hover:text-foreground transition disabled:opacity-50 cursor-pointer";
+
+const lineInputClass =
+  "w-full bg-transparent border-0 border-b border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 text-base sm:text-sm font-sans rounded-none px-0 py-2 sm:py-2.5 placeholder:text-gray-400 dark:placeholder:text-zinc-600 focus:outline-none focus:border-b-2 focus:border-blue-600 dark:focus:border-blue-500 focus:ring-0 transition-colors";
+
+const lineSelectClass =
+  "w-full bg-transparent border-0 border-b border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 text-base sm:text-sm font-sans rounded-none px-0 py-2 sm:py-2.5 focus:outline-none focus:border-b-2 focus:border-blue-600 dark:focus:border-blue-500 focus:ring-0 transition-colors cursor-pointer";
+
+const lineTextareaClass =
+  "w-full bg-transparent border-0 border-b border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 text-base sm:text-sm font-sans rounded-none px-0 py-2 sm:py-2.5 leading-relaxed placeholder:text-gray-400 dark:placeholder:text-zinc-600 focus:outline-none focus:border-b-2 focus:border-blue-600 dark:focus:border-blue-500 focus:ring-0 transition-colors resize-y";
 
 export function AddJobForm() {
   const router = useRouter();
@@ -12,7 +38,10 @@ export function AddJobForm() {
 
   const [title, setTitle] = useState("");
   const [company, setCompany] = useState("");
+  const [location, setLocation] = useState("");
+  const [workplaceType, setWorkplaceType] = useState("");
   const [url, setUrl] = useState("");
+  const [salary, setSalary] = useState("");
   const [description, setDescription] = useState("");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -26,7 +55,10 @@ export function AddJobForm() {
     const formData = new FormData();
     formData.append("title", title);
     formData.append("company", company);
+    formData.append("location", location);
+    formData.append("workplaceType", workplaceType);
     formData.append("url", url);
+    formData.append("salary", salary);
     formData.append("description", description);
 
     const res = await addManualJobAction(formData);
@@ -42,104 +74,170 @@ export function AddJobForm() {
   };
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto">
-      <div className="space-y-2 pb-4 border-b border-slate-300 dark:border-zinc-800/80">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-[10px] font-bold uppercase tracking-wider bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-2.5 py-1 rounded-md border border-indigo-500/20">
-            Source: Manual Entry
-          </span>
-        </div>
-        <h1 className="text-2xl sm:text-3xl font-serif text-gray-900 dark:text-slate-100 font-medium">
-          {t("title")}
-        </h1>
-        <p className="text-xs sm:text-sm text-gray-500 dark:text-zinc-400 max-w-xl">
-          {t("subtitle")}
-        </p>
-      </div>
+    <div className="space-y-6 w-full font-sans">
+      <AddJobHeader />
 
       {errorMsg && (
-        <div className="p-4 bg-rose-50 dark:bg-rose-950/80 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-200 text-xs font-semibold rounded-2xl flex justify-between items-center shadow-sm">
+        <div className="p-4 bg-rose-50 dark:bg-rose-950/80 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-200 text-xs font-semibold rounded-lg flex justify-between items-center shadow-xs">
           <span>⚠️ {errorMsg}</span>
           <button
             onClick={() => setErrorMsg(null)}
-            className="text-rose-500 hover:text-rose-800 text-xs font-bold"
+            className="text-rose-500 hover:text-rose-800 text-xs font-bold cursor-pointer"
           >
             Dismiss
           </button>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+      {/* Clear content boundary above the first field */}
+      <div className="border-t border-slate-200/80 dark:border-zinc-800/80 pt-6">
+        <form onSubmit={handleSubmit} className="space-y-7">
+          {/* Row 1: Title & Company */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+            <div>
+              <label
+                htmlFor="job-title-input"
+                className="block text-xs font-medium text-slate-500 dark:text-zinc-400 mb-1 font-sans"
+              >
+                {t("jobTitleLabel")} *
+              </label>
+              <input
+                id="job-title-input"
+                type="text"
+                required
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder={t("jobTitlePlaceholder")}
+                className={lineInputClass}
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="company-name-input"
+                className="block text-xs font-medium text-slate-500 dark:text-zinc-400 mb-1 font-sans"
+              >
+                {t("companyLabel")} *
+              </label>
+              <input
+                id="company-name-input"
+                type="text"
+                required
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                placeholder={t("companyPlaceholder")}
+                className={lineInputClass}
+              />
+            </div>
+          </div>
+
+          {/* Row 2: Location & Workplace Type */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+            <div>
+              <label
+                htmlFor="job-location-input"
+                className="block text-xs font-medium text-slate-500 dark:text-zinc-400 mb-1 font-sans"
+              >
+                {t("locationLabel")}
+              </label>
+              <input
+                id="job-location-input"
+                type="text"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder={t("locationPlaceholder")}
+                className={lineInputClass}
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="job-workplace-input"
+                className="block text-xs font-medium text-slate-500 dark:text-zinc-400 mb-1 font-sans"
+              >
+                {t("workplaceTypeLabel")}
+              </label>
+              <select
+                id="job-workplace-input"
+                value={workplaceType}
+                onChange={(e) => setWorkplaceType(e.target.value)}
+                className={lineSelectClass}
+              >
+                <option value="">—</option>
+                <option value="remote">{t("workplaceRemote")}</option>
+                <option value="hybrid">{t("workplaceHybrid")}</option>
+                <option value="on-site">{t("workplaceOnSite")}</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Row 3: URL & Salary */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+            <div>
+              <label
+                htmlFor="job-url-input"
+                className="block text-xs font-medium text-slate-500 dark:text-zinc-400 mb-1 font-sans"
+              >
+                {t("urlLabel")}
+              </label>
+              <input
+                id="job-url-input"
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder={t("urlPlaceholder")}
+                className={lineInputClass}
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="job-salary-input"
+                className="block text-xs font-medium text-slate-500 dark:text-zinc-400 mb-1 font-sans"
+              >
+                {t("salaryLabel")}
+              </label>
+              <input
+                id="job-salary-input"
+                type="text"
+                value={salary}
+                onChange={(e) => setSalary(e.target.value)}
+                placeholder={t("salaryPlaceholder")}
+                className={lineInputClass}
+              />
+            </div>
+          </div>
+
+          {/* Row 4: Description */}
           <div>
-            <label htmlFor="job-title-input" className="block text-xs font-bold text-gray-700 dark:text-zinc-300 mb-1.5">
-              {t("jobTitleLabel")} *
+            <label
+              htmlFor="job-description-input"
+              className="block text-xs font-medium text-slate-500 dark:text-zinc-400 mb-1 font-sans"
+            >
+              {t("descriptionLabel")} *
             </label>
-            <input
-              id="job-title-input"
-              type="text"
+            <textarea
+              id="job-description-input"
+              rows={1}
               required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={t("jobTitlePlaceholder")}
-              className="w-full bg-white dark:bg-[#121215] border border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 text-xs sm:text-sm font-medium rounded-2xl p-4 focus:outline-none focus:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/20 transition shadow-xs"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder={t("descriptionPlaceholder")}
+              className={lineTextareaClass}
             />
           </div>
 
-          <div>
-            <label htmlFor="company-name-input" className="block text-xs font-bold text-gray-700 dark:text-zinc-300 mb-1.5">
-              {t("companyLabel")} *
-            </label>
-            <input
-              id="company-name-input"
-              type="text"
-              required
-              value={company}
-              onChange={(e) => setCompany(e.target.value)}
-              placeholder={t("companyPlaceholder")}
-              className="w-full bg-white dark:bg-[#121215] border border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 text-xs sm:text-sm font-medium rounded-2xl p-4 focus:outline-none focus:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/20 transition shadow-xs"
-            />
+          <div className="pt-24 flex items-center justify-end">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className={cn("w-full sm:w-auto", formPrimaryButtonClass)}
+            >
+              {isSubmitting ? t("submitting") : t("submitButton")}
+            </button>
           </div>
-        </div>
-
-        <div>
-          <label htmlFor="job-url-input" className="block text-xs font-bold text-gray-700 dark:text-zinc-300 mb-1.5">
-            {t("urlLabel")} *
-          </label>
-          <input
-            id="job-url-input"
-            type="url"
-            required
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder={t("urlPlaceholder")}
-            className="w-full bg-white dark:bg-[#121215] border border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 text-xs sm:text-sm font-medium rounded-2xl p-4 focus:outline-none focus:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/20 transition shadow-xs"
-          />
-        </div>
-
-        <div>
-          <label htmlFor="job-description-input" className="block text-xs font-bold text-gray-700 dark:text-zinc-300 mb-1.5">
-            {t("descriptionLabel")} *
-          </label>
-          <textarea
-            id="job-description-input"
-            rows={12}
-            required
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder={t("descriptionPlaceholder")}
-            className="w-full bg-white dark:bg-[#121215] border border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 text-xs sm:text-sm font-sans rounded-2xl p-4 focus:outline-none focus:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/20 leading-relaxed transition shadow-xs"
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm py-4 rounded-2xl transition disabled:opacity-50 shadow-md shadow-blue-500/20 cursor-pointer"
-        >
-          {isSubmitting ? t("submitting") : t("submitButton")}
-        </button>
-      </form>
+        </form>
+      </div>
     </div>
   );
 }

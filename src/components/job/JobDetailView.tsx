@@ -11,7 +11,6 @@ import { JobCoverLetterSection } from "./JobCoverLetterSection";
 import { JobDescriptionSection } from "./JobDescriptionSection";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
 import {
   Dialog,
   DialogContent,
@@ -20,22 +19,23 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { FileText, Info } from "lucide-react";
 import posthog from "posthog-js";
+import { useTranslations } from "next-intl";
 
 interface JobDetailViewProps {
   initialJob: JobSelect;
 }
 
 export function JobDetailView({ initialJob }: JobDetailViewProps) {
+  const tCommon = useTranslations("common");
+  const tDash = useTranslations("dashboard");
   const [job, setJob] = useState<JobSelect>(initialJob);
   const [isScoring, setIsScoring] = useState(false);
   const [scoringError, setScoringError] = useState<string | null>(null);
   const [missingResumeOpen, setMissingResumeOpen] = useState(false);
   const pendingScoreIdempotencyKeyRef = useRef<string | null>(null);
   const router = useRouter();
-  const t = useTranslations("dashboard");
-  const tCommon = useTranslations("common");
 
   const handleStatusChange = async (newStatus: JobStatus) => {
     setJob((prev) => ({ ...prev, status: newStatus }));
@@ -44,8 +44,11 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
       toast.error(res.error || "Failed to update status");
       setJob((prev) => ({ ...prev, status: job.status }));
     } else {
-      posthog.capture("job_status_updated", { status: newStatus, location: "detail" });
-      toast.success(`Status updated to "${newStatus.toUpperCase()}"`);
+      posthog.capture("job_status_updated", {
+        status: newStatus,
+        location: "detail",
+      });
+      toast.success(`Status updated to ${newStatus}`);
     }
   };
 
@@ -81,7 +84,7 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
       pendingScoreIdempotencyKeyRef.current = null;
       posthog.capture("job_scored", { location: "detail" });
       setJob(data);
-      toast.success("Job scored against Master Resume successfully!");
+      toast.success("Job scored");
       router.refresh();
     } catch (err) {
       console.error(err);
@@ -98,7 +101,7 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
   };
 
   return (
-    <div className="space-y-10 sm:space-y-12">
+    <div className="divide-y divide-border/40">
       <JobDetailHeader job={job} onStatusChange={handleStatusChange} />
 
       <JobScoreSection
@@ -112,39 +115,46 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
 
       <JobCoverLetterSection job={job} onJobUpdated={handleJobUpdated} />
 
+      {/* AI Toolkit Area Disclaimer (single instance) */}
+      <div className="py-3.5 flex items-center gap-2 text-sm text-muted-foreground font-normal font-sans">
+        <Info className="size-4.5 text-muted-foreground/70 shrink-0" />
+        <span>{tCommon("aiNotice")}</span>
+      </div>
+
       <JobDescriptionSection description={job.description} />
 
       {/* Missing Master Resume Modal */}
       <Dialog open={missingResumeOpen} onOpenChange={setMissingResumeOpen}>
-        <DialogContent className="sm:max-w-md bg-white dark:bg-[#121215] border border-slate-300 dark:border-zinc-800 rounded-3xl p-6 space-y-4">
+        <DialogContent className="sm:max-w-md p-6 space-y-4">
           <DialogHeader>
-            <div className="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center text-lg mb-1">
-              📄
+            <div className="flex items-center gap-2">
+              <FileText className="size-4.5 text-muted-foreground shrink-0" />
+              <DialogTitle className="text-sm font-medium text-foreground">
+                {tDash("missingResumeTitle")}
+              </DialogTitle>
             </div>
-            <DialogTitle className="text-base font-bold text-gray-900 dark:text-slate-100">
-              {t("missingResumeTitle")}
-            </DialogTitle>
-            <DialogDescription className="text-xs text-gray-500 dark:text-zinc-400 leading-relaxed">
-              {t("missingResumeDescription")}
+            <DialogDescription className="text-xs text-muted-foreground font-normal leading-relaxed pt-1">
+              {tDash("missingResumeDescription")}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="flex flex-row justify-end gap-2 pt-2">
-            <Button
-              variant="outline"
+          <DialogFooter className="flex flex-row items-center justify-end gap-3 pt-3 border-t border-border/40">
+            <button
+              type="button"
               onClick={() => setMissingResumeOpen(false)}
-              className="text-xs font-bold rounded-xl cursor-pointer"
+              className="text-xs font-normal text-muted-foreground hover:text-foreground transition-colors cursor-pointer p-0 bg-transparent border-0"
             >
               {tCommon("cancel")}
-            </Button>
-            <Button
+            </button>
+            <button
+              type="button"
               onClick={() => {
                 setMissingResumeOpen(false);
                 router.push("/dashboard/profile");
               }}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl cursor-pointer"
+              className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors cursor-pointer p-0 bg-transparent border-0"
             >
-              {t("goToProfile")}
-            </Button>
+              {tDash("goToProfile")}
+            </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

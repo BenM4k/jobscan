@@ -59,13 +59,13 @@ export function ExperienceEditor({ experiences, onChange }: ExperienceEditorProp
     <div className="space-y-4">
       {/* Section Header */}
       <div className="flex items-center justify-between">
-        <h4 className="text-[10px] font-mono font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-400">
+        <h4 className="text-xs font-semibold text-slate-700 dark:text-zinc-300 font-sans">
           {t("experienceHeading")}
         </h4>
         <button
           type="button"
           onClick={handleAddRole}
-          className="text-xs font-mono font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+          className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline cursor-pointer font-sans"
         >
           {t("addPosition")}
         </button>
@@ -81,14 +81,14 @@ export function ExperienceEditor({ experiences, onChange }: ExperienceEditorProp
                   placeholder={t("jobTitlePlaceholder")}
                   value={exp.title}
                   onChange={(e) => handleUpdateRole(rIdx, "title", e.target.value)}
-                  className="bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-xs p-2.5 rounded-xl font-bold text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-blue-500 shadow-2xs"
+                  className="bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-base sm:text-xs p-2.5 rounded-xl font-bold text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-blue-500 shadow-2xs"
                 />
                 <input
                   type="text"
                   placeholder={t("companyPlaceholder")}
                   value={exp.company}
                   onChange={(e) => handleUpdateRole(rIdx, "company", e.target.value)}
-                  className="bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-xs p-2.5 rounded-xl text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 shadow-2xs"
+                  className="bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-base sm:text-xs p-2.5 rounded-xl text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 shadow-2xs"
                 />
                 <input
                   type="text"
@@ -102,7 +102,7 @@ export function ExperienceEditor({ experiences, onChange }: ExperienceEditorProp
                       handleUpdateRole(rIdx, "startDate", val);
                     }
                   }}
-                  className="bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-xs p-2.5 rounded-xl text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 shadow-2xs"
+                  className="bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-base sm:text-xs p-2.5 rounded-xl text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 shadow-2xs"
                 />
               </div>
 
@@ -126,7 +126,7 @@ export function ExperienceEditor({ experiences, onChange }: ExperienceEditorProp
                     value={bullet}
                     onChange={(e) => handleBulletChange(rIdx, bIdx, e.target.value)}
                     placeholder="Describe specific achievements, responsibilities, metrics..."
-                    className="flex-1 bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-xs p-2 rounded-xl text-slate-700 dark:text-zinc-300 focus:outline-none focus:border-blue-500 shadow-2xs"
+                    className="flex-1 bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-base sm:text-xs p-2 rounded-xl text-slate-700 dark:text-zinc-300 focus:outline-none focus:border-blue-500 shadow-2xs"
                   />
                   <button
                     type="button"

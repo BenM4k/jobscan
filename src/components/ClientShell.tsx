@@ -100,7 +100,7 @@ export function ClientShell({ children }: ClientShellProps) {
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t("searchPlaceholder")}
             aria-label={t("searchPlaceholder")}
-            className="w-full bg-transparent text-gray-900 dark:text-slate-100 text-sm font-normal focus:outline-none placeholder-gray-400 dark:placeholder-zinc-500"
+            className="w-full bg-transparent text-gray-900 dark:text-slate-100 text-base sm:text-sm font-normal focus:outline-none placeholder-gray-400 dark:placeholder-zinc-500"
           />
         </div>
 

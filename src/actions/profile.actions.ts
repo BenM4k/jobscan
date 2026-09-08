@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/auth-guard";
 import * as profileService from "@/services/profile.service";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { formatProfileDateRange } from "@/lib/date-format";
 
 const updateProfileSchema = z.object({
   resumeText: z.string().min(10, "Resume text must be at least 10 characters"),
@@ -47,6 +48,32 @@ export async function saveProfileTextAction(formData: FormData) {
   return { success: true, data: reformatResult.value };
 }
 
+const educationItemSchema = z.object({
+  institution: z.string(),
+  degree: z.string(),
+  field: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+});
+
+const experienceItemSchema = z.object({
+  company: z.string(),
+  title: z.string(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  bullets: z.array(z.string()).default([]),
+});
+
+const saveMasterResumeSchema = z.object({
+  summary: z.string().default(""),
+  skills: z.array(z.string()).default([]),
+  education: z.array(educationItemSchema).optional().default([]),
+  experience: z.array(experienceItemSchema).optional().default([]),
+  rawText: z.string().optional(),
+  resumeText: z.string().optional(),
+  aiProvider: z.string().optional(),
+});
+
 export async function saveMasterResumeAction(data: {
   summary: string;
   skills: string[];
@@ -59,30 +86,39 @@ export async function saveMasterResumeAction(data: {
   const sessionResult = await requireSession();
   if (!sessionResult.ok || !sessionResult.value) return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
 
+  const parsed = saveMasterResumeSchema.safeParse(data);
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: parsed.error.issues[0]?.message || "Invalid resume data",
+    };
+  }
+
+  const validData = parsed.data;
   const profileDal = await import("@/dal/profile.dal");
   
   // Format readable text if not provided
-  let formattedResume = data.resumeText || "";
+  let formattedResume = validData.resumeText || "";
   if (!formattedResume) {
-    const summaryBlock = data.summary ? `## Professional Summary\n${data.summary}` : "";
-    const skillsBlock = data.skills?.length ? `## Core Skills\n${data.skills.join(", ")}` : "";
-    const expBlock = data.experience?.length
+    const summaryBlock = validData.summary ? `## Professional Summary\n${validData.summary}` : "";
+    const skillsBlock = validData.skills?.length ? `## Core Skills\n${validData.skills.join(", ")}` : "";
+    const expBlock = validData.experience?.length
       ? `## Work Experience\n\n` +
-        data.experience
-          .map(
-            (exp) =>
-              `### ${exp.title} — ${exp.company}${exp.startDate || exp.endDate ? ` (${[exp.startDate, exp.endDate].filter(Boolean).join(" - ")})` : ""}\n` +
-              exp.bullets.map((b) => `• ${b}`).join("\n")
-          )
+        validData.experience
+          .map((exp) => {
+            const dateRange = formatProfileDateRange(exp.startDate, exp.endDate);
+            return `### ${exp.title} — ${exp.company}${dateRange ? ` (${dateRange})` : ""}\n` +
+              exp.bullets.map((b) => `• ${b}`).join("\n");
+          })
           .join("\n\n")
       : "";
-    const eduBlock = data.education?.length
+    const eduBlock = validData.education?.length
       ? `## Education\n\n` +
-        data.education
-          .map(
-            (edu) =>
-              `• ${edu.degree}${edu.field ? ` in ${edu.field}` : ""} — ${edu.institution}${edu.startDate || edu.endDate ? ` (${[edu.startDate, edu.endDate].filter(Boolean).join(" - ")})` : ""}`
-          )
+        validData.education
+          .map((edu) => {
+            const dateRange = formatProfileDateRange(edu.startDate, edu.endDate);
+            return `• ${edu.degree}${edu.field ? ` in ${edu.field}` : ""} — ${edu.institution}${dateRange ? ` (${dateRange})` : ""}`;
+          })
           .join("\n")
       : "";
 
@@ -92,13 +128,13 @@ export async function saveMasterResumeAction(data: {
   const userId = sessionResult.value.user.id;
 
   const result = await profileDal.upsertProfile(userId, {
-    summary: data.summary,
-    skills: data.skills,
-    education: data.education || [],
-    experience: data.experience || [],
-    rawText: data.rawText || formattedResume,
+    summary: validData.summary,
+    skills: validData.skills,
+    education: validData.education,
+    experience: validData.experience,
+    rawText: validData.rawText || formattedResume,
     resumeText: formattedResume,
-    aiProvider: data.aiProvider || "gemini",
+    aiProvider: validData.aiProvider || "gemini",
   });
 
   if (!result.ok) {

@@ -33,13 +33,13 @@ export function EducationEditor({ education, onChange }: EducationEditorProps) {
     <div className="space-y-4">
       {/* Section Header */}
       <div className="flex items-center justify-between">
-        <h4 className="text-[10px] font-mono font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-400">
+        <h4 className="text-xs font-semibold text-slate-700 dark:text-zinc-300 font-sans">
           {t("educationHeading")}
         </h4>
         <button
           type="button"
           onClick={handleAddEdu}
-          className="text-xs font-mono font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+          className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline cursor-pointer font-sans"
         >
           {t("addEducation")}
         </button>
@@ -54,14 +54,14 @@ export function EducationEditor({ education, onChange }: EducationEditorProps) {
                 placeholder={t("degreePlaceholder")}
                 value={edu.degree}
                 onChange={(e) => handleUpdateEdu(idx, "degree", e.target.value)}
-                className="bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-xs p-2.5 rounded-xl font-bold text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-blue-500 shadow-2xs"
+                className="bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-base sm:text-xs p-2.5 rounded-xl font-bold text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-blue-500 shadow-2xs"
               />
               <input
                 type="text"
                 placeholder={t("institutionPlaceholder")}
                 value={edu.institution}
                 onChange={(e) => handleUpdateEdu(idx, "institution", e.target.value)}
-                className="bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-xs p-2.5 rounded-xl text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 shadow-2xs"
+                className="bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-base sm:text-xs p-2.5 rounded-xl text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 shadow-2xs"
               />
               <input
                 type="text"
@@ -75,7 +75,7 @@ export function EducationEditor({ education, onChange }: EducationEditorProps) {
                     handleUpdateEdu(idx, "endDate", val);
                   }
                 }}
-                className="bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-xs p-2.5 rounded-xl text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 shadow-2xs"
+                className="bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-base sm:text-xs p-2.5 rounded-xl text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 shadow-2xs"
               />
             </div>
             <button

@@ -42,6 +42,7 @@ export async function upsertCanonicalJob(
       description: data.description || "",
       postedAt: data.postedAt || null,
       location,
+      rawSalaryText: data.rawSalaryText || null,
       status: "active",
       simhash: data.simhash ? sql`${data.simhash}::numeric` : null,
       addedByUserId: data.source === "manual" ? data.userId || null : null,
@@ -55,6 +56,10 @@ export async function upsertCanonicalJob(
         description: data.description || "",
         postedAt: data.postedAt || null,
         location,
+        rawSalaryText:
+          data.rawSalaryText !== undefined
+            ? (data.rawSalaryText || null)
+            : sql`${job.rawSalaryText}`,
         simhash: data.simhash
           ? sql`${data.simhash}::numeric`
           : sql`${job.simhash}`,
@@ -87,7 +92,9 @@ export async function upsertCanonicalJobWithSimhashDedup(
 
     const locationParts = [data.city, data.country].filter(Boolean);
     const location =
-      locationParts.length > 0 ? locationParts.join(", ") : data.city || null;
+      locationParts.length > 0
+        ? locationParts.join(", ")
+        : data.location || data.city || null;
 
     const res = await db.transaction(async (tx) => {
       // Advisory transaction lock serialized per Postgres connection
@@ -124,6 +131,7 @@ export async function upsertCanonicalJobWithSimhashDedup(
           description: data.description || "",
           postedAt: data.postedAt || null,
           location,
+          rawSalaryText: data.rawSalaryText || null,
           status: "active",
           simhash: data.simhash ? sql`${data.simhash}::numeric` : null,
           addedByUserId: data.source === "manual" ? data.userId || null : null,
@@ -137,6 +145,10 @@ export async function upsertCanonicalJobWithSimhashDedup(
             description: data.description || "",
             postedAt: data.postedAt || null,
             location,
+            rawSalaryText:
+              data.rawSalaryText !== undefined
+                ? (data.rawSalaryText || null)
+                : sql`${job.rawSalaryText}`,
             simhash: data.simhash
               ? sql`${data.simhash}::numeric`
               : sql`${job.simhash}`,
@@ -207,7 +219,9 @@ export async function upsertJob(
 
     const locationParts = [data.city, data.country].filter(Boolean);
     const location =
-      locationParts.length > 0 ? locationParts.join(", ") : data.city || null;
+      locationParts.length > 0
+        ? locationParts.join(", ")
+        : data.location || data.city || null;
 
     const canonical = await upsertCanonicalJob(data, location);
     if (!canonical) {

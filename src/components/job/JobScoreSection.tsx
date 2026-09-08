@@ -2,6 +2,7 @@
 
 import React from "react";
 import { JobSelect } from "@/dal/jobs.dal";
+import { Sparkles, Check, AlertCircle, RotateCcw } from "lucide-react";
 import { getScoreBadgeStyle } from "@/lib/score-style";
 import { useTranslations } from "next-intl";
 
@@ -18,160 +19,141 @@ export function JobScoreSection({
   scoringError,
   onScoreJob,
 }: JobScoreSectionProps) {
-  const isScored = job.fitScore !== null && job.fitScore !== undefined;
   const t = useTranslations("jobDetail");
+  const isScored = job.fitScore !== null && job.fitScore !== undefined;
+  const scoreStyle = isScored ? getScoreBadgeStyle(job.fitScore!) : null;
 
   return (
-    <section aria-labelledby="ai-match-score-heading" className="space-y-4">
+    <section aria-label={t("qualificationMatch")} className="py-4 space-y-3">
+      {/* Trigger Row */}
+      {/* Header Row: Icon (18px) + Title (text-sm font-medium) + Description (text-sm text-muted) */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <Sparkles className="size-4.5 text-muted-foreground dark:text-zinc-400 shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <h2 className="text-sm font-medium text-foreground dark:text-zinc-100 font-sans">
+              {t("qualificationMatch")}
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-zinc-400 font-normal leading-relaxed max-w-xl font-sans">
+              {t("scoreSubtitle")}
+            </p>
+          </div>
+        </div>
+
+        <div className="shrink-0 pt-0.5">
+          {isScoring ? (
+            <span className="text-sm font-normal text-muted-foreground inline-flex items-center gap-1.5 font-sans">
+              <Sparkles className="size-4.5 animate-spin text-blue-600 dark:text-blue-400 shrink-0" />
+              <span>{t("scoring")}</span>
+            </span>
+          ) : isScored && scoreStyle ? (
+            <span
+              className={`text-base sm:text-lg font-semibold font-sans ${scoreStyle.textColor}`}
+            >
+              {t("matchPercent", { score: job.fitScore ?? 0 })}
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={onScoreJob}
+              className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer font-sans"
+            >
+              <span>{t("scoreMatch")}</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Warning/Error Notice */}
       {scoringError && (
-        <div
-          role="alert"
-          aria-live="polite"
-          className="p-3.5 bg-rose-50 dark:bg-rose-950/80 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-200 text-xs font-semibold rounded-xl flex items-center justify-between shadow-xs"
-        >
-          <span>⚠️ {scoringError}</span>
+        <div className="flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400 font-normal pt-1">
+          <AlertCircle className="size-4.5 shrink-0" />
+          <span>{scoringError}</span>
         </div>
       )}
 
-      {/* Main Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="text-base text-indigo-600 dark:text-indigo-400 font-bold">✧</span>
-            <h3
-              id="ai-match-score-heading"
-              className="text-sm sm:text-base font-bold text-gray-900 dark:text-white"
-            >
-              {t("scoreHeading")}
-            </h3>
+      {/* Lightweight Loading State */}
+      {isScoring && (
+        <div className="pt-2 pb-1 space-y-2">
+          <div className="h-0.5 w-full bg-blue-600/10 dark:bg-blue-400/10 overflow-hidden rounded-full">
+            <div className="h-full w-1/3 bg-blue-600 dark:bg-blue-400 animate-pulse" />
           </div>
-          <p className="text-xs text-gray-600 dark:text-zinc-400 max-w-xl leading-relaxed">
-            Run Gemini 3.8 Flash to evaluate your Master Resume against this job posting,
-            identify matched/missing skill keywords, and compute a qualification fit score.
-          </p>
+          <div className="space-y-1.5 pt-1">
+            <div className="w-4/5 h-3 rounded bg-muted animate-pulse" />
+            <div className="w-2/3 h-3 rounded bg-muted animate-pulse" />
+          </div>
         </div>
+      )}
 
-        <button
-          type="button"
-          onClick={onScoreJob}
-          disabled={isScoring}
-          className="bg-[#dbeafe] dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/80 border border-indigo-200/80 dark:border-indigo-800/80 font-semibold text-xs px-4 py-2.5 rounded-xl transition inline-flex items-center justify-center gap-1.5 shrink-0 shadow-xs cursor-pointer disabled:opacity-50 self-start sm:self-auto"
-        >
-          {isScoring ? (
-            <>
-              <span className="w-2 h-2 rounded-full bg-indigo-600 animate-ping" />
-              <span>{t("scoringWithAi")}</span>
-            </>
-          ) : isScored ? (
-            <>
-              <span>✧</span>
-              <span>{t("reScore")} ({job.fitScore}%)</span>
-            </>
-          ) : (
-            <>
-              <span>✧</span>
-              <span>Score with Gemini Flash</span>
-            </>
+      {/* Inline Generated Content */}
+      {isScored && !isScoring && (
+        <div className="pt-2 space-y-3 font-sans">
+          {job.scoreReasoning && (
+            <p className="text-sm text-gray-600 dark:text-zinc-300 font-normal leading-relaxed">
+              {job.scoreReasoning}
+            </p>
           )}
-        </button>
-      </div>
 
-      {/* Scored Breakdown Details Card */}
-      {isScored && (
-        (() => {
-          const scoreStyle = getScoreBadgeStyle(job.fitScore!);
-          return (
-            <div
-              className={`p-5 sm:p-6 rounded-2xl border space-y-4 transition shadow-xs mt-3 ${scoreStyle.bgColor} ${scoreStyle.borderColor}`}
-            >
-              {/* Header with Score Ring/Badge */}
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-black/10 dark:border-white/10 flex items-center justify-center font-black text-sm shadow-xs font-mono">
-                  <span className={scoreStyle.textColor}>{job.fitScore}%</span>
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-gray-900 dark:text-slate-100">
-                    Qualification Fit Assessment
-                  </h4>
-                  <p className="text-[11px] text-gray-600 dark:text-zinc-400">
-                    Evaluated against your Master Resume
-                  </p>
-                </div>
+          {/* Matched & Missing Skills Breakdown */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1 text-sm font-normal">
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5 text-foreground dark:text-zinc-100 font-medium">
+                <Check className="size-4.5 text-muted-foreground dark:text-zinc-400 shrink-0" />
+                <span>
+                  {t("matchedSkills")} ({job.matchedSkills?.length || 0})
+                </span>
               </div>
-
-              {/* Matched & Missing Skills Breakdown Tags */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-black/5 dark:border-white/5">
-                <div className="space-y-1.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-1">
-                    <span>✓</span>
-                    <span>{t("matchedSkills")} ({job.matchedSkills?.length || 0})</span>
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {job.matchedSkills?.length ? (
-                      job.matchedSkills.map((skill, i) => (
-                        <span
-                          key={i}
-                          className="text-[11px] bg-emerald-100/80 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-800 px-2 py-0.5 rounded-md font-medium"
-                        >
-                          {skill}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-xs text-gray-500 italic">None specifically parsed</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-rose-800 dark:text-rose-300 flex items-center gap-1">
-                    <span>!</span>
-                    <span>{t("missingSkills")} ({job.missingSkills?.length || 0})</span>
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {job.missingSkills?.length ? (
-                      job.missingSkills.map((skill, i) => (
-                        <span
-                          key={i}
-                          className="text-[11px] bg-rose-100/80 dark:bg-rose-950/80 text-rose-800 dark:text-rose-200 border border-rose-300 dark:border-rose-800 px-2 py-0.5 rounded-md font-medium"
-                        >
-                          {skill}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-xs text-gray-500 italic">No significant missing skills</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Gaps Analysis */}
-              {Array.isArray(job.gaps) && job.gaps.length > 0 && (
-                <div className="space-y-1 pt-2 border-t border-black/5 dark:border-white/5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">
-                    {t("gapsAnalysis")}
-                  </span>
-                  <ul className="list-disc pl-4 space-y-0.5 text-xs text-gray-800 dark:text-slate-200">
-                    {job.gaps.map((gap, i) => (
-                      <li key={i}>{gap}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Reasoning */}
-              {job.scoreReasoning && (
-                <div className="pt-2 border-t border-black/5 dark:border-white/5 space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-700 dark:text-slate-300">
-                    {t("reasoning")}
-                  </span>
-                  <p className="text-xs text-gray-800 dark:text-slate-200 leading-relaxed font-sans">
-                    {job.scoreReasoning}
-                  </p>
-                </div>
-              )}
+              <p className="text-gray-600 dark:text-zinc-300 leading-relaxed pl-6">
+                {job.matchedSkills?.length
+                  ? job.matchedSkills.join(", ")
+                  : t("noneIdentified")}
+              </p>
             </div>
-          );
-        })()
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5 text-foreground dark:text-zinc-100 font-medium">
+                <AlertCircle className="size-4.5 text-muted-foreground dark:text-zinc-400 shrink-0" />
+                <span>
+                  {t("missingSkills")} ({job.missingSkills?.length || 0})
+                </span>
+              </div>
+              <p className="text-gray-600 dark:text-zinc-300 leading-relaxed pl-6">
+                {job.missingSkills?.length
+                  ? job.missingSkills.join(", ")
+                  : t("noneIdentified")}
+              </p>
+            </div>
+          </div>
+
+          {/* Gaps Analysis */}
+          {Array.isArray(job.gaps) && job.gaps.length > 0 && (
+            <div className="pt-1 space-y-1 text-sm font-normal">
+              <div className="text-foreground dark:text-zinc-100 font-medium">
+                {t("gapsAnalysis")}
+              </div>
+              <ul className="space-y-1 text-gray-600 dark:text-zinc-300 pl-4">
+                {job.gaps.map((gap, i) => (
+                  <li key={i} className="list-disc leading-relaxed">
+                    {gap}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Actions Directly Below Content, Separated by Divider */}
+          <div className="pt-3 border-t border-border/40 flex items-center gap-4">
+            <button
+              type="button"
+              onClick={onScoreJob}
+              disabled={isScoring}
+              className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer disabled:opacity-50 font-sans"
+            >
+              <RotateCcw className="size-4.5 shrink-0" />
+              <span>{t("reScore")}</span>
+            </button>
+          </div>
+        </div>
       )}
     </section>
   );
