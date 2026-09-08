@@ -54,13 +54,13 @@ export function ProfileHeader({
     if (typeof window !== "undefined" && navigator.clipboard) {
       try {
         await navigator.clipboard.writeText(window.location.href);
-        toast.success("Profile link copied to clipboard");
+        toast.success(t("copiedLink"));
       } catch (err) {
         console.error("Failed to copy profile link:", err);
-        toast.error("Failed to copy profile link");
+        toast.error(t("copyLinkFailed"));
       }
     } else {
-      toast.error("Clipboard access not available");
+      toast.error(t("clipboardUnavailable"));
     }
   };
 

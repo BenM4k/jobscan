@@ -56,7 +56,10 @@ export async function upsertCanonicalJob(
         description: data.description || "",
         postedAt: data.postedAt || null,
         location,
-        rawSalaryText: data.rawSalaryText || null,
+        rawSalaryText:
+          data.rawSalaryText !== undefined
+            ? (data.rawSalaryText || null)
+            : sql`${job.rawSalaryText}`,
         simhash: data.simhash
           ? sql`${data.simhash}::numeric`
           : sql`${job.simhash}`,
@@ -142,7 +145,10 @@ export async function upsertCanonicalJobWithSimhashDedup(
             description: data.description || "",
             postedAt: data.postedAt || null,
             location,
-            rawSalaryText: data.rawSalaryText || null,
+            rawSalaryText:
+              data.rawSalaryText !== undefined
+                ? (data.rawSalaryText || null)
+                : sql`${job.rawSalaryText}`,
             simhash: data.simhash
               ? sql`${data.simhash}::numeric`
               : sql`${job.simhash}`,

@@ -1,5 +1,8 @@
+"use client";
+
 import React from "react";
 import { Sparkles, Zap } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { AiUsageCard } from "@/components/shared/AiUsageCard";
 import type { UserAiUsage } from "@/services/ai/usage.service";
 
@@ -11,33 +14,6 @@ export interface AiUsageProgressProps {
   showDetails?: boolean;
 }
 
-const STATUS_CONFIGS = {
-  high: {
-    bar: "bg-rose-600",
-    text: "text-rose-600 dark:text-rose-400",
-    badge: "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/60",
-    statusText: "Near limit",
-  },
-  medium: {
-    bar: "bg-amber-500",
-    text: "text-amber-600 dark:text-amber-400",
-    badge: "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60",
-    statusText: "High usage",
-  },
-  normal: {
-    bar: "bg-blue-600",
-    text: "text-blue-600 dark:text-blue-400",
-    badge: "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/60",
-    statusText: "Normal",
-  },
-};
-
-function getStatusClasses(percent: number) {
-  if (percent >= 90) return STATUS_CONFIGS.high;
-  if (percent >= 70) return STATUS_CONFIGS.medium;
-  return STATUS_CONFIGS.normal;
-}
-
 export function AiUsageProgress({
   usage,
   error = false,
@@ -45,6 +21,8 @@ export function AiUsageProgress({
   className = "",
   showDetails = true,
 }: AiUsageProgressProps) {
+  const t = useTranslations("aiUsage");
+
   if (error) {
     if (variant === "sidebar") {
       return (
@@ -56,7 +34,7 @@ export function AiUsageProgress({
             </span>
           </div>
           <div className="rounded-lg border border-red-200 dark:border-red-900/40 bg-red-50/50 dark:bg-red-950/20 p-2.5 text-xs text-red-600 dark:text-red-400">
-            Failed to load AI usage details.
+            {t("sidebarError")}
           </div>
         </div>
       );
@@ -64,13 +42,13 @@ export function AiUsageProgress({
     if (variant === "compact") {
       return (
         <div className={`text-xs text-red-500 ${className}`}>
-          Failed to load AI credits.
+          {t("compactError")}
         </div>
       );
     }
     return (
       <div className={`rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50/50 dark:bg-red-950/20 p-6 text-sm text-red-600 dark:text-red-400 ${className}`}>
-        Failed to load AI usage details. Please refresh the page to retry.
+        {t("cardError")}
       </div>
     );
   }
@@ -81,7 +59,21 @@ export function AiUsageProgress({
   const percentUsed = usage?.percentUsed ?? Math.min(100, Math.round((usedCount / monthlyLimit) * 100));
   const totalTokens = usage?.totalTokens ?? 0;
   const totalCostEstimateUsd = usage?.totalCostEstimateUsd ?? "0.0000";
-  const status = getStatusClasses(percentUsed);
+
+  const status = {
+    bar: percentUsed >= 90 ? "bg-rose-600" : percentUsed >= 70 ? "bg-amber-500" : "bg-blue-600",
+    text: percentUsed >= 90 ? "text-rose-600 dark:text-rose-400" : percentUsed >= 70 ? "text-amber-600 dark:text-amber-400" : "text-blue-600 dark:text-blue-400",
+    badge: percentUsed >= 90
+      ? "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/60"
+      : percentUsed >= 70
+      ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60"
+      : "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/60",
+    statusText: percentUsed >= 90
+      ? t("statusNearLimit")
+      : percentUsed >= 70
+      ? t("statusHighUsage")
+      : t("statusNormal"),
+  };
 
   // Variant: Sidebar
   if (variant === "sidebar") {

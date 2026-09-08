@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth-guard";
 import { runWithIdempotency } from "@/services/idempotency.service";
 import { generateTailoredResume } from "@/services/tailoring.service";
+import * as jobService from "@/services/job.service";
 import * as jobsDal from "@/dal/jobs.dal";
 import { ok } from "@/lib/result";
 
@@ -141,9 +142,22 @@ export async function PUT(
     }
 
     const { id } = await params;
-    const body = await req.json();
-    const tailoredResume = body.tailoredResume;
 
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json(
+        { error: "Request body must be an object" },
+        { status: 400 },
+      );
+    }
+
+    const tailoredResume = (body as Record<string, unknown>).tailoredResume;
     if (typeof tailoredResume !== "string") {
       return NextResponse.json(
         { error: "Invalid tailored resume content" },
@@ -151,10 +165,9 @@ export async function PUT(
       );
     }
 
-    const updateRes = await jobsDal.updateJobTailoredResume(
+    const updateRes = await jobService.updateTailoredResume(
       id,
       tailoredResume,
-      null,
       sessionResult.value.user.id
     );
     if (!updateRes.ok) {

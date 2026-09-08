@@ -50,7 +50,7 @@ export function JobScoreSection({
             <span
               className={`text-base sm:text-lg font-semibold font-sans ${scoreStyle.textColor}`}
             >
-              {job.fitScore}% match
+              {t("matchPercent", { score: job.fitScore ?? 0 })}
             </span>
           ) : (
             <button

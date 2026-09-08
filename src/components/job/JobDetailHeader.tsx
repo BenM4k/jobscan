@@ -10,7 +10,7 @@ import {
   ArrowUpRight,
   ChevronDown,
 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -26,6 +26,7 @@ interface JobDetailHeaderProps {
 export function JobDetailHeader({ job, onStatusChange }: JobDetailHeaderProps) {
   const t = useTranslations("jobDetail");
   const tDash = useTranslations("dashboard");
+  const locale = useLocale();
 
   const statusOptions: { id: JobStatus; label: string }[] = [
     { id: "new", label: tDash("statusNew") },
@@ -87,7 +88,7 @@ export function JobDetailHeader({ job, onStatusChange }: JobDetailHeaderProps) {
                 <Calendar className="size-4.5 shrink-0 text-muted-foreground" />
                 <span>
                   {t("posted")}{" "}
-                  {new Date(job.postedAt).toLocaleDateString("en-US", {
+                  {new Date(job.postedAt).toLocaleDateString(locale, {
                     month: "short",
                     day: "numeric",
                     year: "numeric",

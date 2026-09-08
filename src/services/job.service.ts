@@ -324,3 +324,17 @@ export async function transitionJobStatus(
 
   return await jobsDal.updateJobStatus(jobId, targetStatus);
 }
+
+export async function updateTailoredResume(
+  jobId: string,
+  tailoredResume: string,
+  userId: string,
+  structured?: jobsDal.TailoredResumeData | null,
+): Promise<Result<jobsDal.JobSelect, AppError>> {
+  return await jobsDal.updateJobTailoredResume(
+    jobId,
+    tailoredResume,
+    structured ?? null,
+    userId
+  );
+}

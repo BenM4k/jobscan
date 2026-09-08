@@ -93,11 +93,13 @@ function sanitizeDescription(rawHtml?: string | null): string {
             if (attrName.startsWith("on") || !allowedAttrs.has(attrName)) {
               el.removeAttribute(attr.name);
             } else if (attrName === "href") {
-              const val = attr.value.trim().toLowerCase();
+              const normalizedVal = attr.value
+                .replace(/[\u0000-\u001F\u007F\s]+/g, "")
+                .toLowerCase();
               if (
-                val.startsWith("javascript:") ||
-                val.startsWith("data:") ||
-                val.startsWith("vbscript:")
+                normalizedVal.startsWith("javascript:") ||
+                normalizedVal.startsWith("data:") ||
+                normalizedVal.startsWith("vbscript:")
               ) {
                 el.removeAttribute(attr.name);
               } else {

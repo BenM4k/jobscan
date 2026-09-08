@@ -1,5 +1,8 @@
+"use client";
+
 import React from "react";
 import { Sparkles, Cpu, Zap, Activity } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { StatBox } from "@/components/shared/StatBox";
 
 export interface AiUsageCardProps {
@@ -30,6 +33,8 @@ export function AiUsageCard({
   showDetails = true,
   className = "",
 }: AiUsageCardProps) {
+  const t = useTranslations("aiUsage");
+
   return (
     <div
       className={`bg-white dark:bg-[#121216] rounded-2xl border border-slate-200 dark:border-zinc-800/80 p-6 shadow-2xs transition-all ${className}`}
@@ -39,13 +44,13 @@ export function AiUsageCard({
         <div>
           <h2 className="text-base font-bold text-gray-900 dark:text-zinc-100 flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
-            <span>AI Usage & Monthly Allowance</span>
+            <span>{t("title")}</span>
             <span className={`text-xs font-medium px-2.5 py-0.5 rounded-md border ${status.badge}`}>
               {status.statusText}
             </span>
           </h2>
           <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
-            Track your monthly allocation for scoring, resume tailoring, and custom cover letters.
+            {t("description")}
           </p>
         </div>
         <div className="hidden sm:flex flex-col items-end">
