@@ -36,7 +36,7 @@ export async function setActiveResumeAction(resumeId: string) {
     return { success: false, error: res.error.message };
   }
 
-  revalidatePath("/resumes");
+  revalidatePath("/dashboard/resumes");
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/profile");
   return { success: true, data: true };
@@ -74,14 +74,14 @@ export async function createMasterResumeAction(data: {
       version: 1,
       source: "uploaded",
     },
-    data.skills
+    parsed.data.skills
   );
 
   if (!res.ok) {
     return { success: false, error: res.error.message };
   }
 
-  revalidatePath("/resumes");
+  revalidatePath("/dashboard/resumes");
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/profile");
   return { success: true, data: res.value };
@@ -113,14 +113,14 @@ export async function updateMasterResumeAction(data: {
       ...(parsed.data.content ? { content: parsed.data.content } : {}),
       ...(parsed.data.language ? { language: parsed.data.language } : {}),
     },
-    data.skills
+    parsed.data.skills
   );
 
   if (!res.ok) {
     return { success: false, error: res.error.message };
   }
 
-  revalidatePath("/resumes");
+  revalidatePath("/dashboard/resumes");
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/profile");
   return { success: true, data: res.value };
@@ -153,7 +153,7 @@ export async function promoteTailoredResumeAction(
     return { success: false, error: res.error.message };
   }
 
-  revalidatePath("/resumes");
+  revalidatePath("/dashboard/resumes");
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/profile");
 
@@ -184,7 +184,7 @@ export async function revertActiveResumeAction(previousActiveId: string) {
     return { success: false, error: res.error.message };
   }
 
-  revalidatePath("/resumes");
+  revalidatePath("/dashboard/resumes");
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/profile");
   return { success: true, data: true };
@@ -209,7 +209,7 @@ export async function deleteMasterResumeAction(resumeId: string): Promise<
     return { success: false, error: res.error.message };
   }
 
-  revalidatePath("/resumes");
+  revalidatePath("/dashboard/resumes");
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/profile");
   return { success: true, data: res.value };

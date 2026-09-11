@@ -4,7 +4,12 @@ import {
   buildCoverLetterInstructions,
   buildCoverLetterPrompt,
 } from "@/services/tailoring.service";
-import { tailoredCoverLetterActionSchema } from "@/actions/job.schema";
+import {
+  tailoredCoverLetterActionSchema,
+  coverLetterPromptFieldsSchema,
+  coverLetterInstructionsSchema,
+  coverLetterToneSchema,
+} from "@/actions/job.schema";
 
 describe("Cover Letter Regeneration Unit Tests", () => {
   test("buildCoverLetterInstructions generates baseline instructions for new cover letter", () => {
@@ -107,6 +112,58 @@ describe("Cover Letter Regeneration Unit Tests", () => {
       idempotencyKey: "bad-key",
     });
     assert.ok(!invalid.success);
+
+    // Tone validation: accepts executive and confident, rejects excessively long strings
+    const validTone1 = tailoredCoverLetterActionSchema.safeParse({
+      jobId: validJobId,
+      idempotencyKey: validKey,
+      tone: "executive",
+    });
+    assert.ok(validTone1.success);
+    assert.equal(validTone1.data.tone, "executive");
+
+    const validTone2 = tailoredCoverLetterActionSchema.safeParse({
+      jobId: validJobId,
+      idempotencyKey: validKey,
+      tone: "confident",
+    });
+    assert.ok(validTone2.success);
+    assert.equal(validTone2.data.tone, "confident");
+
+    const invalidTone = tailoredCoverLetterActionSchema.safeParse({
+      jobId: validJobId,
+      idempotencyKey: validKey,
+      tone: "a".repeat(51),
+    });
+    assert.ok(!invalidTone.success, "Tone longer than 50 chars must fail validation");
+
+    // Instructions validation: accepts bounded string, rejects excessively long instructions
+    const validInstructions = tailoredCoverLetterActionSchema.safeParse({
+      jobId: validJobId,
+      idempotencyKey: validKey,
+      instructions: "Highlight full-stack TypeScript experience",
+    });
+    assert.ok(validInstructions.success);
+
+    const invalidInstructions = tailoredCoverLetterActionSchema.safeParse({
+      jobId: validJobId,
+      idempotencyKey: validKey,
+      instructions: "x".repeat(1001),
+    });
+    assert.ok(!invalidInstructions.success, "Instructions exceeding 1000 chars must fail validation");
+
+    // Shared API route schema parsing path
+    const apiValid = coverLetterPromptFieldsSchema.safeParse({
+      instructions: "Short prompt instructions",
+      tone: "executive",
+    });
+    assert.ok(apiValid.success);
+
+    const apiInvalid = coverLetterPromptFieldsSchema.safeParse({
+      instructions: "x".repeat(1001),
+      tone: "a".repeat(51),
+    });
+    assert.ok(!apiInvalid.success);
   });
 
   test("diffFromPrevious metadata shape is properly structured on regeneration", () => {

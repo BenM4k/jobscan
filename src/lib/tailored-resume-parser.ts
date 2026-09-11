@@ -41,13 +41,15 @@ export function parseTailoredResume(
   let summary = "";
   const experience: string[] = [];
 
-  const summaryMatch = text.match(/##\s*Summary\s*([\s\S]*?)(?=##|$)/i);
+  const summaryMatch = text.match(
+    /##\s*Summary\s*([\s\S]*?)(?=(?:\r?\n|^)##(?!#)|$)/i
+  );
   if (summaryMatch && summaryMatch[1]) {
     summary = summaryMatch[1].trim();
   }
 
   const expMatch = text.match(
-    /##\s*(?:Work Experience|Experience|Relevant Experience)\s*([\s\S]*?)(?=##|$)/i
+    /##\s*(?:Work Experience|Experience|Relevant Experience)\s*([\s\S]*?)(?=(?:\r?\n|^)##(?!#)|$)/i
   );
   if (expMatch && expMatch[1]) {
     const lines = expMatch[1]

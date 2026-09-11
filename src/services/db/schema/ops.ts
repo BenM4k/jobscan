@@ -24,6 +24,7 @@ export const aiFeatureEnum = pgEnum("ai_feature", [
   "tailored_cover_letter",
   "interview_prep",
   "explanation",
+  "embedding",
 ]);
 
 export const aiCallLog = pgTable(

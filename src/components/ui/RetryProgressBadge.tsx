@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, XCircle, AlertCircle, Sparkles } from "lucide-react";
 import type { AsyncJobStatus } from "@/hooks/useAsyncJobWithRetry";
@@ -26,6 +27,8 @@ export function RetryProgressBadge({
   onCancel,
   className = "",
 }: RetryProgressBadgeProps) {
+  const t = useTranslations("retry");
+
   if (status === "idle" || status === "success") {
     return null;
   }
@@ -41,10 +44,10 @@ export function RetryProgressBadge({
           <RefreshCw className="w-4 h-4 text-amber-600 dark:text-amber-400 animate-spin shrink-0" />
           <div className="min-w-0">
             <div className="font-semibold flex items-center gap-1.5">
-              <span>Attempt {attempt} of {totalAttempts}</span>
+              <span>{t("attemptCount", { attempt, total: totalAttempts })}</span>
               {countdown > 0 && (
                 <span className="bg-amber-500/20 text-amber-700 dark:text-amber-300 font-mono px-1.5 py-0.5 rounded text-[11px]">
-                  in {countdown}s
+                  {t("inSeconds", { seconds: countdown })}
                 </span>
               )}
             </div>
@@ -65,7 +68,7 @@ export function RetryProgressBadge({
               onClick={onRetryNow}
               className="h-7 text-xs border-amber-500/40 hover:bg-amber-500/20 text-amber-800 dark:text-amber-200 cursor-pointer"
             >
-              Retry Now
+              {t("retryNow")}
             </Button>
           )}
           {onCancel && (
@@ -77,7 +80,7 @@ export function RetryProgressBadge({
               className="h-7 px-2 text-xs text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 cursor-pointer"
             >
               <XCircle className="w-3.5 h-3.5 mr-1" />
-              Cancel
+              {t("cancel")}
             </Button>
           )}
         </div>
@@ -94,7 +97,7 @@ export function RetryProgressBadge({
       >
         <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 animate-spin shrink-0" />
         <span className="font-medium">
-          Executing retry {attempt} of {totalAttempts}...
+          {t("executingRetry", { attempt, total: totalAttempts })}
         </span>
       </div>
     );
@@ -118,7 +121,7 @@ export function RetryProgressBadge({
             onClick={onRetryNow}
             className="h-6 text-[11px] border-rose-500/40 hover:bg-rose-500/20 text-rose-800 dark:text-rose-200 shrink-0 cursor-pointer"
           >
-            Retry
+            {t("retry")}
           </Button>
         )}
       </div>

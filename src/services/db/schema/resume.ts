@@ -10,6 +10,7 @@ import {
   uniqueIndex,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { timestamps } from "./common";
 import { user } from "./auth";
 import { skill } from "./skills";
@@ -48,6 +49,9 @@ export const masterResume = pgTable(
   },
   (t) => [
     index("master_resume_user_idx").on(t.userId),
+    uniqueIndex("master_resume_user_active_unique_idx")
+      .on(t.userId)
+      .where(sql`${t.isActive} = true`),
   ]
 );
 

@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth-guard";
 import { getMasterResumesAction } from "@/actions/resume.actions";
 import { ResumesManager } from "@/components/resumes/ResumesManager";
@@ -17,7 +18,10 @@ async function ResumesContent() {
 }
 
 export default async function ResumesPage() {
-  await requireSession();
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok || !sessionResult.value) {
+    redirect("/sign-in");
+  }
 
   return (
     <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 w-full space-y-8 z-10">

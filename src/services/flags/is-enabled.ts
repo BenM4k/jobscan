@@ -1,6 +1,6 @@
 import "server-only";
 import * as flagsDal from "@/dal/flags.dal";
-import { cacheGet, cacheSet, cacheDel } from "@/services/cache/redis-client";
+import { cacheGet, cacheSet, cacheDel, getRedisClient } from "@/services/cache/redis-client";
 
 export const FEATURE_FLAG_CACHE_TTL_SECONDS = 60;
 
@@ -44,6 +44,7 @@ export async function isFeatureEnabled(
 
   // 2. Query DB
   let enabled = false;
+  let hasUserAssignment = false;
   try {
     const flag = await flagsDal.getFeatureFlagByKey(flagKey);
     if (!flag) {
@@ -55,6 +56,7 @@ export async function isFeatureEnabled(
       const assignment = await flagsDal.getFeatureFlagAssignment(flag.id, userId);
       if (assignment) {
         enabled = assignment.enabled;
+        hasUserAssignment = true;
       } else {
         enabled = flag.enabledGlobally;
       }
@@ -69,7 +71,26 @@ export async function isFeatureEnabled(
 
   // 3. Write to Redis cache with 60s TTL
   try {
-    await cacheSet(cacheKey, enabled, FEATURE_FLAG_CACHE_TTL_SECONDS);
+    if (!userId) {
+      // Anonymous / global evaluation
+      await cacheSet(cacheKey, enabled, FEATURE_FLAG_CACHE_TTL_SECONDS);
+    } else {
+      // Cache user evaluation
+      await cacheSet(cacheKey, enabled, FEATURE_FLAG_CACHE_TTL_SECONDS);
+
+      // Track evaluated user so global flag invalidation purges all affected user evaluations
+      const client = getRedisClient();
+      if (client) {
+        await client.sadd(`flag:${flagKey}:users`, userId).catch(() => {});
+        await client.expire(`flag:${flagKey}:users`, FEATURE_FLAG_CACHE_TTL_SECONDS).catch(() => {});
+      }
+
+      // If globally-derived, also warm the global/anonymous cache entry
+      if (!hasUserAssignment) {
+        const anonKey = getFeatureFlagCacheKey(flagKey, null);
+        await cacheSet(anonKey, enabled, FEATURE_FLAG_CACHE_TTL_SECONDS);
+      }
+    }
   } catch (err) {
     console.warn(`[Flags] Redis cache write failed for "${cacheKey}":`, err);
   }
@@ -78,15 +99,37 @@ export async function isFeatureEnabled(
 }
 
 /**
- * Invalidate the Redis cache for a user's feature flag evaluation.
+ * Invalidate the Redis cache for a user's feature flag evaluation or all evaluations on global change.
+ * When userId is null/undefined (global change flow), purges the anonymous entry AND all affected user evaluations.
  */
 export async function invalidateFeatureFlagCache(
   flagKey: string,
   userId?: string | null
 ): Promise<void> {
   try {
-    const key = getFeatureFlagCacheKey(flagKey, userId);
-    await cacheDel(key);
+    if (userId) {
+      const key = getFeatureFlagCacheKey(flagKey, userId);
+      await cacheDel(key);
+      const client = getRedisClient();
+      if (client) {
+        await client.srem(`flag:${flagKey}:users`, userId).catch(() => {});
+      }
+    } else {
+      // Global flag-change flow: invalidate anonymous entry and all cached user evaluations
+      const anonKey = getFeatureFlagCacheKey(flagKey, null);
+      const keysToDel: string[] = [anonKey];
+      const client = getRedisClient();
+      if (client) {
+        const users = await client.smembers(`flag:${flagKey}:users`).catch(() => []);
+        if (Array.isArray(users) && users.length > 0) {
+          for (const u of users) {
+            keysToDel.push(getFeatureFlagCacheKey(flagKey, u));
+          }
+        }
+        keysToDel.push(`flag:${flagKey}:users`);
+      }
+      await cacheDel(...keysToDel);
+    }
   } catch (err) {
     console.warn(`[Flags] Failed to invalidate cache for flag "${flagKey}":`, err);
   }

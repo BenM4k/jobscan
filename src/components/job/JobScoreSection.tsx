@@ -73,6 +73,7 @@ export function JobScoreSection({
               selectedResumeId={selectedResumeId}
               onSelectResume={onSelectResume}
               size="sm"
+              disabled={isScoring}
             />
           )}
 
@@ -173,7 +174,7 @@ export function JobScoreSection({
             {resumes && resumes.length > 1 && (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground font-sans">
-                  Persona:
+                  {t("personaPrefix")}
                 </span>
                 <PersonaSelectDropdown
                   resumes={resumes}
@@ -181,6 +182,7 @@ export function JobScoreSection({
                   onSelectResume={onSelectResume}
                   size="xs"
                   showIcon={false}
+                  disabled={isScoring}
                 />
               </div>
             )}

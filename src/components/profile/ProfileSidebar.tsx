@@ -67,12 +67,12 @@ export function ProfileSidebar({
             <FileText className="w-4 h-4 text-slate-400 dark:text-zinc-500 shrink-0 mt-0.5" />
             <div className="space-y-0.5">
               <p className="text-xs font-medium text-slate-900 dark:text-zinc-100">
-                {resumeLabel ? `Master: ${resumeLabel}` : t("editResume")}
+                {resumeLabel ? t("masterLabel", { label: resumeLabel }) : t("editResume")}
               </p>
               <p className="text-xs text-slate-500 dark:text-zinc-400">
                 {resumeVersion ? `v${resumeVersion} • ` : ""}
                 {resumeLanguage ? `${resumeLanguage.toUpperCase()} • ` : ""}
-                {resumeSource === "promoted_tailored" ? "Promoted • " : ""}
+                {resumeSource === "promoted_tailored" ? `${t("promotedBadge")} • ` : ""}
                 {resumeLength > 0 ? `${resumeLength} ${t("charsSaved")}` : `0 ${t("charsSaved")}`}
               </p>
             </div>

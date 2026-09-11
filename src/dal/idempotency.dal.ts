@@ -4,7 +4,7 @@ import { db } from "@/services/db";
 import { idempotencyKey, IdempotencyKeySelect } from "@/services/db/schema";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 export type BeginIdempotencyResult =
   | { type: "locked"; record: IdempotencyKeySelect; attemptId: string }
@@ -265,12 +265,20 @@ export async function reopenIdempotentAction(
         resultRef: null,
         createdAt: new Date(),
       })
-      .where(eq(idempotencyKey.id, id))
+      .where(
+        and(
+          eq(idempotencyKey.id, id),
+          inArray(idempotencyKey.status, ["completed", "failed"])
+        )
+      )
       .returning();
 
     if (!updated) {
       return err(
-        new AppError("NOT_FOUND", `Idempotency record ${id} not found`)
+        new AppError(
+          "CONFLICT",
+          `Idempotency record ${id} cannot be reopened or is already in_progress`
+        )
       );
     }
 

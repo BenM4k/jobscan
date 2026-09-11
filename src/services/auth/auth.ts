@@ -5,7 +5,12 @@ import { db } from "@/services/db";
 import * as schema from "@/services/db/schema";
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY || "re_dummy");
+const resendApiKey = process.env.RESEND_API_KEY?.trim();
+if (!resendApiKey) {
+  throw new Error("RESEND_API_KEY environment variable is required");
+}
+
+const resend = new Resend(resendApiKey);
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {

@@ -104,7 +104,7 @@ export function FetchJobsPopover({
         setFetchFailedSources(failed);
 
         const total = data?.totalUpserted ?? data?.upserted ?? 0;
-        const successCount = sources.filter((s) => !s.skipped).length;
+        const successCount = sources.filter((s) => !s.skipped && !s.error).length;
 
         if (successCount === 0 && sources.length > 0) {
           throw new Error(

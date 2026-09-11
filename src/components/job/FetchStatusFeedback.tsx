@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { AlertCircle, AlertTriangle } from "lucide-react";
 import { RetryProgressBadge } from "@/components/ui/RetryProgressBadge";
 import type { AsyncJobStatus } from "@/hooks/useAsyncJobWithRetry";
@@ -37,6 +38,7 @@ export function FetchStatusFeedback({
   circuitOpenSources = [],
   fetchFailedSources = [],
 }: FetchStatusFeedbackProps) {
+  const t = useTranslations("dashboard");
   const hasCircuitBreaker = circuitOpenSources.length > 0;
   const hasFetchFailed = fetchFailedSources.length > 0;
 
@@ -56,9 +58,11 @@ export function FetchStatusFeedback({
         <div className="flex items-start gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs">
           <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
           <div className="space-y-0.5 min-w-0">
-            <span className="font-semibold">Circuit Breaker Cooldown</span>
+            <span className="font-semibold">{t("circuitBreakerCooldown")}</span>
             <p className="text-[11px] leading-relaxed opacity-90">
-              {circuitOpenSources.map((s) => s.source.toUpperCase()).join(", ")} cooling down due to consecutive external failures.
+              {t("circuitBreakerDesc", {
+                sources: circuitOpenSources.map((s) => s.source.toUpperCase()).join(", "),
+              })}
             </p>
           </div>
         </div>
@@ -68,9 +72,11 @@ export function FetchStatusFeedback({
         <div className="flex items-start gap-2 p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-800 dark:text-rose-200 text-xs">
           <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
           <div className="space-y-0.5 min-w-0">
-            <span className="font-semibold">Source Fetch Unreachable</span>
+            <span className="font-semibold">{t("sourceUnreachable")}</span>
             <p className="text-[11px] leading-relaxed opacity-90">
-              {fetchFailedSources.map((s) => s.source.toUpperCase()).join(", ")} could not be reached.
+              {t("sourceUnreachableDesc", {
+                sources: fetchFailedSources.map((s) => s.source.toUpperCase()).join(", "),
+              })}
             </p>
           </div>
         </div>

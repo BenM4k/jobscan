@@ -156,7 +156,15 @@
     "goToProfile": "Set Up Resume in Profile →",
     "matchedSkills": "Matched Skills",
     "missingSkills": "Missing / Gap Skills",
-    "noneIdentified": "None identified"
+    "noneIdentified": "None identified",
+    "bgIngestionActive": "Background Ingestion Active",
+    "bgIngestionDesc": "Job boards are being queried in the background. Check status below.",
+    "checkingBgIngestion": "Checking Background Ingestion...",
+    "checkForIngestedJobs": "Check for Ingested Jobs",
+    "circuitBreakerCooldown": "Circuit Breaker Cooldown",
+    "circuitBreakerDesc": "{sources} cooling down due to consecutive external failures.",
+    "sourceUnreachable": "Source Fetch Unreachable",
+    "sourceUnreachableDesc": "{sources} could not be reached."
   },
   "addJob": {
     "sourceManual": "Source: Manual entry",
@@ -230,7 +238,14 @@
     "yearPlaceholder": "Year / Period (e.g. 2018 - 2022)",
     "deleteResumeModalTitle": "Clear Master Resume?",
     "deleteResumeModalDescription": "This action will permanently delete your stored master resume text, parsed skills, work experience, and education from your profile. Are you sure you want to proceed?",
-    "deleteResumeConfirm": "Clear Resume"
+    "deleteResumeConfirm": "Clear Resume",
+    "defaultResumeLabel": "Default",
+    "activeMasterResumeTitle": "Active Master Resume",
+    "masterVersionBadge": "Master: {label} (v{version})",
+    "masterLabel": "Master: {label}",
+    "promotedBadge": "Promoted",
+    "masterFallbackLabel": "Master",
+    "profileTitleTemplate": "{label} Resume Profile"
   },
   "jobDetail": {
     "via": "via",
@@ -240,6 +255,11 @@
     "scoreWithAi": "Score with Gemini Flash",
     "scoringWithAi": "Analyzing & Scoring...",
     "reScore": "Re-score against Resume ↻",
+    "selectScoringPersona": "Select scoring persona",
+    "personaLabel": "Persona",
+    "scoringPersonaMenu": "Scoring persona",
+    "activeTag": "active",
+    "personaPrefix": "Persona:",
     "matchedSkills": "Matched Skills",
     "missingSkills": "Missing / Gap Skills",
     "gapsAnalysis": "Qualification Gaps & Requirements",
@@ -383,5 +403,13 @@
     "sidebarError": "Failed to load AI usage details.",
     "compactError": "Failed to load AI credits.",
     "cardError": "Failed to load AI usage details. Please refresh the page to retry."
+  },
+  "retry": {
+    "attemptCount": "Attempt {attempt} of {total}",
+    "inSeconds": "in {seconds}s",
+    "retryNow": "Retry Now",
+    "cancel": "Cancel",
+    "executingRetry": "Executing retry {attempt} of {total}...",
+    "retry": "Retry"
   }
 }

@@ -13,6 +13,7 @@ import {
   buildCoverLetterInstructions,
   buildCoverLetterPrompt,
 } from "@/services/tailoring.service";
+import { coverLetterPromptFieldsSchema } from "@/actions/job.schema";
 
 export async function POST(
   _req: NextRequest,
@@ -43,7 +44,12 @@ export async function POST(
           code: "rate_limited",
           retryAfterSeconds: rateLimitRes.retryAfterSeconds,
         },
-        { status: 429 }
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rateLimitRes.retryAfterSeconds),
+          },
+        }
       );
     }
 
@@ -88,15 +94,35 @@ export async function POST(
       reqBody?.isRegeneration === true ||
       _req.nextUrl.searchParams.get("regenerate") === "true";
 
-    const customInstructions =
+    const rawInstructions =
       typeof reqBody?.instructions === "string"
         ? reqBody.instructions.trim()
         : typeof reqBody?.feedback === "string"
           ? reqBody.feedback.trim()
           : undefined;
 
-    const tone =
+    const rawTone =
       typeof reqBody?.tone === "string" ? reqBody.tone.trim() : undefined;
+
+    // Apply shared field-level validation to custom prompt inputs
+    const validatedPromptFields = coverLetterPromptFieldsSchema.safeParse({
+      instructions: rawInstructions,
+      tone: rawTone,
+    });
+
+    if (!validatedPromptFields.success) {
+      return NextResponse.json(
+        {
+          error:
+            validatedPromptFields.error.issues[0]?.message ||
+            "Invalid instructions or tone parameters",
+        },
+        { status: 400 }
+      );
+    }
+
+    const customInstructions = validatedPromptFields.data.instructions;
+    const tone = validatedPromptFields.data.tone;
 
     const resumeId =
       typeof reqBody?.resumeId === "string"
@@ -227,7 +253,7 @@ export async function POST(
     }
 
     const previousCoverLetter = job.coverLetterDraft || null;
-    const isRegeneration = Boolean(isRegenerateRequested || previousCoverLetter);
+    const isRegeneration = Boolean(isRegenerateRequested);
     const resumeText = activeResume.content;
     const resumeSkills: string[] = skillsResult.ok ? skillsResult.value : [];
     const model = getGoogleModel();

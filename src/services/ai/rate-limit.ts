@@ -50,6 +50,11 @@ export const DEFAULT_AI_RATE_LIMITS: Record<AiFeature, RateLimitConfig> = {
     refillRatePerSec: 0.5,
     cost: 1,
   },
+  embedding: {
+    capacity: 50,
+    refillRatePerSec: 2.0,
+    cost: 1,
+  },
 };
 
 export const AI_RATE_LIMIT_CONFIGS = DEFAULT_AI_RATE_LIMITS;
@@ -74,7 +79,7 @@ export interface RateLimitCheckResult extends TokenBucketRateLimitResult {
 /**
  * Step 16: Check rate limit for a user and feature.
  * Returns { allowed: true } or { allowed: false, retryAfterSeconds }.
- * Fails open gracefully if Redis is unconfigured or offline.
+ * Falls back to bounded local in-memory token-bucket limiter if Redis is unconfigured or offline.
  */
 export async function checkRateLimit(
   userId: string,

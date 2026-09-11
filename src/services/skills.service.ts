@@ -134,7 +134,7 @@ export function diffSkills(
 /**
  * Resolves a model instance for structured text generation across configured providers.
  */
-function resolveLanguageModel(preferredProvider?: string) {
+export function resolveLanguageModel(preferredProvider?: string) {
   const provider = (
     preferredProvider ||
     process.env.AI_PROVIDER ||
@@ -146,17 +146,34 @@ function resolveLanguageModel(preferredProvider?: string) {
       const apiKey = process.env.ANTHROPIC_API_KEY;
       if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not configured");
       const anthropic = createAnthropic({ apiKey });
-      return anthropic("claude-3-5-sonnet-latest");
+      const modelId = "claude-3-5-sonnet-latest";
+      return {
+        model: anthropic(modelId),
+        provider: "claude",
+        modelId,
+        modelName: modelId,
+      };
     }
     case "openai": {
       const apiKey = process.env.OPENAI_API_KEY;
       if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
       const openai = createOpenAI({ apiKey });
-      return openai("gpt-4o");
+      const modelId = "gpt-4o";
+      return {
+        model: openai(modelId),
+        provider: "openai",
+        modelId,
+        modelName: modelId,
+      };
     }
     case "gateway": {
-      const modelName = process.env.AI_GATEWAY_MODEL || "openai/gpt-4o";
-      return gateway(modelName);
+      const modelId = process.env.AI_GATEWAY_MODEL || "openai/gpt-4o";
+      return {
+        model: gateway(modelId),
+        provider: "gateway",
+        modelId,
+        modelName: modelId,
+      };
     }
     case "gemini":
     default: {
@@ -164,7 +181,13 @@ function resolveLanguageModel(preferredProvider?: string) {
         process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
       if (!apiKey) throw new Error("GEMINI_API_KEY is not configured");
       const google = createGoogleGenerativeAI({ apiKey });
-      return google(AI_MODEL);
+      const modelId = AI_MODEL;
+      return {
+        model: google(modelId),
+        provider: "gemini",
+        modelId,
+        modelName: modelId,
+      };
     }
   }
 }
@@ -178,7 +201,7 @@ export async function extractSkillsFromJob(
   preferredProvider?: string
 ): Promise<Result<string[], AppError>> {
   try {
-    const model = resolveLanguageModel(preferredProvider);
+    const { model } = resolveLanguageModel(preferredProvider);
     const result = await generateText({
       model,
       output: Output.object({ schema: extractSkillsSchema }),
@@ -204,7 +227,7 @@ export async function extractSkillsFromResume(
   preferredProvider?: string
 ): Promise<Result<string[], AppError>> {
   try {
-    const model = resolveLanguageModel(preferredProvider);
+    const { model } = resolveLanguageModel(preferredProvider);
     const result = await generateText({
       model,
       output: Output.object({ schema: extractSkillsSchema }),
@@ -232,7 +255,7 @@ export async function extractSkillsCombined(
   preferredProvider?: string
 ): Promise<Result<{ jobSkills: string[]; resumeSkills: string[] }, AppError>> {
   try {
-    const model = resolveLanguageModel(preferredProvider);
+    const { model } = resolveLanguageModel(preferredProvider);
     const result = await generateText({
       model,
       output: Output.object({ schema: extractCombinedSkillsSchema }),
@@ -398,7 +421,7 @@ export async function analyzeJobResumeMatch(
   preferredProvider?: string
 ): Promise<Result<MatchAnalysisResult, AppError>> {
   try {
-    const model = resolveLanguageModel(preferredProvider);
+    const { model, provider, modelId } = resolveLanguageModel(preferredProvider);
     const { system, prompt } = buildMatchAnalysisPrompt(
       jobDescription,
       resumeContent,
@@ -409,8 +432,8 @@ export async function analyzeJobResumeMatch(
       {
         userId: userId ?? null,
         feature: "scoring",
-        provider: preferredProvider || "gemini",
-        model: AI_MODEL,
+        provider,
+        model: modelId,
       },
       async () => {
         return await generateText({

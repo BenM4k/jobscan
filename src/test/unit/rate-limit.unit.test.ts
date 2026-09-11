@@ -4,6 +4,7 @@ import {
   checkAiRateLimit,
   DEFAULT_AI_RATE_LIMITS,
 } from "@/services/ai/rate-limit";
+import { clearLocalRateLimitBuckets, redis } from "@/services/cache/redis-client";
 
 function assert(condition: boolean, msg: string) {
   if (!condition) {
@@ -13,6 +14,7 @@ function assert(condition: boolean, msg: string) {
 
 async function runRateLimitUnitTests() {
   console.log("Running Step 16 Token-Bucket Rate Limiter unit tests...\n");
+  clearLocalRateLimitBuckets();
 
   // 1. Key format verification
   const key = getRateLimitKey("usr-123", "scoring");
@@ -51,17 +53,60 @@ async function runRateLimitUnitTests() {
   );
   console.log("✓ Step 16 Rate limit tiers verified: scoring (20 burst, 1/10s), tailored_resume & cover_letter (5 burst, 1/60s)");
 
-  // 3. checkRateLimit shape check & graceful degradation when Redis is unconfigured
-  const res = await checkRateLimit("user-test", "scoring");
-  assert(typeof res.allowed === "boolean", "allowed must be boolean");
-  if (!res.allowed) {
+  // 3. checkRateLimit shape check & bounded local fallback when Redis is rejected or unavailable
+  const origEval = (redis as any).eval;
+  const origUrl = process.env.UPSTASH_REDIS_REST_URL;
+  const origToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+  try {
+    process.env.UPSTASH_REDIS_REST_URL = "https://mock.upstash.io";
+    process.env.UPSTASH_REDIS_REST_TOKEN = "mock-token";
+    (redis as any).eval = async () => {
+      throw new Error("Redis connection refused (ECONNREFUSED)");
+    };
+
+    const res = await checkRateLimit("user-test", "scoring");
+    assert(typeof res.allowed === "boolean", "allowed must be boolean");
+    if (!res.allowed) {
+      assert(
+        typeof res.retryAfterSeconds === "number",
+        "retryAfterSeconds must be number when allowed is false"
+      );
+    }
     assert(
-      typeof res.retryAfterSeconds === "number",
-      "retryAfterSeconds must be number when allowed is false"
+      res.allowed === true,
+      "Must allow initial request via bounded local limiter when Redis dependency is rejected/unavailable"
+    );
+    console.log("✓ checkRateLimit returns { allowed: true } with bounded fallback when Redis is forced into rejected state");
+  } finally {
+    (redis as any).eval = origEval;
+    if (origUrl !== undefined) {
+      process.env.UPSTASH_REDIS_REST_URL = origUrl;
+    } else {
+      delete process.env.UPSTASH_REDIS_REST_URL;
+    }
+    if (origToken !== undefined) {
+      process.env.UPSTASH_REDIS_REST_TOKEN = origToken;
+    } else {
+      delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    }
+  }
+
+  // 4. Bounded local fallback: Redis unavailability must NOT permit unlimited cost-bearing requests
+  // Test tailored_resume with capacity 5: 5 rapid requests should succeed, 6th must be rejected
+  const resumeUserId = "user-burst-test";
+  for (let i = 0; i < 5; i++) {
+    const burstRes = await checkRateLimit(resumeUserId, "tailored_resume");
+    assert(burstRes.allowed === true, `Burst request #${i + 1} within capacity 5 must be allowed`);
+  }
+  const blockedRes = await checkRateLimit(resumeUserId, "tailored_resume");
+  assert(blockedRes.allowed === false, "6th burst request exceeding capacity 5 must be blocked");
+  if (!blockedRes.allowed) {
+    assert(
+      blockedRes.retryAfterSeconds > 0,
+      `retryAfterSeconds must be > 0 when blocked, got ${blockedRes.retryAfterSeconds}`
     );
   }
-  assert(res.allowed === true, "Must fail open when Redis is unconfigured or offline");
-  console.log("✓ checkRateLimit returns { allowed: true } or { allowed: false, retryAfterSeconds } and fails open safely");
+  console.log("✓ Bounded local fallback enforces capacity limit when Redis is offline (prevents unlimited AI requests)");
 
   // 4. Backward compatibility with checkAiRateLimit
   const aiRes = await checkAiRateLimit("user-test", "scoring");

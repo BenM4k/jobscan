@@ -80,7 +80,7 @@ export async function setUserFeatureFlagOverride(
 }
 
 /**
- * Update the global state of a feature flag and invalidate default/anonymous cache.
+ * Update the global state of a feature flag and invalidate default/anonymous cache as well as all cached user evaluations.
  */
 export async function setGlobalFlagState(
   flagKey: string,
@@ -92,7 +92,7 @@ export async function setGlobalFlagState(
       return { success: false, error: `Feature flag "${flagKey}" not found` };
     }
 
-    // Invalidate anonymous/default cache entry
+    // Invalidate anonymous/default cache entry and all affected user evaluations
     await invalidateFeatureFlagCache(flagKey, null);
 
     return { success: true };

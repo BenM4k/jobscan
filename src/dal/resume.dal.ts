@@ -83,6 +83,9 @@ export async function createMasterResume(
     // If setting as active, deactivate other personas and create in one transaction
     const created = await db.transaction(async (tx) => {
       if (data.isActive) {
+        await tx.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtext('master_resume_' || ${data.userId}))`
+        );
         await tx
           .update(masterResume)
           .set({ isActive: false })
@@ -106,13 +109,14 @@ export async function createMasterResume(
     }
 
     // Generate embedding asynchronously — never block the response on this
+    const expectedVersion = created.version;
     generateEmbedding(created.content)
       .then((embRes) => {
         if (!embRes.ok) {
           console.warn("Resume embedding generation failed (create):", embRes.error.message);
           return;
         }
-        return setResumeEmbedding(created.id, created.userId, embRes.value);
+        return setResumeEmbedding(created.id, created.userId, embRes.value, expectedVersion);
       })
       .catch((e) => console.warn("Resume embedding write failed (create):", e));
 
@@ -141,6 +145,9 @@ export async function updateMasterResume(
       }
 
       if (data.isActive) {
+        await tx.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtext('master_resume_' || ${userId}))`
+        );
         await tx
           .update(masterResume)
           .set({ isActive: false })
@@ -170,13 +177,14 @@ export async function updateMasterResume(
 
     // Re-embed only if resume content changed
     if (data.content) {
+      const expectedVersion = updated.version;
       generateEmbedding(updated.content)
         .then((embRes) => {
           if (!embRes.ok) {
             console.warn("Resume embedding generation failed (update):", embRes.error.message);
             return;
           }
-          return setResumeEmbedding(updated.id, updated.userId, embRes.value);
+          return setResumeEmbedding(updated.id, updated.userId, embRes.value, expectedVersion);
         })
         .catch((e) => console.warn("Resume embedding write failed (update):", e));
     }
@@ -193,6 +201,9 @@ export async function setActiveMasterResume(
 ): Promise<Result<boolean, AppError>> {
   try {
     return await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext('master_resume_' || ${userId}))`
+      );
       const [target] = await tx
         .select({ id: masterResume.id })
         .from(masterResume)
@@ -282,19 +293,34 @@ export async function syncResumeSkills(
  * Store a pre-computed embedding vector on a master_resume row.
  * Kept separate from content updates so the embedding step can be
  * fire-and-forget without retrying the full upsert on failure.
+ * When expectedVersion is provided (number or content string), the update condition
+ * matches both the resume/user identity and the expected value to prevent stale callbacks
+ * from overwriting a newer embedding.
  */
 export async function setResumeEmbedding(
   resumeId: string,
   userId: string,
-  embedding: number[]
+  embedding: number[],
+  expectedVersion?: number | string
 ): Promise<Result<void, AppError>> {
   try {
     // Cast the JS number[] to the pgvector literal format expected by Drizzle
     const vectorLiteral = `[${embedding.join(",")}]`;
+    const conditions = [
+      eq(masterResume.id, resumeId),
+      eq(masterResume.userId, userId),
+    ];
+
+    if (typeof expectedVersion === "number") {
+      conditions.push(eq(masterResume.version, expectedVersion));
+    } else if (typeof expectedVersion === "string") {
+      conditions.push(eq(masterResume.content, expectedVersion));
+    }
+
     await db
       .update(masterResume)
       .set({ embedding: sql`${vectorLiteral}::vector`, updatedAt: new Date() })
-      .where(and(eq(masterResume.id, resumeId), eq(masterResume.userId, userId)));
+      .where(and(...conditions));
     return ok(undefined);
   } catch (error) {
     return err(
@@ -339,6 +365,9 @@ export async function promoteTailoredResumeToMaster(
 
     // 2. Perform promotion in a transaction: capture previous active ID, demote, insert new active
     const result = await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext('master_resume_' || ${userId}))`
+      );
       const [currentActive] = await tx
         .select({ id: masterResume.id })
         .from(masterResume)
@@ -379,6 +408,7 @@ export async function promoteTailoredResumeToMaster(
     }
 
     // 3. Generate embedding asynchronously (fire-and-forget)
+    const expectedVersion = result.newMasterResume.version;
     generateEmbedding(result.newMasterResume.content)
       .then((embRes) => {
         if (!embRes.ok) {
@@ -388,7 +418,8 @@ export async function promoteTailoredResumeToMaster(
         return setResumeEmbedding(
           result.newMasterResume.id,
           result.newMasterResume.userId,
-          embRes.value
+          embRes.value,
+          expectedVersion
         );
       })
       .catch((e) => console.warn("Resume embedding write failed (promote):", e));
@@ -410,6 +441,9 @@ export async function revertActiveResume(
 ): Promise<Result<boolean, AppError>> {
   try {
     return await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext('master_resume_' || ${userId}))`
+      );
       const [target] = await tx
         .select({ id: masterResume.id })
         .from(masterResume)
@@ -446,6 +480,9 @@ export async function deleteMasterResume(
 ): Promise<Result<{ deletedId: string; fallbackActiveId: string | null }, AppError>> {
   try {
     return await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext('master_resume_' || ${userId}))`
+      );
       const [target] = await tx
         .select()
         .from(masterResume)

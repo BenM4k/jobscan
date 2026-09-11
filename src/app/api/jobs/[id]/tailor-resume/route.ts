@@ -33,7 +33,12 @@ export async function POST(
           code: "rate_limited",
           retryAfterSeconds: rateLimitRes.retryAfterSeconds,
         },
-        { status: 429 }
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rateLimitRes.retryAfterSeconds),
+          },
+        }
       );
     }
 

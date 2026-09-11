@@ -80,7 +80,7 @@ export async function embedText(
 
     await logAiCall({
       userId: userId ?? null,
-      feature: "scoring",
+      feature: "embedding",
       provider: "google",
       model: GEMINI_EMBEDDING_MODEL_ID,
       inputTokens: tokens,
@@ -112,6 +112,7 @@ export async function embedResume(
   resumeId: string,
   userId: string,
   content: string,
+  expectedVersion?: number | string
 ): Promise<Result<void, AppError>> {
   const embRes = await embedText(content, userId);
   if (!embRes.ok) {
@@ -122,7 +123,12 @@ export async function embedResume(
     return embRes;
   }
 
-  const setRes = await setResumeEmbedding(resumeId, userId, embRes.value);
+  const setRes = await setResumeEmbedding(
+    resumeId,
+    userId,
+    embRes.value,
+    expectedVersion
+  );
   if (!setRes.ok) {
     console.warn(
       `Resume embedding storage failed for resume ${resumeId}:`,

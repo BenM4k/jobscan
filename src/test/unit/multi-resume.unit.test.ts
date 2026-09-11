@@ -56,7 +56,21 @@ async function runMultiResumeUnitTests() {
     tailoredResume.language !== undefined,
     "tailoredResume table must have 'language' column"
   );
-  console.log("✓ Schema columns and enum values verified.");
+
+  const { getTableConfig } = await import("drizzle-orm/pg-core");
+  const config = getTableConfig(masterResume);
+  const activeUniqueIdx = config.indexes.find(
+    (idx) => idx.config.name === "master_resume_user_active_unique_idx"
+  );
+  assert(
+    activeUniqueIdx !== undefined,
+    "masterResume table must have 'master_resume_user_active_unique_idx' partial unique index"
+  );
+  assert(
+    activeUniqueIdx?.config.unique === true,
+    "'master_resume_user_active_unique_idx' must be a unique index"
+  );
+  console.log("✓ Schema columns, unique index, and enum values verified.");
 
   // 2. Action Input Validation Schemas
   console.log("2. Verifying server action schemas...");
@@ -66,8 +80,13 @@ async function runMultiResumeUnitTests() {
     label: "Backend Persona",
     content: "Experienced with Go, Node.js, and Postgres.",
     language: "en",
+    skills: ["Go", "Node.js", "Postgres"],
   });
-  assert(validCreate.success, "createMasterResumeSchema should accept valid payload");
+  assert(validCreate.success, "createMasterResumeSchema should accept valid payload with skills");
+  assert(
+    validCreate.data?.skills?.length === 3,
+    "createMasterResumeSchema should parse skills correctly"
+  );
 
   const invalidCreate = createMasterResumeSchema.safeParse({
     label: "Backend Persona",
@@ -75,12 +94,38 @@ async function runMultiResumeUnitTests() {
   });
   assert(!invalidCreate.success, "createMasterResumeSchema should reject empty content");
 
+  const invalidSkillName = createMasterResumeSchema.safeParse({
+    label: "Backend Persona",
+    content: "Valid content string here.",
+    skills: ["   "], // empty after trim
+  });
+  assert(!invalidSkillName.success, "createMasterResumeSchema should reject empty skill name");
+
+  const oversizedSkill = createMasterResumeSchema.safeParse({
+    label: "Backend Persona",
+    content: "Valid content string here.",
+    skills: ["s".repeat(101)],
+  });
+  assert(!oversizedSkill.success, "createMasterResumeSchema should reject skill > 100 chars");
+
+  const tooManySkills = createMasterResumeSchema.safeParse({
+    label: "Backend Persona",
+    content: "Valid content string here.",
+    skills: Array.from({ length: 101 }, (_, i) => `Skill ${i}`),
+  });
+  assert(!tooManySkills.success, "createMasterResumeSchema should reject > 100 skills");
+
   // updateMasterResumeSchema
   const validUpdate = updateMasterResumeSchema.safeParse({
     id: "a0000000-0000-4000-8000-000000000001",
     label: "Updated Label",
+    skills: ["TypeScript", "React"],
   });
-  assert(validUpdate.success, "updateMasterResumeSchema should accept valid id and partial fields");
+  assert(validUpdate.success, "updateMasterResumeSchema should accept valid id and partial fields with skills");
+  assert(
+    validUpdate.data?.skills?.length === 2,
+    "updateMasterResumeSchema should parse skills correctly"
+  );
 
   // promoteTailoredResumeSchema
   const validPromote = promoteTailoredResumeSchema.safeParse({

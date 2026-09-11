@@ -6,9 +6,41 @@ import {
   jobLanguageEnum,
 } from "@/services/db/schema";
 import * as pipelineDal from "@/dal/pipeline.dal";
-import { decayFactor } from "@/services/ranking/decay";
+import { computeDisplayRank } from "@/services/ranking/decay";
 import type { TailoredResumeData } from "@/lib/ai";
 export type { TailoredResumeData };
+
+/**
+ * Modern default model version for undecayed raw score records.
+ */
+export const DEFAULT_RAW_SCORE_MODEL = "hybrid-v1";
+
+/**
+ * Explicit model identifiers for legacy score records whose stored `finalScore`
+ * was produced by `applyExponentialDecay` at write time.
+ * For these rows, read-time exponential decay must be skipped to avoid double decay.
+ */
+export const LEGACY_DECAYED_SCORE_MODELS = [
+  "gemini",
+  "hybrid-pgvector-bm25",
+  "claude",
+  "openai",
+  "gateway",
+  "legacy",
+  "legacy-decayed",
+] as const;
+
+export type LegacyDecayedScoreModel =
+  (typeof LEGACY_DECAYED_SCORE_MODELS)[number];
+
+export function isLegacyDecayedScore(modelUsed?: string | null): boolean {
+  if (!modelUsed) return false;
+  const normalized = modelUsed.toLowerCase().trim();
+  return (
+    (LEGACY_DECAYED_SCORE_MODELS as readonly string[]).includes(normalized) ||
+    normalized.startsWith("legacy")
+  );
+}
 
 export type CanonicalJobInsert = typeof job.$inferInsert;
 export type CanonicalJobSelect = typeof job.$inferSelect;
@@ -68,15 +100,22 @@ export type JobInsert = Partial<JobSelect> & {
 };
 
 export function pipelineEntryToJobSelect(
-  entry: pipelineDal.PipelineEntryWithDetails
+  entry: pipelineDal.PipelineEntryWithDetails,
 ): JobSelect {
   const rawFitScore = entry.score?.finalScore
     ? Math.round(Number(entry.score.finalScore))
     : null;
   const postedAt = entry.job.postedAt || entry.createdAt;
+
+  // Identify legacy rows whose stored finalScore was produced by applyExponentialDecay at write time.
+  // Skip read-time decay for legacy rows to avoid double decay, while retaining it for new raw-score rows.
+  // Raw scores are not reconstructed from rounded stored values; fitScore remains rawFitScore.
+  const isLegacy = isLegacyDecayedScore(entry.score?.modelUsed);
   const rank =
     rawFitScore !== null
-      ? Math.min(100, Math.max(0, Math.round(rawFitScore * decayFactor(postedAt))))
+      ? isLegacy
+        ? rawFitScore
+        : computeDisplayRank(rawFitScore, postedAt)
       : null;
 
   return {

@@ -40,12 +40,23 @@ export function useAsyncJobWithRetry<T>({
   const toastIdRef = useRef<string | number | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const nextAttemptFnRef = useRef<(() => void) | null>(null);
+  const resolveCountdownRef = useRef<(() => void) | null>(null);
   const isCancelledRef = useRef(false);
 
-  // Clear timers on unmount
+  const lastJobFnRef = useRef<((currentAttempt: number) => Promise<T>) | null>(null);
+
+  // Clear timers and resolve pending countdowns on unmount
   useEffect(() => {
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      isCancelledRef.current = true;
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      if (resolveCountdownRef.current) {
+        resolveCountdownRef.current();
+        resolveCountdownRef.current = null;
+      }
     };
   }, []);
 
@@ -54,6 +65,10 @@ export function useAsyncJobWithRetry<T>({
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
+    }
+    if (resolveCountdownRef.current) {
+      resolveCountdownRef.current();
+      resolveCountdownRef.current = null;
     }
     nextAttemptFnRef.current = null;
     setStatus("idle");
@@ -65,21 +80,9 @@ export function useAsyncJobWithRetry<T>({
     }
   }, [enableToasts]);
 
-  const retryNow = useCallback(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    setCountdown(0);
-    if (nextAttemptFnRef.current) {
-      const executeNext = nextAttemptFnRef.current;
-      nextAttemptFnRef.current = null;
-      executeNext();
-    }
-  }, []);
-
   const execute = useCallback(
     async (fn: (currentAttempt: number) => Promise<T>): Promise<T | null> => {
+      lastJobFnRef.current = fn;
       isCancelledRef.current = false;
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -146,19 +149,23 @@ export function useAsyncJobWithRetry<T>({
               : defaultDelaySeconds * currentAttempt;
 
           if (currentAttempt < totalAttempts) {
+            if (isCancelledRef.current) return null;
             setStatus("retrying");
             setCountdown(waitSeconds);
 
             // Wait with a 1-second countdown ticker
             await new Promise<void>((resolve) => {
+              resolveCountdownRef.current = resolve;
               let remaining = waitSeconds;
               nextAttemptFnRef.current = () => {
                 if (timerRef.current) clearInterval(timerRef.current);
                 timerRef.current = null;
+                resolveCountdownRef.current = null;
                 resolve();
               };
 
               const updateCountdownText = (sec: number) => {
+                if (isCancelledRef.current) return;
                 const retryMsg = isRateLimited
                   ? `${jobName}: Rate limit hit. Retrying in ${sec}s (attempt ${currentAttempt + 1} of ${totalAttempts})...`
                   : `${jobName}: Temporary issue. Retrying in ${sec}s (attempt ${currentAttempt + 1} of ${totalAttempts})...`;
@@ -171,12 +178,20 @@ export function useAsyncJobWithRetry<T>({
               updateCountdownText(remaining);
 
               timerRef.current = setInterval(() => {
+                if (isCancelledRef.current) {
+                  if (timerRef.current) clearInterval(timerRef.current);
+                  timerRef.current = null;
+                  resolveCountdownRef.current = null;
+                  resolve();
+                  return;
+                }
                 remaining -= 1;
                 setCountdown(remaining);
                 if (remaining <= 0) {
                   if (timerRef.current) clearInterval(timerRef.current);
                   timerRef.current = null;
                   nextAttemptFnRef.current = null;
+                  resolveCountdownRef.current = null;
                   resolve();
                 } else {
                   updateCountdownText(remaining);
@@ -184,9 +199,13 @@ export function useAsyncJobWithRetry<T>({
               }, 1000);
             });
 
+            resolveCountdownRef.current = null;
+            if (isCancelledRef.current) return null;
+
             currentAttempt += 1;
           } else {
             // Retries exhausted
+            if (isCancelledRef.current) return null;
             setStatus("error");
             setError(rawError);
             const failMsg =
@@ -209,6 +228,21 @@ export function useAsyncJobWithRetry<T>({
     },
     [jobName, maxRetries, defaultDelaySeconds, enableToasts]
   );
+
+  const retryNow = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setCountdown(0);
+    if (nextAttemptFnRef.current) {
+      const executeNext = nextAttemptFnRef.current;
+      nextAttemptFnRef.current = null;
+      executeNext();
+    } else if (status === "error" && lastJobFnRef.current) {
+      execute(lastJobFnRef.current);
+    }
+  }, [status, execute]);
 
   return {
     status,

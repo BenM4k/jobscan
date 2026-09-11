@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import posthog from "posthog-js";
 import { JobSelect } from "@/dal/jobs.dal";
@@ -20,6 +20,7 @@ export function useJobScoring({
   const router = useRouter();
   const [missingResumeOpen, setMissingResumeOpen] = useState(false);
   const pendingScoreIdempotencyKeyRef = useRef<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const retryRunner = useAsyncJobWithRetry<JobSelect>({
     jobName: "AI Job Scoring",
@@ -28,6 +29,24 @@ export function useJobScoring({
     enableToasts: true,
   });
 
+  const cancelRetry = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    pendingScoreIdempotencyKeyRef.current = null;
+    retryRunner.cancelRetry();
+  }, [retryRunner]);
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
+  }, []);
+
   const handleScoreJob = async () => {
     if (!pendingScoreIdempotencyKeyRef.current) {
       pendingScoreIdempotencyKeyRef.current = crypto.randomUUID();
@@ -35,38 +54,48 @@ export function useJobScoring({
     const idempotencyKey = pendingScoreIdempotencyKeyRef.current;
 
     const result = await retryRunner.execute(async () => {
-      const res = await fetch(`/api/jobs/${job.id}/score`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": idempotencyKey,
-        },
-        body: JSON.stringify({ idempotencyKey, resumeId: selectedResumeId }),
-      });
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
 
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        const msg = errJson.error || `Scoring failed with status ${res.status}`;
-        if (msg.toLowerCase().includes("resume") && res.status === 400) {
-          setMissingResumeOpen(true);
-          // Do not retry missing resume configuration
-          retryRunner.cancelRetry();
-          throw new Error(msg);
+      try {
+        const res = await fetch(`/api/jobs/${job.id}/score`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": idempotencyKey,
+          },
+          body: JSON.stringify({ idempotencyKey, resumeId: selectedResumeId }),
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          const errJson = await res.json().catch(() => ({}));
+          const msg = errJson.error || `Scoring failed with status ${res.status}`;
+          if (msg.toLowerCase().includes("resume") && res.status === 400) {
+            setMissingResumeOpen(true);
+            // Do not retry missing resume configuration
+            cancelRetry();
+            throw new Error(msg);
+          }
+
+          const errorObj = new Error(msg) as Error & {
+            status?: number;
+            code?: string;
+            retryAfterSeconds?: number;
+          };
+          errorObj.status = res.status;
+          errorObj.code = errJson.code;
+          errorObj.retryAfterSeconds = errJson.retryAfterSeconds;
+          throw errorObj;
         }
 
-        const errorObj = new Error(msg) as Error & {
-          status?: number;
-          code?: string;
-          retryAfterSeconds?: number;
-        };
-        errorObj.status = res.status;
-        errorObj.code = errJson.code;
-        errorObj.retryAfterSeconds = errJson.retryAfterSeconds;
-        throw errorObj;
+        const { data } = await res.json();
+        return data;
+      } finally {
+        if (abortControllerRef.current === controller) {
+          abortControllerRef.current = null;
+        }
       }
-
-      const { data } = await res.json();
-      return data;
     });
 
     if (result) {
@@ -88,7 +117,7 @@ export function useJobScoring({
     missingResumeOpen,
     setMissingResumeOpen,
     handleScoreJob,
-    cancelRetry: retryRunner.cancelRetry,
+    cancelRetry,
     retryNow: retryRunner.retryNow,
   };
 }

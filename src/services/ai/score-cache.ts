@@ -10,15 +10,17 @@ export const DEFAULT_SCORE_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60; // 604,800s
 
 /**
  * Generates the cache key for an AI job score.
- * Key format: score:${jobId}:${resumeVersion}:${modelVersion}
+ * Key format: score:${jobId}:${resumeId}:${resumeVersion}:${modelVersion}
+ * resumeId isolates scores between different resumes/personas.
  * resumeVersion on masterResume automatically invalidates stale scores on resume updates.
  */
 export function getScoreCacheKey(
   jobId: string,
+  resumeId: string,
   resumeVersion: number | string,
   modelVersion: string
 ): string {
-  return `score:${jobId}:${resumeVersion}:${modelVersion}`;
+  return `score:${jobId}:${resumeId}:${resumeVersion}:${modelVersion}`;
 }
 
 /**
@@ -27,11 +29,12 @@ export function getScoreCacheKey(
  */
 export async function getCachedScore<T = ScoreResult>(
   jobId: string,
+  resumeId: string,
   resumeVersion: number | string,
   modelVersion: string
 ): Promise<T | null> {
   try {
-    const key = getScoreCacheKey(jobId, resumeVersion, modelVersion);
+    const key = getScoreCacheKey(jobId, resumeId, resumeVersion, modelVersion);
     return await cacheGet<T>(key);
   } catch (err) {
     console.warn(
@@ -48,13 +51,14 @@ export async function getCachedScore<T = ScoreResult>(
  */
 export async function setCachedScore<T = ScoreResult>(
   jobId: string,
+  resumeId: string,
   resumeVersion: number | string,
   modelVersion: string,
   score: T,
   ttlSeconds = DEFAULT_SCORE_CACHE_TTL_SECONDS
 ): Promise<void> {
   try {
-    const key = getScoreCacheKey(jobId, resumeVersion, modelVersion);
+    const key = getScoreCacheKey(jobId, resumeId, resumeVersion, modelVersion);
     await cacheSet(key, score, ttlSeconds);
   } catch (err) {
     console.warn(
@@ -69,11 +73,12 @@ export async function setCachedScore<T = ScoreResult>(
  */
 export async function invalidateCachedScore(
   jobId: string,
+  resumeId: string,
   resumeVersion: number | string,
   modelVersion: string
 ): Promise<number> {
   try {
-    const key = getScoreCacheKey(jobId, resumeVersion, modelVersion);
+    const key = getScoreCacheKey(jobId, resumeId, resumeVersion, modelVersion);
     return await cacheDel(key);
   } catch (err) {
     console.warn(

@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { MasterResumeSelect } from "@/services/db/schema";
 import {
   DropdownMenu,
@@ -19,6 +20,7 @@ interface PersonaSelectDropdownProps {
   onSelectResume?: (id: string) => void;
   size?: "sm" | "xs";
   showIcon?: boolean;
+  disabled?: boolean;
 }
 
 export function PersonaSelectDropdown({
@@ -27,7 +29,10 @@ export function PersonaSelectDropdown({
   onSelectResume,
   size = "sm",
   showIcon = true,
+  disabled = false,
 }: PersonaSelectDropdownProps) {
+  const t = useTranslations("jobDetail");
+
   if (resumes.length <= 1) return null;
 
   const selectedPersona =
@@ -39,19 +44,20 @@ export function PersonaSelectDropdown({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className={`inline-flex items-center gap-1.5 rounded-lg border border-border bg-background hover:bg-muted font-normal text-foreground transition-colors cursor-pointer ${heightClass}`}
-        aria-label="Select scoring persona"
+        disabled={disabled}
+        className={`inline-flex items-center gap-1.5 rounded-lg border border-border bg-background hover:bg-muted font-normal text-foreground transition-colors cursor-pointer disabled:opacity-50 disabled:pointer-events-none disabled:cursor-not-allowed ${heightClass}`}
+        aria-label={t("selectScoringPersona")}
       >
         {showIcon && <FileText className="size-3.5 text-muted-foreground" />}
         <span className={`truncate ${maxWidthClass}`}>
-          {selectedPersona?.label || "Persona"}
+          {selectedPersona?.label || t("personaLabel")}
         </span>
         <ChevronDown className="size-3 text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 p-1">
         <DropdownMenuGroup>
           <DropdownMenuLabel className="text-xs text-muted-foreground px-2 py-1 font-normal">
-            Scoring persona
+            {t("scoringPersonaMenu")}
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
@@ -66,7 +72,7 @@ export function PersonaSelectDropdown({
                 <span className="truncate font-medium">{r.label}</span>
                 {r.isActive && (
                   <span className="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 px-1 py-0.2 rounded font-mono">
-                    active
+                    {t("activeTag")}
                   </span>
                 )}
               </div>

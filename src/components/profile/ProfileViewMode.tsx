@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { ProfileOverview } from "@/components/profile/ProfileOverview";
 import { ProfileSidebar } from "@/components/profile/ProfileSidebar";
 import { EducationItem, ExperienceItem } from "@/lib/ai";
@@ -43,6 +44,7 @@ export function ProfileViewMode({
   onEditClick,
   onDeleteClick,
 }: ProfileViewModeProps) {
+  const t = useTranslations("profile");
   const displayName =
     userName || (userEmail ? userEmail.split("@")[0] : "Candidate");
 
@@ -51,7 +53,7 @@ export function ProfileViewMode({
       ? `${experience[0].title}${experience[0].company ? ` at ${experience[0].company}` : ""}`
       : parsedSkillsList.length > 0
       ? parsedSkillsList.slice(0, 3).join(" • ")
-      : `${resumeLabel || "Master"} Resume Profile`;
+      : t("profileTitleTemplate", { label: resumeLabel || t("masterFallbackLabel") });
 
   return (
     <div className="flex flex-col lg:flex-row items-start gap-12 lg:gap-16 pt-2">

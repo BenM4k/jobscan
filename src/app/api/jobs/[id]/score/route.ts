@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import * as jobsDal from "@/dal/jobs.dal";
 import { requireSession } from "@/lib/auth-guard";
 import { runWithIdempotency } from "@/services/idempotency.service";
@@ -31,7 +32,12 @@ export async function POST(
           code: "rate_limited",
           retryAfterSeconds: rateLimitRes.retryAfterSeconds,
         },
-        { status: 429 }
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rateLimitRes.retryAfterSeconds),
+          },
+        }
       );
     }
 
@@ -61,10 +67,22 @@ export async function POST(
       );
     }
 
-    const resumeId =
+    const rawResumeId =
       typeof reqBody?.resumeId === "string"
         ? reqBody.resumeId
         : _req.nextUrl.searchParams.get("resumeId") || undefined;
+
+    let resumeId: string | undefined = undefined;
+    if (rawResumeId) {
+      const parsedResumeId = z.string().uuid().safeParse(rawResumeId);
+      if (!parsedResumeId.success) {
+        return NextResponse.json(
+          { error: "Invalid resume ID format: must be a valid UUID" },
+          { status: 400 }
+        );
+      }
+      resumeId = parsedResumeId.data;
+    }
 
     const result = await runWithIdempotency({
       userId,
@@ -119,6 +137,12 @@ export async function POST(
         return NextResponse.json(
           { error: "Job scoring is currently in progress", inProgress: true },
           { status: 409 }
+        );
+      }
+      if (result.error.code === "NOT_FOUND") {
+        return NextResponse.json(
+          { error: result.error.message || "Requested resume persona not found" },
+          { status: 404 }
         );
       }
       if (result.error.code === "NO_MASTER_RESUME") {

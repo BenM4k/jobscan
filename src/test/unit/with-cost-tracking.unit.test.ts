@@ -49,15 +49,59 @@ async function runCostTrackingUnitTests() {
     `gemini-embedding-2 output pricing should be $0.00/1M, got ${embPricing.output}`
   );
 
-  // Gemini 3.7 Flash pricing
-  const flashCost = calculateEstimatedCost("gemini-3.7-flash", 1_000_000, 1_000_000);
-  assert(flashCost !== undefined, "flashCost should not be undefined");
-  const parsedFlashCost = parseFloat(flashCost!);
-  // Prior to 2027: 0.75 + 3.75 = 4.50. After: 1.50 + 7.50 = 9.00
-  assert(
-    parsedFlashCost === 4.5 || parsedFlashCost === 9.0,
-    `gemini-3.7-flash 1M/1M cost should be 4.500000 (or 9.000000 post-2026), got ${flashCost}`
-  );
+  // Gemini 3.7 Flash pricing: separate pre- and post-boundary tests with frozen time
+  const OriginalDate = globalThis.Date;
+  try {
+    // 1. Fixed pre-boundary test (before 2027 boundary): 0.75 + 3.75 = 4.50
+    const mockPreDate = new Date("2026-09-10T12:00:00Z");
+    class PreDateMock extends OriginalDate {
+      constructor(...args: any[]) {
+        if (args.length === 0) {
+          super(mockPreDate.getTime());
+        } else {
+          super(...(args as [any]));
+        }
+      }
+      static now() {
+        return mockPreDate.getTime();
+      }
+    }
+    globalThis.Date = PreDateMock as unknown as DateConstructor;
+
+    const preFlashCost = calculateEstimatedCost("gemini-3.7-flash", 1_000_000, 1_000_000);
+    assert(preFlashCost !== undefined, "preFlashCost should not be undefined");
+    const parsedPreCost = parseFloat(preFlashCost!);
+    assert(
+      parsedPreCost === 4.5,
+      `gemini-3.7-flash pre-boundary cost should be 4.500000, got ${preFlashCost}`
+    );
+
+    // 2. Fixed post-boundary test (post-2026 boundary): 1.50 + 7.50 = 9.00
+    const mockPostDate = new Date("2027-01-02T00:00:00Z");
+    class PostDateMock extends OriginalDate {
+      constructor(...args: any[]) {
+        if (args.length === 0) {
+          super(mockPostDate.getTime());
+        } else {
+          super(...(args as [any]));
+        }
+      }
+      static now() {
+        return mockPostDate.getTime();
+      }
+    }
+    globalThis.Date = PostDateMock as unknown as DateConstructor;
+
+    const postFlashCost = calculateEstimatedCost("gemini-3.7-flash", 1_000_000, 1_000_000);
+    assert(postFlashCost !== undefined, "postFlashCost should not be undefined");
+    const parsedPostCost = parseFloat(postFlashCost!);
+    assert(
+      parsedPostCost === 9.0,
+      `gemini-3.7-flash post-boundary cost should be 9.000000, got ${postFlashCost}`
+    );
+  } finally {
+    globalThis.Date = OriginalDate;
+  }
 
   // Gemini Embedding 2 cost check: 1,000,000 tokens -> $0.20
   const embCost = calculateEstimatedCost("gemini-embedding-2", 1_000_000, 0);

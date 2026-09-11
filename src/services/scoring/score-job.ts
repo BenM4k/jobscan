@@ -92,6 +92,7 @@ export async function scoreJobForResume(
     // 2. Cache check
     const cached = await getCachedScore<CachedHybridScore>(
       job.id,
+      resume.id,
       resume.version,
       MODEL_USED
     );
@@ -180,7 +181,17 @@ export async function scoreJobForResume(
       userId
     );
 
-    const extractedJobSkills = matchRes.ok ? matchRes.value.jobSkills : [];
+    let existingJobSkills: string[] = [];
+    if (!matchRes.ok) {
+      const existingJobRes = await skillsDal.getJobSkills(job.id);
+      if (existingJobRes.ok) {
+        existingJobSkills = existingJobRes.value;
+      }
+    }
+
+    const extractedJobSkills = matchRes.ok
+      ? matchRes.value.jobSkills
+      : existingJobSkills;
     const extractedResumeSkills = matchRes.ok
       ? matchRes.value.resumeSkills
       : resumeSkills;
@@ -197,7 +208,9 @@ export async function scoreJobForResume(
 
     // D. Persist extracted skills relationally
     await Promise.all([
-      skillsDal.syncJobSkills(job.id, extractedJobSkills),
+      matchRes.ok
+        ? skillsDal.syncJobSkills(job.id, extractedJobSkills)
+        : Promise.resolve(ok(undefined)),
       resumeDal.syncResumeSkills(resume.id, extractedResumeSkills),
     ]);
 
@@ -234,7 +247,7 @@ export async function scoreJobForResume(
       resumeSkills: extractedResumeSkills,
     };
 
-    await setCachedScore(job.id, resume.version, MODEL_USED, cachePayload);
+    await setCachedScore(job.id, resume.id, resume.version, MODEL_USED, cachePayload);
 
     return ok(insertedScore);
   } catch (error) {

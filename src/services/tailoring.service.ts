@@ -156,25 +156,12 @@ ${job.gaps?.length ? `Identified Skills & Gaps from Evaluation:\n- Matched: ${jo
       tailoredResumeText,
       object,
       userId,
-      activeResume.id
+      activeResume.id,
+      (activeResume.language as "en" | "fr") || "en"
     );
 
     if (!updateResult.ok) {
       return err(updateResult.error);
-    }
-
-    // Ensure language is updated on tailored_resume from source resume
-    const [entryRes] = await Promise.all([
-      jobsDal.getJobById(job.id, userId),
-    ]);
-    if (entryRes.ok && entryRes.value) {
-      await tailoringDal.saveTailoredResume(
-        entryRes.value.id,
-        tailoredResumeText,
-        undefined,
-        undefined,
-        (activeResume.language as "en" | "fr") || "en"
-      );
     }
 
     // Retrieve tailoredResume record to provide resultRef
@@ -319,7 +306,7 @@ export async function generateTailoredCoverLetter(
     }
 
     const previousCoverLetter = job.coverLetterDraft || null;
-    const isRegeneration = Boolean(opts.regenerate || previousCoverLetter);
+    const isRegeneration = Boolean(opts.regenerate);
 
     const skillsResult = await resumeDal.getResumeSkills(activeResume.id);
     const resumeSkills: string[] = skillsResult.ok ? skillsResult.value : [];

@@ -71,10 +71,10 @@ export function JobListEmptyState() {
             </div>
             <div className="space-y-0.5 min-w-0 flex-1 text-xs">
               <span className="font-semibold text-blue-900 dark:text-blue-200">
-                Background Ingestion Active
+                {t("bgIngestionActive")}
               </span>
               <p className="text-[11px] text-blue-700/80 dark:text-blue-300/80 leading-relaxed">
-                Job boards are being queried in the background. Check status below.
+                {t("bgIngestionDesc")}
               </p>
             </div>
           </div>
@@ -99,7 +99,7 @@ export function JobListEmptyState() {
           className="gap-2 text-xs font-medium rounded-xl h-8.5 px-4 cursor-pointer"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${checkSyncRunner.isLoading ? "animate-spin text-blue-600" : ""}`} />
-          <span>{checkSyncRunner.isLoading ? "Checking Background Ingestion..." : "Check for Ingested Jobs"}</span>
+          <span>{checkSyncRunner.isLoading ? t("checkingBgIngestion") : t("checkForIngestedJobs")}</span>
         </Button>
       </div>
     </div>

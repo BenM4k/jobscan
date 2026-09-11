@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { JobSelect } from "@/dal/jobs.dal";
 import { toast } from "sonner";
 import posthog from "posthog-js";
@@ -33,6 +33,24 @@ export function useCoverLetter({ job, onJobUpdated }: UseCoverLetterProps) {
     defaultDelaySeconds: 3,
     enableToasts: true,
   });
+
+  const cancelRetry = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    pendingIdempotencyKeyRef.current = null;
+    retryRunner.cancelRetry();
+  }, [retryRunner]);
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
+  }, []);
 
   const handleGenerateStream = async (options?: GenerateCoverLetterOptions) => {
     const isRegeneration =
@@ -172,7 +190,7 @@ export function useCoverLetter({ job, onJobUpdated }: UseCoverLetterProps) {
     totalAttempts: retryRunner.totalAttempts,
     retryCountdown: retryRunner.countdown,
     retryMessage: retryRunner.message,
-    cancelRetry: retryRunner.cancelRetry,
+    cancelRetry,
     retryNow: retryRunner.retryNow,
     coverLetter,
     setCoverLetter,

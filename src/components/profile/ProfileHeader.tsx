@@ -39,7 +39,7 @@ export function ProfileHeader({
   name,
   headline,
   location,
-  resumeLabel = "Default",
+  resumeLabel,
   resumeVersion = 1,
   resumeLanguage = "en",
   resumeSource = "uploaded",
@@ -49,6 +49,7 @@ export function ProfileHeader({
   isReformatting = false,
 }: ProfileHeaderProps) {
   const t = useTranslations("profile");
+  const displayLabel = resumeLabel || t("defaultResumeLabel");
 
   const initials = (name || "Candidate")
     .trim()
@@ -86,7 +87,7 @@ export function ProfileHeader({
               <span>{initials}</span>
             </div>
             <span
-              title="Active Master Resume"
+              title={t("activeMasterResumeTitle")}
               className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white dark:border-[#0A0A0C] flex items-center justify-center shadow-2xs"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-white" />
@@ -108,7 +109,7 @@ export function ProfileHeader({
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <span className="inline-flex items-center gap-1.5 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 px-2.5 py-1 rounded-md border border-blue-200 dark:border-blue-900/60 text-xs font-semibold font-sans">
                 <FileText className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
-                <span>Master: {resumeLabel} (v{resumeVersion})</span>
+                <span>{t("masterVersionBadge", { label: displayLabel, version: resumeVersion })}</span>
               </span>
 
               <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-zinc-800/80 text-slate-700 dark:text-zinc-300 px-2.5 py-1 rounded-md border border-slate-200 dark:border-zinc-700/70 text-xs font-medium font-sans uppercase">
@@ -118,7 +119,7 @@ export function ProfileHeader({
               {resumeSource === "promoted_tailored" && (
                 <span className="inline-flex items-center gap-1 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 px-2.5 py-1 rounded-md border border-purple-200 dark:border-purple-800/60 text-xs font-medium font-sans">
                   <Sparkles className="w-3 h-3 text-purple-500 shrink-0" />
-                  <span>Promoted</span>
+                  <span>{t("promotedBadge")}</span>
                 </span>
               )}
 

@@ -23,6 +23,7 @@ import {
   JobSource,
   JobStatus,
   RawJobPayloadSelect,
+  DEFAULT_RAW_SCORE_MODEL,
 } from "./types";
 import { getJobById } from "./queries";
 
@@ -516,7 +517,7 @@ export async function updateJobScoreAndCoverLetter(
     await db.insert(score).values({
       pipelineEntryId,
       resumeVersion: resumeVersion ?? 1,
-      modelUsed: modelUsed ?? "gemini",
+      modelUsed: modelUsed ?? DEFAULT_RAW_SCORE_MODEL,
       cosineSimilarity:
         cosineSimilarity !== undefined && cosineSimilarity !== null
           ? cosineSimilarity.toString()
@@ -610,6 +611,7 @@ export async function saveHybridScore(
     bm25Rank: number | null;
     resumeVersion?: number;
     explanation?: string;
+    modelUsed?: string;
   },
   userId?: string
 ): Promise<Result<JobSelect, AppError>> {
@@ -637,7 +639,7 @@ export async function saveHybridScore(
     await db.insert(score).values({
       pipelineEntryId: entry.id,
       resumeVersion: data.resumeVersion ?? 1,
-      modelUsed: "hybrid-pgvector-bm25",
+      modelUsed: data.modelUsed ?? DEFAULT_RAW_SCORE_MODEL,
       finalScore: data.finalScore.toString(),
       cosineSimilarity: data.cosineSimilarity != null ? data.cosineSimilarity.toString() : null,
       bm25Rank: data.bm25Rank != null ? data.bm25Rank.toString() : null,
@@ -724,6 +726,7 @@ export async function recalculateScoreWithWeights(
       .update(score)
       .set({
         finalScore: newScore.toString(),
+        modelUsed: DEFAULT_RAW_SCORE_MODEL,
         updatedAt: new Date(),
       })
       .where(eq(score.id, latestScore.id));
@@ -750,7 +753,8 @@ export async function updateJobTailoredResume(
   tailoredResumeText: string,
   _tailoredResumeData?: TailoredResumeData | null,
   userId?: string,
-  resumeIdUsed?: string
+  resumeIdUsed?: string,
+  language?: "en" | "fr"
 ): Promise<Result<JobSelect, AppError>> {
   try {
     const entryConditions = [
@@ -774,7 +778,10 @@ export async function updateJobTailoredResume(
 
     const saveRes = await tailoringDal.saveTailoredResume(
       entry.id,
-      tailoredResumeText
+      tailoredResumeText,
+      undefined,
+      undefined,
+      language
     );
     if (!saveRes.ok) {
       return err(saveRes.error);

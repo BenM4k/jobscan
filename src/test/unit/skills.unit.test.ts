@@ -218,6 +218,43 @@ async function runSkillsUnitTests() {
   }
   console.log("✓ matchAnalysisSchema validates combined output structure");
 
+  // 8. resolveLanguageModel resolution of provider and model
+  {
+    const origAiProvider = process.env.AI_PROVIDER;
+    const origGeminiKey = process.env.GEMINI_API_KEY;
+    const origAnthropicKey = process.env.ANTHROPIC_API_KEY;
+    const origOpenaiKey = process.env.OPENAI_API_KEY;
+
+    try {
+      process.env.GEMINI_API_KEY = "test-gemini-key";
+      delete process.env.AI_PROVIDER;
+
+      // Default with no preferredProvider and no AI_PROVIDER
+      const defaultResolved = skillsService.resolveLanguageModel();
+      assert(defaultResolved.provider === "gemini", `Expected provider gemini, got ${defaultResolved.provider}`);
+      assert(defaultResolved.modelId.includes("gemini"), `Expected gemini modelId, got ${defaultResolved.modelId}`);
+
+      // When AI_PROVIDER is set and preferredProvider is absent
+      process.env.AI_PROVIDER = "claude";
+      process.env.ANTHROPIC_API_KEY = "test-anthropic-key";
+      const claudeFromEnv = skillsService.resolveLanguageModel();
+      assert(claudeFromEnv.provider === "claude", `Expected provider claude from env, got ${claudeFromEnv.provider}`);
+      assert(claudeFromEnv.modelId === "claude-3-5-sonnet-latest", `Expected claude modelId, got ${claudeFromEnv.modelId}`);
+
+      // When preferredProvider overrides AI_PROVIDER
+      process.env.OPENAI_API_KEY = "test-openai-key";
+      const openaiOverride = skillsService.resolveLanguageModel("openai");
+      assert(openaiOverride.provider === "openai", `Expected provider openai, got ${openaiOverride.provider}`);
+      assert(openaiOverride.modelId === "gpt-4o", `Expected gpt-4o, got ${openaiOverride.modelId}`);
+    } finally {
+      if (origAiProvider !== undefined) process.env.AI_PROVIDER = origAiProvider; else delete process.env.AI_PROVIDER;
+      if (origGeminiKey !== undefined) process.env.GEMINI_API_KEY = origGeminiKey; else delete process.env.GEMINI_API_KEY;
+      if (origAnthropicKey !== undefined) process.env.ANTHROPIC_API_KEY = origAnthropicKey; else delete process.env.ANTHROPIC_API_KEY;
+      if (origOpenaiKey !== undefined) process.env.OPENAI_API_KEY = origOpenaiKey; else delete process.env.OPENAI_API_KEY;
+    }
+  }
+  console.log("✓ resolveLanguageModel accurately resolves provider and model identifiers");
+
   console.log("\n==========================================");
   console.log("✓ All Skills & Explanation unit tests passed successfully!");
   console.log("==========================================");
