@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { FileText } from "lucide-react";
 import posthog from "posthog-js";
+import { useAsyncJobWithRetry } from "@/hooks/useAsyncJobWithRetry";
+import { RetryProgressBadge } from "@/components/ui/RetryProgressBadge";
 
 interface MasterResumeUploadProps {
   onExtracted: (data: ResumeProfileData, rawText: string) => void;
@@ -14,17 +16,29 @@ interface MasterResumeUploadProps {
 }
 
 export function MasterResumeUpload({ onExtracted, disabled, isReplacing }: MasterResumeUploadProps) {
-  const [isProcessing, setIsProcessing] = useState(false);
   const [stepLabel, setStepLabel] = useState<string>("");
   const t = useTranslations("profile");
+
+  const retryRunner = useAsyncJobWithRetry<{
+    data: ResumeProfileData;
+    rawText: string;
+  }>({
+    jobName: "Resume Parsing & Extraction",
+    maxRetries: 2,
+    defaultDelaySeconds: 2,
+    enableToasts: true,
+  });
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    try {
-      setIsProcessing(true);
-      setStepLabel("Extracting text from file...");
+    const result = await retryRunner.execute(async (attempt) => {
+      setStepLabel(
+        attempt > 1
+          ? `Extracting text (attempt ${attempt})...`
+          : "Extracting text from file..."
+      );
 
       // 1. Call /api/resume/parse
       const formData = new FormData();
@@ -36,12 +50,16 @@ export function MasterResumeUpload({ onExtracted, disabled, isReplacing }: Maste
       });
 
       if (!parseRes.ok) {
-        const errJson = await parseRes.json();
-        throw new Error(errJson.error || "Failed to parse document");
+        const errJson = await parseRes.json().catch(() => ({}));
+        throw new Error(errJson.error || `Failed to parse document (${parseRes.status})`);
       }
 
       const { text: rawText } = await parseRes.json();
-      setStepLabel("Extracting structured profile with Gemini 3.8 Flash...");
+      setStepLabel(
+        attempt > 1
+          ? `Structuring with AI (attempt ${attempt})...`
+          : "Structuring profile with Gemini AI..."
+      );
 
       // 2. Call /api/resume/extract
       const extractRes = await fetch("/api/resume/extract", {
@@ -51,27 +69,26 @@ export function MasterResumeUpload({ onExtracted, disabled, isReplacing }: Maste
       });
 
       if (!extractRes.ok) {
-        const errJson = await extractRes.json();
-        throw new Error(errJson.error || "Failed to extract structured resume");
+        const errJson = await extractRes.json().catch(() => ({}));
+        throw new Error(errJson.error || `Failed to extract structured resume (${extractRes.status})`);
       }
 
       const { data: extractedProfile } = await extractRes.json();
+      return { data: extractedProfile, rawText };
+    });
+
+    if (result) {
       posthog.capture("master_resume_uploaded", { file_type: file.type || "unknown" });
-      toast.success("Resume parsed & structured with Gemini AI! Please review before saving.");
-      onExtracted(extractedProfile, rawText);
-    } catch (err) {
-      console.error(err);
-      const message = err instanceof Error ? err.message : "Error processing resume";
-      toast.error(message);
-    } finally {
-      setIsProcessing(false);
-      setStepLabel("");
-      e.target.value = "";
+      toast.success("Resume parsed & structured with AI! Please review before saving.");
+      onExtracted(result.data, result.rawText);
     }
+
+    setStepLabel("");
+    e.target.value = "";
   };
 
   return (
-    <div className="border border-dashed border-slate-300 dark:border-zinc-800 rounded-2xl p-8 sm:p-10 bg-white/60 dark:bg-[#121215]/60 flex flex-col items-center justify-center text-center gap-2.5 transition hover:border-blue-500 shadow-2xs">
+    <div className="border border-dashed border-slate-300 dark:border-zinc-800 rounded-2xl p-8 sm:p-10 bg-white/60 dark:bg-[#121215]/60 flex flex-col items-center justify-center text-center gap-3 transition hover:border-blue-500 shadow-2xs">
       <FileText className="w-7 h-7 text-blue-600 dark:text-blue-400" />
 
       <div className="space-y-0.5 max-w-md">
@@ -83,10 +100,20 @@ export function MasterResumeUpload({ onExtracted, disabled, isReplacing }: Maste
         </p>
       </div>
 
-      {isProcessing ? (
+      <RetryProgressBadge
+        status={retryRunner.status}
+        attempt={retryRunner.attempt}
+        totalAttempts={retryRunner.totalAttempts}
+        countdown={retryRunner.countdown}
+        message={retryRunner.message}
+        onRetryNow={retryRunner.retryNow}
+        onCancel={retryRunner.cancelRetry}
+      />
+
+      {retryRunner.isLoading ? (
         <div className="flex items-center gap-2 text-xs font-bold text-blue-600 dark:text-blue-400 py-2">
           <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-ping" />
-          <span>{stepLabel}</span>
+          <span>{stepLabel || "Processing..."}</span>
         </div>
       ) : (
         <label className="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-5 py-2.5 rounded-lg transition shadow-xs inline-flex items-center gap-2 mt-1 select-none">
@@ -95,7 +122,7 @@ export function MasterResumeUpload({ onExtracted, disabled, isReplacing }: Maste
             type="file"
             accept=".pdf,.docx,.doc,.txt"
             onChange={handleFileChange}
-            disabled={disabled || isProcessing}
+            disabled={disabled || retryRunner.isLoading}
             className="hidden"
           />
         </label>

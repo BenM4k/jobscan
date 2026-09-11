@@ -34,27 +34,11 @@ const transitionStatusSchema = z.object({
   ]),
 });
 
-const scoreJobSchema = z.object({
-  jobId: z.uuid(),
-  provider: z.enum(["claude", "gemini", "openai", "gateway"]).optional(),
-  idempotencyKey: z.uuid({
-    message: "A valid UUID idempotencyKey is required for scoring",
-  }),
-});
-
-const tailoredResumeActionSchema = z.object({
-  jobId: z.uuid(),
-  idempotencyKey: z.uuid({
-    message: "A valid UUID idempotencyKey is required",
-  }),
-});
-
-const tailoredCoverLetterActionSchema = z.object({
-  jobId: z.uuid(),
-  idempotencyKey: z.uuid({
-    message: "A valid UUID idempotencyKey is required",
-  }),
-});
+import {
+  scoreJobSchema,
+  tailoredResumeActionSchema,
+  tailoredCoverLetterActionSchema,
+} from "./job.schema";
 
 export async function triggerJobFetchAction(formData: FormData) {
   const sessionResult = await requireSession();
@@ -144,6 +128,7 @@ export async function scoreJobAction(
   jobId: string,
   idempotencyKey: string,
   provider?: "claude" | "gemini" | "openai" | "gateway",
+  resumeId?: string,
 ) {
   const sessionResult = await requireSession();
   if (!sessionResult.ok || !sessionResult.value)
@@ -152,7 +137,7 @@ export async function scoreJobAction(
       error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message,
     };
 
-  const parsed = scoreJobSchema.safeParse({ jobId, provider, idempotencyKey });
+  const parsed = scoreJobSchema.safeParse({ jobId, provider, idempotencyKey, resumeId });
   if (!parsed.success) {
     return {
       success: false,
@@ -167,6 +152,8 @@ export async function scoreJobAction(
   if (!rateLimitRes.allowed) {
     return {
       success: false,
+      code: "rate_limited",
+      retryAfterSeconds: rateLimitRes.retryAfterSeconds,
       error: `Rate limit exceeded for AI scoring. Please wait ${rateLimitRes.retryAfterSeconds}s before retrying.`,
     };
   }
@@ -181,6 +168,7 @@ export async function scoreJobAction(
         parsed.data.jobId,
         userId,
         parsed.data.provider,
+        parsed.data.resumeId,
       );
       if (!scoreRes.ok) return scoreRes;
       return ok({ data: scoreRes.value, resultRef: parsed.data.jobId });
@@ -212,6 +200,7 @@ export async function scoreJobAction(
 export async function generateTailoredResumeAction(
   jobId: string,
   idempotencyKey: string,
+  resumeId?: string,
 ) {
   const sessionResult = await requireSession();
   if (!sessionResult.ok || !sessionResult.value)
@@ -223,6 +212,7 @@ export async function generateTailoredResumeAction(
   const parsed = tailoredResumeActionSchema.safeParse({
     jobId,
     idempotencyKey,
+    resumeId,
   });
   if (!parsed.success) {
     return {
@@ -239,6 +229,8 @@ export async function generateTailoredResumeAction(
   if (!rateLimitRes.allowed) {
     return {
       success: false,
+      code: "rate_limited",
+      retryAfterSeconds: rateLimitRes.retryAfterSeconds,
       error: `Rate limit exceeded for resume tailoring. Please wait ${rateLimitRes.retryAfterSeconds}s before retrying.`,
     };
   }
@@ -252,7 +244,11 @@ export async function generateTailoredResumeAction(
     key: parsed.data.idempotencyKey,
     targetId: parsed.data.jobId,
     execute: async () => {
-      const tailorRes = await generateTailoredResume(parsed.data.jobId, userId);
+      const tailorRes = await generateTailoredResume(
+        parsed.data.jobId,
+        userId,
+        parsed.data.resumeId,
+      );
       if (!tailorRes.ok) return tailorRes;
       return ok({
         data: tailorRes.value,
@@ -299,6 +295,12 @@ export async function generateTailoredResumeAction(
 export async function generateTailoredCoverLetterAction(
   jobId: string,
   idempotencyKey: string,
+  options?: {
+    resumeId?: string;
+    regenerate?: boolean;
+    instructions?: string;
+    tone?: string;
+  }
 ) {
   const sessionResult = await requireSession();
   if (!sessionResult.ok || !sessionResult.value)
@@ -310,6 +312,7 @@ export async function generateTailoredCoverLetterAction(
   const parsed = tailoredCoverLetterActionSchema.safeParse({
     jobId,
     idempotencyKey,
+    ...options,
   });
   if (!parsed.success) {
     return {
@@ -326,6 +329,8 @@ export async function generateTailoredCoverLetterAction(
   if (!rateLimitRes.allowed) {
     return {
       success: false,
+      code: "rate_limited",
+      retryAfterSeconds: rateLimitRes.retryAfterSeconds,
       error: `Rate limit exceeded for cover letter generation. Please wait ${rateLimitRes.retryAfterSeconds}s before retrying.`,
     };
   }
@@ -342,6 +347,12 @@ export async function generateTailoredCoverLetterAction(
       const clRes = await generateTailoredCoverLetter(
         parsed.data.jobId,
         userId,
+        {
+          resumeId: parsed.data.resumeId,
+          regenerate: parsed.data.regenerate,
+          instructions: parsed.data.instructions,
+          tone: parsed.data.tone,
+        }
       );
       if (!clRes.ok) return clRes;
       return ok({

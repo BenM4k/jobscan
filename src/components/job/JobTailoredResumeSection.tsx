@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useTailoredResume } from "./useTailoredResume";
+import { TailoredResumeActions } from "./TailoredResumeActions";
+import { RetryProgressBadge } from "@/components/ui/RetryProgressBadge";
 
 interface JobTailoredResumeSectionProps {
   job: JobSelect;
@@ -27,6 +29,13 @@ export function JobTailoredResumeSection({
 
   const {
     isGenerating,
+    retryStatus,
+    retryAttempt,
+    totalAttempts,
+    retryCountdown,
+    retryMessage,
+    cancelRetry,
+    retryNow,
     isSaving,
     isEditing,
     setIsEditing,
@@ -74,8 +83,19 @@ export function JobTailoredResumeSection({
         )}
       </div>
 
+      {/* Retry Feedback Badge */}
+      <RetryProgressBadge
+        status={retryStatus}
+        attempt={retryAttempt}
+        totalAttempts={totalAttempts}
+        countdown={retryCountdown}
+        message={retryMessage}
+        onRetryNow={retryNow}
+        onCancel={cancelRetry}
+      />
+
       {/* Loading State: 3 lines low-contrast pulsing block, indented under title, no spinner icon */}
-      {isGenerating && (
+      {isGenerating && retryStatus !== "retrying" && (
         <div className="ml-7.5 border-l-2 border-border dark:border-zinc-800 pl-3.5 py-1 space-y-2">
           <div className="h-3.5 w-full bg-muted dark:bg-zinc-800 animate-pulse rounded-sm" />
           <div className="h-3.5 w-5/6 bg-muted dark:bg-zinc-800 animate-pulse rounded-sm" />
@@ -178,6 +198,14 @@ export function JobTailoredResumeSection({
               <RotateCcw className="size-3.5 shrink-0" />
               <span>{t("regenerateResume")}</span>
             </button>
+          </div>
+
+          {/* Persona Promotion & Resumes Navigation */}
+          <div className="ml-7.5">
+            <TailoredResumeActions
+              tailoredResumeRecordId={job.tailoredResumeRecordId}
+              defaultLabel={`${job.company} — ${job.title}`}
+            />
           </div>
         </div>
       )}

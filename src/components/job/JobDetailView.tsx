@@ -1,14 +1,17 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { JobSelect } from "@/dal/jobs.dal";
 import { JobStatus } from "@/services/db/schema";
 import { transitionJobStatusAction } from "@/actions/job.actions";
+import { getMasterResumesAction } from "@/actions/resume.actions";
+import { MasterResumeSelect } from "@/services/db/schema";
 import { JobDetailHeader } from "./JobDetailHeader";
 import { JobScoreSection } from "./JobScoreSection";
 import { JobTailoredResumeSection } from "./JobTailoredResumeSection";
 import { JobCoverLetterSection } from "./JobCoverLetterSection";
 import { JobDescriptionSection } from "./JobDescriptionSection";
+import { useJobScoring } from "./useJobScoring";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import {
@@ -31,11 +34,34 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
   const tCommon = useTranslations("common");
   const tDash = useTranslations("dashboard");
   const [job, setJob] = useState<JobSelect>(initialJob);
-  const [isScoring, setIsScoring] = useState(false);
-  const [scoringError, setScoringError] = useState<string | null>(null);
-  const [missingResumeOpen, setMissingResumeOpen] = useState(false);
-  const pendingScoreIdempotencyKeyRef = useRef<string | null>(null);
+  const [resumes, setResumes] = useState<MasterResumeSelect[]>([]);
+  const [selectedResumeId, setSelectedResumeId] = useState<string | undefined>(undefined);
   const router = useRouter();
+
+  const scoring = useJobScoring({
+    job,
+    selectedResumeId,
+    onJobUpdated: setJob,
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    getMasterResumesAction().then((res) => {
+      if (!isMounted) return;
+      if (res.success && res.data) {
+        setResumes(res.data);
+        const active = res.data.find((r) => r.isActive);
+        if (active) {
+          setSelectedResumeId(active.id);
+        } else if (res.data.length > 0) {
+          setSelectedResumeId(res.data[0].id);
+        }
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleStatusChange = async (newStatus: JobStatus) => {
     setJob((prev) => ({ ...prev, status: newStatus }));
@@ -52,50 +78,6 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
     }
   };
 
-  const handleScoreJob = async () => {
-    try {
-      setIsScoring(true);
-      setScoringError(null);
-      if (!pendingScoreIdempotencyKeyRef.current) {
-        pendingScoreIdempotencyKeyRef.current = crypto.randomUUID();
-      }
-      const idempotencyKey = pendingScoreIdempotencyKeyRef.current;
-
-      const res = await fetch(`/api/jobs/${job.id}/score`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": idempotencyKey,
-        },
-        body: JSON.stringify({ idempotencyKey }),
-      });
-
-      if (!res.ok) {
-        const errJson = await res.json();
-        const msg = errJson.error || "Failed to score job";
-        if (msg.toLowerCase().includes("resume")) {
-          setMissingResumeOpen(true);
-          return;
-        }
-        throw new Error(msg);
-      }
-
-      const { data } = await res.json();
-      pendingScoreIdempotencyKeyRef.current = null;
-      posthog.capture("job_scored", { location: "detail" });
-      setJob(data);
-      toast.success("Job scored");
-      router.refresh();
-    } catch (err) {
-      console.error(err);
-      const msg = err instanceof Error ? err.message : "Scoring failed";
-      setScoringError(msg);
-      toast.error(msg);
-    } finally {
-      setIsScoring(false);
-    }
-  };
-
   const handleJobUpdated = (updated: JobSelect) => {
     setJob(updated);
   };
@@ -106,9 +88,19 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
 
       <JobScoreSection
         job={job}
-        isScoring={isScoring}
-        scoringError={scoringError}
-        onScoreJob={handleScoreJob}
+        isScoring={scoring.isScoring}
+        scoringError={scoring.scoringError}
+        onScoreJob={scoring.handleScoreJob}
+        resumes={resumes}
+        selectedResumeId={selectedResumeId}
+        onSelectResume={setSelectedResumeId}
+        retryStatus={scoring.status}
+        retryAttempt={scoring.attempt}
+        totalAttempts={scoring.totalAttempts}
+        retryCountdown={scoring.countdown}
+        retryMessage={scoring.scoringMessage}
+        onRetryNow={scoring.retryNow}
+        onCancelRetry={scoring.cancelRetry}
       />
 
       <JobTailoredResumeSection job={job} onJobUpdated={handleJobUpdated} />
@@ -124,7 +116,7 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
       <JobDescriptionSection description={job.description} />
 
       {/* Missing Master Resume Modal */}
-      <Dialog open={missingResumeOpen} onOpenChange={setMissingResumeOpen}>
+      <Dialog open={scoring.missingResumeOpen} onOpenChange={scoring.setMissingResumeOpen}>
         <DialogContent className="sm:max-w-md p-6 space-y-4">
           <DialogHeader>
             <div className="flex items-center gap-2">
@@ -140,7 +132,7 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
           <DialogFooter className="flex flex-row items-center justify-end gap-3 pt-3 border-t border-border/40">
             <button
               type="button"
-              onClick={() => setMissingResumeOpen(false)}
+              onClick={() => scoring.setMissingResumeOpen(false)}
               className="text-xs font-normal text-muted-foreground hover:text-foreground transition-colors cursor-pointer p-0 bg-transparent border-0"
             >
               {tCommon("cancel")}
@@ -148,7 +140,7 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
             <button
               type="button"
               onClick={() => {
-                setMissingResumeOpen(false);
+                scoring.setMissingResumeOpen(false);
                 router.push("/dashboard/profile");
               }}
               className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors cursor-pointer p-0 bg-transparent border-0"

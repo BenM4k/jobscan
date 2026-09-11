@@ -3,7 +3,7 @@ import {
   getAgeInDays,
   applyExponentialDecay,
   DEFAULT_DECAY_LAMBDA,
-} from "@/lib/decay";
+} from "@/services/ranking/decay";
 
 function assert(condition: boolean, msg: string) {
   if (!condition) {
@@ -12,7 +12,7 @@ function assert(condition: boolean, msg: string) {
 }
 
 async function runLibDecayUnitTests() {
-  console.log("Running src/lib/decay.ts unit tests...\n");
+  console.log("Running src/services/ranking/decay.ts unit tests...\n");
 
   // 1. Check exports
   assert(typeof calculateExponentialDecay === "function", "calculateExponentialDecay must be a function");
@@ -55,7 +55,7 @@ async function runLibDecayUnitTests() {
   assert(getAgeInDays(null, reference) === 0, "Null date should return 0");
   assert(getAgeInDays(undefined, reference) === 0, "Undefined date should return 0");
 
-  console.log("✓ All src/lib/decay.ts unit tests passed successfully! 🎉");
+  console.log("✓ All src/services/ranking/decay.ts unit tests passed successfully! 🎉");
 }
 
 runLibDecayUnitTests().catch((err) => {

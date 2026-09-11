@@ -5,9 +5,11 @@ import {
   timestamp,
   jsonb,
   index,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { timestamps } from "./common";
 import { pipelineEntry } from "./pipeline";
+import { jobLanguageEnum } from "./job";
 
 // ─────────────────────────────────────────────────────────────
 // Tailored documents + version history
@@ -18,10 +20,11 @@ export const tailoredResume = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     pipelineEntryId: uuid("pipeline_entry_id")
-      .references(() => pipelineEntry.id, { onDelete: "cascade" })
+      .references((): AnyPgColumn => pipelineEntry.id, { onDelete: "cascade" })
       .notNull(),
     content: text("content").notNull(),
     strategyLabel: text("strategy_label"),
+    language: jobLanguageEnum("language").default("en").notNull(),
     ...timestamps,
   },
   (t) => [

@@ -83,18 +83,52 @@ These are settled and should not be re-litigated or quietly changed by an agent:
 - **Adapter Circuit Breaker + exponential backoff per adapter:** State is PostgreSQL-backed via the `adapter_circuit_breaker` table (`src/services/db/schema/ops.ts`) and managed via `src/services/reliability/circuit-breaker.ts` (`canAttempt`, `recordSuccess`, `recordFailure`) and `src/dal/circuit-breaker.dal.ts`. Failure threshold: 5 consecutive failures trips the breaker open. Backoff: `min(30min, 1min * 2^consecutiveOpens)` (starts at 1 minute, caps at 30 minutes). `canAttempt()` transitions `open` → `half_open` once the backoff window elapses to allow exactly one probe test call through.
 - **Background job queue via Inngest (zero blocking in request paths):** Asynchronous background tasks, periodic job crawling/polling, email digests, and AI background scoring run through Inngest (`src/inngest/`). Functions are typed event handlers served at `/api/inngest` with no separate worker infra. Source polling and web scraping must NEVER run synchronously in request paths (e.g. initial dashboard feeds); periodic polling is scheduled in an Inngest cron (`scheduledJobFetch`), and on-demand background ingestion runs via `job.fetch.requested`. Automated user email digests run via `scheduledDigestCron` fanning out to `digest.email.scheduled`.
 - **Dual-Language Hybrid Job Matching (Dense pgvector + Sparse tsvector):** Job matching combines dense vector cosine similarity (`<=>`) over 1536-dim embeddings (indexed with HNSW `job_embedding_hnsw_idx` on `(embedding vector_cosine_ops)`) and dual-language sparse lexical search. `job.language` and `masterResume.language` are typed by `jobLanguageEnum` (`en`, `fr`), populated at ingestion via static source mapping (`ashby/greenhouse/remoteok/lever/unjobs/manual/reliefweb -> en`, `congojob/emploi_cd/fecrdc -> fr`). `job.description_tsv` is a generated column branching on `language` via `CASE WHEN "language" = 'fr' THEN to_tsvector('french', "description") ELSE to_tsvector('english', "description") END`. Hybrid scoring uses $W_{\text{SEMANTIC}}=0.6, W_{\text{KEYWORD}}=0.4$. If `jobLanguage !== resumeLanguage`, cross-lingual keyword matching is bypassed and 100% of score weight is redistributed to semantic embeddings. Fast hybrid scoring (`scoreJobHybrid`) executes in PostgreSQL without external LLM cost.
-- **Skill Extraction & Relational Persistence:** AI scoring and the combined skill extractor (`skillsService.extractSkillsCombined`) extract structured candidate and role skills, persisted relationally to `job_skill` and `resume_skill` via `skillsDal` and `resumeDal`. Skill gaps are calculated via `diffSkills` to populate `matchedSkills` and `missingSkills`. Scoring output includes a concise 1–2 sentence "Why this matched" explanation.
-- **Recency Exponential Decay for Ranking:** Job score ranking incorporates exponential recency decay (`src/services/ranking/decay.ts`) with default rate constant $\lambda = 0.05$ (half-life of $\approx 14$ days: $\exp(-\lambda \cdot \text{ageInDays})$), clamping scores to $[0, 100]$.
+- **Skill Extraction, Explanation & Relational Persistence:** AI scoring and the combined skill extractor (`skillsService.analyzeJobResumeMatch`) extract structured candidate and role skills along with a concise 1–2 sentence "Why this matched" explanation. Extracted skills are normalized via `src/services/skills/normalize.ts` (`normalizeSkillName`: lowercase/trim/whitespace-collapse only) and relationally persisted to `job_skill` and `resume_skill` join tables via `skillsDal.syncJobSkills` and `resumeDal.syncResumeSkills`. Skill gaps are calculated via `skillsService.diffSkills` to populate `matchedSkills` and `missingSkills`. Visualized on the frontend via `MatchExplanation.tsx` and `SkillGapBreakdown.tsx` inside `JobScoreSection.tsx`.
+- **Recency Exponential Decay for Freshness Ranking (Read-Time Only):** Job score ranking incorporates exponential recency decay (`src/services/ranking/decay.ts`) with decay constant $\lambda = 0.0495$ ($\approx 14$-day half-life: $\ln(2)/14$: $\exp(-\lambda \cdot \text{ageInDays})$). Missing or null `postedAt` returns a decay factor of 1.0 (no penalty). **Decay is evaluated at read/display time only** (`computeDisplayRank = hybridScore * decayFactor(postedAt)`), ensuring persisted database scores (`score.finalScore`) remain raw and undecayed.
 - **Fire-and-Forget Ingestion Embeddings:** Right after job normalization (DB call 2) and crawler ingestion, 1536-dimensional embeddings are generated and persisted via `embedJob` asynchronously in the background (`.catch(...)`), ensuring the catalog stays vector-indexed without slowing ingestion throughput.
 - **Redis Provisioning & Client Isolation (`allkeys-lru`):** Fast caching and rate limiting use Upstash Redis (serverless REST) provisioned via Vercel Marketplace / Storage (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`). The cache eviction policy is set to `allkeys-lru`. The Redis client SDK (`@upstash/redis`) is strictly encapsulated in `src/services/cache/redis-client.ts`, which is the **only** file in the codebase permitted to import `@upstash/redis` directly. All other modules import high-level cache helpers (`cacheGet`, `cacheSet`, `cacheRemember`, `cacheDel`, `getRedisClient`) from `@/services/cache/redis-client`.
-- **LRU/LFU AI Score Caching (`score:${jobId}:${resumeVersion}:${modelVersion}`):** AI job match scores are cached in Redis via `src/services/ai/score-cache.ts` with a 7-day default TTL and `allkeys-lru` eviction. The cache key isolates by `resumeVersion` (from `masterResume.version`, automatically busting cache on resume updates) and `modelVersion`. `scoreJobWithAI` checks this cache before calling LLM providers; on hit, it logs `cacheHit: true` and 0 tokens to `ai_call_log` without incurring LLM latency or cost.
-- **Token-Bucket Rate Limiter per AI Feature:** AI-calling mutations are protected by an atomic Redis Lua script (`executeTokenBucketRateLimit` in `redis-client.ts`, preserving strict `@upstash/redis` encapsulation). Keyed by `ratelimit:${userId}:${aiFeature}` and checked at the very top of each AI-calling server action (`scoreJobAction`, `generateTailoredResumeAction`, `generateTailoredCoverLetterAction`) *before* the idempotency check. Fails open gracefully if Redis is unconfigured or offline.
-- **Automated AI Cost & Token Usage Tracking:** All AI invocations are wrapped by `withAiTracking` middleware (`src/services/ai/tracker.ts`), which automatically extracts input/output token counts from provider metadata (`_usage` or `usage`), calculates model-specific cost estimates (Gemini 3.8 Flash, 3.7 Flash, 3.7, 3.6 Flash; Claude 3.5 Sonnet; GPT-4o — models below 3.6 Flash are unsupported), and records an entry to `ai_call_log`.
-- **Feature Flags with Per-User Override Precedence:** Feature flag evaluations (`isEnabled(userId, flagKey)` in `src/services/flags/index.ts`) query `featureFlagAssignment` through `src/dal/flags.dal.ts` first to honor user-level overrides (opt-in beta test or kill switch) before falling back to `featureFlag.enabledGlobally`. Direct database access is strictly forbidden in the service layer and confined to the DAL.
+- **LRU/LFU AI Score Caching & Unified Scoring Orchestrator:**
+  - `src/services/scoring/score-job.ts` provides `scoreJobForResume(job, resume, pipelineEntryId, userId)`: the unified orchestrator sequencing rate-limit check at top $\rightarrow$ cache check $\rightarrow$ cosine similarity & BM25 lookup $\rightarrow$ hybrid blend $\rightarrow$ skill extraction & explanation $\rightarrow$ relational persistence $\rightarrow$ DB insertion $\rightarrow$ cache write.
+  - Scores are cached in Redis via `src/services/ai/score-cache.ts` under key `score:${jobId}:${resumeId}:${resumeVersion}:${modelVersion}` (model tag `hybrid-v1`) with a 7-day default TTL as a secondary safety net alongside native `allkeys-lru` eviction.
+  - Cache hits still record a score row in PostgreSQL for history/analytics and log 0 tokens / `cacheHit: true` to `ai_call_log`.
+- **Token-Bucket Rate Limiter per AI Feature:**
+  - Implemented in `src/services/ai/rate-limit.ts` (re-exported via `src/services/rate-limit/index.ts`), powered by atomic Lua script `executeTokenBucketRateLimit` in `redis-client.ts` to preserve strict `@upstash/redis` encapsulation. Falls back to a bounded local in-memory token-bucket limiter if Redis is unconfigured or offline to prevent unbounded cost-bearing requests.
+  - Limits per feature: `scoring` (burst capacity 20, 1 token/10s refill: `refillRatePerSec: 0.1`), `tailored_resume` (burst capacity 5, 1 token/60s refill: `refillRatePerSec: 1/60`), `tailored_cover_letter` (burst capacity 5, 1 token/60s refill: `refillRatePerSec: 1/60`), `embedding` (burst capacity 50, 2 tokens/s refill: `refillRatePerSec: 2.0`).
+  - `checkRateLimit(userId, feature)` returns `{ allowed: true } | { allowed: false, retryAfterSeconds }`.
+  - Rate limiting is checked at the **very top** of `scoreJobForResume()` before cache checks, returning ok-err `Result` with `{ code: "rate_limited", retryAfterSeconds }`. Checked in server actions (`scoreJobAction`, `generateTailoredResumeAction`, `generateTailoredCoverLetterAction`) *before* idempotency checks.
+  - All 429 rate-limit HTTP responses in API routes (`score`, `tailor-resume`, `cover-letter`) include a standard `Retry-After: String(retryAfterSeconds)` response header alongside the JSON error payload.
+- **Automated AI Cost & Token Usage Tracking:** All AI invocations are wrapped by `withAiTracking` middleware (`src/services/ai/tracker.ts`), which automatically extracts input/output token counts from provider metadata (`_usage` or `usage`), calculates model-specific cost estimates (Gemini 3.8 Flash, 3.7 Flash, 3.7, 3.6 Flash; Claude 3.5 Sonnet; GPT-4o — models below 3.6 Flash are unsupported), and records an entry to `ai_call_log`. Embeddings use the dedicated `aiFeatureEnum` value `"embedding"`, separating embedding cost and audit entries from `"scoring"`.
+- **Cover Letter Regeneration Separation & Prompt Directives:**
+  - Explicit regeneration (`isRegenerateRequested` via request body or query parameter) is strictly separated from existing draft presence (`job.coverLetterDraft`).
+  - Draft existence alone never triggers regeneration prompt directives or elevated temperature; `previousCoverLetter` is retained solely for diff calculation and reference when regeneration is explicitly requested.
+- **Single-Save Tailored Resume Ingestion:**
+  - `jobsDal.updateJobTailoredResume` accepts an optional `language` parameter and writes it atomically to `tailored_resume` in a single database operation, eliminating redundant `jobsDal.getJobById` lookups and secondary save mutations.
+- **Persona Routing & Scoring Route Guardrails:**
+  - `resumeId` query/body parameters in `/api/jobs/[id]/score` are validated as UUIDs.
+  - When an explicit `resumeId` is not found or not owned by the user, `scoreJobWithAI` returns `NOT_FOUND` (mapped to HTTP 404 in route handlers), strictly reserving `NO_MASTER_RESUME` (HTTP 400) for requests where no resume was provided and the user lacks an active master resume.
+- **Async Job Retry Lifecycle & Cancel Abort Contracts:**
+  - `useAsyncJobWithRetry` stores the latest job function in a ref; when retries are exhausted (`status === "error"`) and no countdown is active, calling `retryNow()` re-executes `execute(lastJobFn)` to restart the job from the UI.
+  - Hooks managing streaming and background jobs (`useCoverLetter`, `useJobScoring`) implement unmount abort cleanup (`useEffect` calling `abortControllerRef.current?.abort()`) and wire `cancelRetry` to cleanly abort active network streams.
+- **End-to-End Localization (next-intl):**
+  - All static resume metadata text (Default, Active Master Resume, Master:, Promoted, Master fallback, profile title templates), retry-workflow badges (attempt counts, countdowns, retry/cancel buttons, execution notices), background ingestion cards, circuit-breaker banners, and persona selector dropdowns are fully localized via `next-intl` message catalogs (`messages/en.json` and `messages/fr.json`).
+- **Feature Flags with 60-Second Redis Caching & Per-User Override Precedence:**
+  - Evaluated via `isFeatureEnabled(userId, flagKey)` (`src/services/flags/is-enabled.ts`, re-exported in `src/services/flags/index.ts`).
+  - Sequence: checks a 60-second Redis cache (`flag:${flagKey}:${userId || "anon"}`) $\rightarrow$ queries `featureFlagAssignment` in `src/dal/flags.dal.ts` $\rightarrow$ falls back to `featureFlag.enabledGlobally`.
+  - **Fails CLOSED**: returns `false` on unknown flag keys or database errors (never errors and never returns `true`).
+  - **First real flag usage**: `"hybrid-scoring-v1"` gates whether `bm25Rank` is computed in `scoreJobForResume()`. When disabled, `bm25Rank` stays null and semantic-only scoring is applied without new branching.
+  - **Admin console & Overrides UI**: Admin management at `/dashboard/admin` includes global on/off switches, user email search (`searchUsersAction`), and per-user override add/remove (`setUserFlagOverrideAction`, `removeUserFlagOverrideAction`). Queries user emails via explicit SQL `innerJoin(user, eq(featureFlagAssignment.userId, user.id))` in `flags.dal.ts`, avoiding dependencies on missing Drizzle relational schema definitions.
+  - **Immediate Cache Invalidation**: Adding, updating, or deleting a per-user override immediately deletes that user's Redis cache entry (`cacheDel`) rather than waiting out the 60s TTL. Global toggles immediately delete the anonymous/default cache entry.
+  - **Admin Access Stopgap**: Admin privileges are verified via `isAdmin(user)` (`src/services/auth/admin.ts`), which checks membership against a comma-separated `ADMIN_USER_IDS` env var. NOTE: This is an explicit temporary stopgap pending a full RBAC system.
 - **Canonical shadcn User Navigation & Settings:** The user settings and experimental feature flag toggles are located at `/dashboard/settings`. The main navbar desktop user section is `NavbarUserDropdown` (`src/components/layout/NavbarUserDropdown.tsx`), composed with official shadcn `DropdownMenu` primitives. Hand-written dropdown controls or raw `NavbarUserSection` replacements are strictly forbidden.
 - **`.agents/` and `skills-lock.json` are Local-Only:** Custom IDE agent configurations, prompt skills, and `skills-lock.json` are local-only developer assets and must remain in `.gitignore`. Never track, stage, or commit `.agents/` or `skills-lock.json` to GitHub.
 - **Tailored Resume Edit Persistence & Client Sanitization:** User modifications to AI-tailored resumes persist via `PUT /api/jobs/[id]/tailor-resume` calling `jobService.updateTailoredResume` before exiting edit mode (strictly adhering to route handler → service layer → DAL layering). External job descriptions rendered via `dangerouslySetInnerHTML` in client components must be sanitized with an explicit safe-tag/safe-attribute allowlist via browser `DOMParser`.
-- **Date Range Delimiter Rules:** Range splitting logic (`sepParts`) must preserve ISO date strings (`YYYY-MM`, `YYYY-MM-DD`) by requiring whitespace around hyphens (`\s+-\s+`) or using unicode dashes (`—`, `–`) / words (`to`, `until`), avoiding splitting internal ISO date hyphens.
+- **Multi-Resume Personas & Promotion Flow:**
+  - `master_resume` supports multiple personas per user (`source` enum: `"uploaded"`, `"promoted_tailored"`, `promotedFromTailoredResumeId` foreign key).
+  - Creating a new persona via `createMasterResume(userId, content, label, language, fileUrl?)` transactionally demotes any existing `isActive: true` row to `false` and inserts a new row (`isActive: true, version: 1, source: "uploaded"`), avoiding destructive overwriting of past resumes. Editing an existing persona in-place is handled via `updateMasterResume` (`version += 1`).
+  - Tailored resumes can be promoted to a new master persona via `promoteTailoredResumeToMaster(tailoredResumeId, userId, label)`, setting `source: "promoted_tailored"`, inheriting language from `tailoredResume.language`, and linking `promotedFromTailoredResumeId`.
+  - Safe promotion rollback is supported via `revertActiveResumeAction(previousActiveId)`, surfaced in the UI as an interactive Sonner "Undo" action toast.
+  - All scoring, tailored resume, and cover letter mutations record the resolved persona ID into `pipelineEntry.resumeIdUsed`.
+  - UI: Persona selection dropdown before scoring is conditionally rendered **only** when `resumes.length > 1`. Dedicated `/resumes` management page provides persona activation, deletion (with automatic fallback to the next active persona), and creation.
 - **Never commit or print secret values** (API keys for Anthropic/OpenAI/Gemini/Vercel AI Gateway, DB credentials, better-auth secret, etc.). Reference only by env var name, per §14.
 
 ---
@@ -137,6 +171,7 @@ src/
       jobs/[jobId]/         # Job detail, tailored resume/cover letter generation
       add-job/              # Manual job addition
       settings/             # Account settings, feature flags & email preferences
+      admin/                # Feature flags rollout & user override admin console
     api/
       auth/[...all]/route.ts# better-auth route handler
       inngest/route.ts      # Inngest serve route exposing all background functions
@@ -146,10 +181,12 @@ src/
     ui/                     # shadcn/ui primitives — dropdown-menu, button, dialog, popover, sonner, etc.
     shared/                 # App-specific reusable components (composed from ui/)
     settings/               # Settings cards: AccountSettingsCard, FeatureFlagsCard, NotificationPreferencesCard
+    admin/                  # AdminFeatureFlagsManager (global flag toggle, email search, per-user overrides)
     layout/                 # App navigation: Navbar, NavbarUserDropdown (shadcn DropdownMenu), NavbarMobileMenu
-    {feature}/              # Feature-scoped components colocated by domain (job, profile, auth, etc.)
+    job/                    # Job cards, MatchExplanation.tsx, SkillGapBreakdown.tsx, JobScoreSection.tsx
+    {feature}/              # Feature-scoped components colocated by domain (profile, auth, etc.)
 
-  actions/                  # Server actions, grouped by domain (job.actions.ts, profile.actions.ts, settings.actions.ts)
+  actions/                  # Server actions, grouped by domain (job.actions.ts, profile.actions.ts, settings.actions.ts, admin.actions.ts)
                             # Input validation (Zod) + auth checks happen here, before calling into services/
 
   inngest/                  # Inngest background queue, typed events & durable functions
@@ -163,11 +200,12 @@ src/
     crawler/                # Crawler engine and DRC/global scrapers & fetchers
       sources/              # One adapter per source: ashby.ts, greenhouse.ts, remoteok.ts, lever.ts,
                             # congojob.ts, emploicd.ts, fecrdc.ts, unjobs.ts, reliefweb.ts
-    ai/                     # AI provider client(s) via Vercel AI SDK, embed.ts, embeddings.ts, score-cache.ts, tracker.ts
-    scoring/                # AI job matching providers (returning ScoreWithUsage) and scoring factory
-    ranking/                # Candidate score ranking & recency exponential decay (decay.ts)
-    rate-limit/             # Token-bucket rate limiter service (checked at top of AI actions)
-    flags/                  # Feature flags evaluation service (isEnabled with per-user override priority)
+    ai/                     # AI provider clients via Vercel AI SDK, embed.ts, embeddings.ts, score-cache.ts, rate-limit.ts, with-cost-tracking.ts (tracker.ts)
+    scoring/                # AI job matching providers, scoring factory, and score-job.ts unified orchestrator
+    ranking/                # Candidate score ranking & read-time recency exponential decay (decay.ts)
+    rate-limit/             # Rate limiter index re-exporting ai/rate-limit.ts
+    skills/                 # Skill string normalization (normalize.ts)
+    flags/                  # Feature flags evaluation service (is-enabled.ts, index.ts with 60s Redis caching)
     reliability/
       circuit-breaker.ts    # PostgreSQL-backed adapter circuit breaker with exponential backoff
     cache/
@@ -178,6 +216,7 @@ src/
     auth/
       auth.ts               # better-auth server instance/config
       auth-client.ts        # better-auth client instance for use in Client Components
+      admin.ts              # ADMIN_USER_IDS stopgap verification
     db/
       index.ts              # Drizzle client instance
       schema/               # Modular Drizzle schemas (pipeline, resume, scoring, ops, auth, growth, etc.)
@@ -188,7 +227,7 @@ src/
     pipeline.dal.ts
     resume.dal.ts           # Canonical DAL for master resumes, skills, and pgvector embeddings
     circuit-breaker.dal.ts  # DAL for adapter_circuit_breaker state and failure tracking
-    flags.dal.ts            # DAL for feature_flag and feature_flag_assignment queries
+    flags.dal.ts            # DAL for feature_flag and feature_flag_assignment queries (SQL joins for user emails)
     growth.dal.ts           # DAL for user preferences and digest email dispatch logs
     ops.dal.ts              # DAL for ai_call_log and operational metrics
     idempotency.dal.ts      # DAL for idempotency keys
@@ -198,13 +237,17 @@ src/
     simhash.ts              # 64-bit SipHash-2-4 SimHash near-duplicate detector
     validations/            # Zod schemas, shared across client + server
     result.ts               # ok-err helper types/functions (see §13)
+    errors.ts               # AppError and error codes
     utils.ts                # cn() and other small helpers
 
   hooks/                    # Client-side React hooks
   types/                    # Shared TS types not owned by Drizzle/Zod inference
 
-  test/                     # Standalone test suites
-    unit/                   # Unit test suites (*.unit.test.ts)
+  test/                     # Standalone test suites (executed with NODE_OPTIONS='--conditions=react-server' npx tsx <file>)
+    unit/                   # Unit test suites: feature-flags.unit.test.ts, with-cost-tracking.unit.test.ts,
+                            # rate-limit.unit.test.ts, score-job.unit.test.ts, score-cache.unit.test.ts,
+                            # skills.unit.test.ts, ranking-decay.unit.test.ts, decay.unit.test.ts
+    integration/            # Integration test suites (*.integration.test.ts)
     integration/            # Integration test suites (*.integration.test.ts)
 
 drizzle.config.ts
@@ -432,6 +475,10 @@ Background jobs and asynchronous event processing are handled via **Inngest** (`
 - **Dual-Language `websearch_to_tsquery` & `ts_rank` Normalization Flag 32**: When performing sparse lexical full-text scoring, dynamically resolve the PostgreSQL text-search configuration matching the document/query language (`websearch_to_tsquery(langConfig, query)` with `'french'::regconfig` or `'english'::regconfig`) rather than assuming English. Always pass normalization flag `32` (`ts_rank(description_tsv, query, 32)`) to divide rank by `rank + 1`, mapping the lexical score cleanly into the $[0, 1)$ interval. Never run cross-lingual keyword searches; redistribute 100% of score weight to dense semantic embeddings instead.
 - **1536-Dimensional Vectors Across Providers**: Both `master_resume.embedding` and `job.embedding` are configured as `vector(1536)`. When calling `@ai-sdk/google` (`gemini-embedding-2`), ensure `providerOptions: { google: { outputDimensionality: 1536 } }` is provided. For `@ai-sdk/openai`, use `text-embedding-3-small` (outputs 1536 dimensions natively).
 - **Pure Hybrid Scoring vs Paid AI Scoring**: `scoreJobHybrid` in `src/services/job.service.ts` executes entirely within PostgreSQL using dense pgvector similarity (`<=>`) and sparse tsvector `ts_rank`, providing instant 0–100 scores without external LLM cost. Heavy AI scoring (`scoreJobWithAI`) is reserved for generating structured match analysis, tailored resumes, and cover letters, and must always be wrapped with client idempotency keys (`runWithIdempotency`).
+- **Read-Time vs Write-Time Freshness Decay**: The freshness decay factor (`decayFactor(postedAt)`) using $\lambda = 0.0495$ ($\approx 14$-day half-life: $\ln(2)/14$) is evaluated **exclusively at read/display time** via `computeDisplayRank`. Persisted scores in the database (`score.finalScore`) must remain raw, unpenalized scores so sorting criteria remain flexible and decay can be recalculated on the fly.
+- **Skill Normalization Scope**: `normalizeSkillName()` in `src/services/skills/normalize.ts` strictly performs lowercasing, trimming, and whitespace collapsing. Deliberately avoid pre-mature synonym resolution (e.g. mapping "JS" to "JavaScript") at this level to preserve exact lexical tokens for graph-based mapping.
+- **Rate-Limit Check Ordering at Very Top of `scoreJobForResume`**: Token-bucket rate limiting (`checkRateLimit(userId, "scoring")`) must run as step 1 at the very top of `scoreJobForResume`, prior to Redis cache lookups (`getCachedScore`). Rejecting on rate limits must be the cheapest possible operation.
+- **`scoreJobForResume` Result Error Contract**: `scoreJobForResume()` returns `Promise<Result<ScoreResult, ScoreJobError>>`, returning `err({ code: "rate_limited", retryAfterSeconds })` on rate limit rejection through the standard ok-err shape rather than throwing exceptions across the service boundary.
 - _(Add more here as they come up — that's the point of this section.)_
 
 ---

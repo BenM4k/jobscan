@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Settings, User, LogOut, ChevronDown } from "lucide-react";
+import { Settings, User, LogOut, ChevronDown, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -87,6 +87,14 @@ export function NavbarUserDropdown({
           <DropdownMenuSeparator />
 
           <DropdownMenuGroup className="space-y-0.5">
+            <DropdownMenuItem
+              render={<Link href="/dashboard/resumes" />}
+              className="cursor-pointer px-3 py-2.5"
+            >
+              <FileText className="size-4 text-muted-foreground" />
+              <span>{t("resumes")}</span>
+            </DropdownMenuItem>
+
             <DropdownMenuItem
               render={<Link href="/dashboard/profile" />}
               className="cursor-pointer px-3 py-2.5"

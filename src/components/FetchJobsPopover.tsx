@@ -17,6 +17,11 @@ import {
   FetchSource,
 } from "@/components/job/SourceSelectorGrid";
 import { FetchQueryInput } from "@/components/job/FetchQueryInput";
+import {
+  FetchStatusFeedback,
+  SourceResult,
+} from "@/components/job/FetchStatusFeedback";
+import { useAsyncJobWithRetry } from "@/hooks/useAsyncJobWithRetry";
 
 interface FetchJobsPopoverProps {
   onSuccess: (msg: string) => void;
@@ -29,9 +34,20 @@ export function FetchJobsPopover({
 }: FetchJobsPopoverProps) {
   const [selectedSource, setSelectedSource] = useState<FetchSource>("remoteok");
   const [queryInput, setQueryInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [circuitOpenSources, setCircuitOpenSources] = useState<SourceResult[]>([]);
+  const [fetchFailedSources, setFetchFailedSources] = useState<SourceResult[]>([]);
   const t = useTranslations("dashboard");
+
+  const retryRunner = useAsyncJobWithRetry<{
+    total: number;
+    sources: SourceResult[];
+  }>({
+    jobName: `Job Fetch (${selectedSource.toUpperCase()})`,
+    maxRetries: 2,
+    defaultDelaySeconds: 3,
+    enableToasts: true,
+  });
 
   const isKeywordSource =
     selectedSource === "remoteok" ||
@@ -42,167 +58,92 @@ export function FetchJobsPopover({
 
   const handleFetch = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     onError("");
+    setCircuitOpenSources([]);
+    setFetchFailedSources([]);
 
-    try {
+    const result = await retryRunner.execute(async () => {
       if (selectedSource === "drc") {
         const res = await triggerDrcCrawlAction(queryInput.trim() || undefined);
-        setIsLoading(false);
         if (!res.success) {
-          onError(res.error || "Failed to crawl DRC local job sources.");
-        } else {
-          const sources = res.data?.sources || [];
-          const circuitOpenSources = sources.filter(
-            (s) => s.skipped && s.reason === "circuit_open",
-          );
-          const fetchFailedSources = sources.filter(
-            (s) => s.skipped && s.reason === "fetch_failed",
-          );
-          const successfulSources = sources.filter(
-            (s) => !s.skipped && !s.error,
-          );
-          const total = res.data?.totalUpserted || 0;
-
-          if (successfulSources.length === 0 && (circuitOpenSources.length > 0 || fetchFailedSources.length > 0)) {
-            if (circuitOpenSources.length > 0) {
-              const names = circuitOpenSources
-                .map((s) => s.source.toUpperCase())
-                .join(", ");
-              onError(
-                `DRC crawl skipped: circuit breaker is OPEN for ${names} due to consecutive failures. Cooling down.`,
-              );
-            } else {
-              const names = fetchFailedSources
-                .map((s) => s.source.toUpperCase())
-                .join(", ");
-              onError(
-                `DRC crawl failed for ${names}. The external source may be temporarily unreachable.`,
-              );
-            }
-          } else {
-            posthog.capture("jobs_fetched", {
-              source: selectedSource,
-              jobs_upserted: total,
-            });
-
-            let msg = `DRC Job Crawl complete! ${total} job(s) updated in pipeline.`;
-            if (circuitOpenSources.length > 0) {
-              const names = circuitOpenSources
-                .map((s) => s.source.toUpperCase())
-                .join(", ");
-              msg += ` Note: ${names} skipped (circuit breaker open).`;
-            }
-            if (fetchFailedSources.length > 0) {
-              const names = fetchFailedSources
-                .map((s) => s.source.toUpperCase())
-                .join(", ");
-              msg += ` Note: ${names} skipped (fetch failed).`;
-            }
-
-            onSuccess(msg);
-            setIsOpen(false);
-            setTimeout(() => window.location.reload(), 1200);
-          }
+          throw new Error(res.error || "Failed to crawl DRC job sources");
         }
+        const sources: SourceResult[] = res.data?.sources || [];
+        const open = sources.filter((s) => s.skipped && s.reason === "circuit_open");
+        const failed = sources.filter((s) => s.skipped && s.reason === "fetch_failed");
+        setCircuitOpenSources(open);
+        setFetchFailedSources(failed);
+
+        const total = res.data?.totalUpserted || 0;
+        const successCount = sources.filter((s) => !s.skipped && !s.error).length;
+
+        if (successCount === 0 && (open.length > 0 || failed.length > 0)) {
+          throw new Error(
+            open.length > 0
+              ? `Circuit breaker is cooling down for ${open.map((s) => s.source).join(", ")}`
+              : `External source unreachable for ${failed.map((s) => s.source).join(", ")}`
+          );
+        }
+
+        return { total, sources };
       } else {
         const formData = new FormData();
         formData.append("sourceId", selectedSource);
-        if (queryInput.trim()) {
-          formData.append("target", queryInput.trim());
-        }
+        if (queryInput.trim()) formData.append("target", queryInput.trim());
 
         const res = await triggerJobFetchAction(formData);
-        setIsLoading(false);
         if (!res.success) {
-          onError(
-            res.error ||
-              `Failed to fetch jobs from ${selectedSource.toUpperCase()}.`,
-          );
-        } else {
-          const data = res.data;
-          const sources = Array.isArray(data?.sources) ? data.sources : [];
-          const skippedSources = sources.filter((s) => s.skipped);
-          const circuitOpenSources = skippedSources.filter(
-            (s) => s.reason === "circuit_open",
-          );
-          const fetchFailedSources = skippedSources.filter(
-            (s) => s.reason === "fetch_failed",
-          );
-          const successfulSources = sources.filter((s) => !s.skipped);
-
-          const total = data?.totalUpserted ?? data?.upserted ?? 0;
-
-          if (successfulSources.length === 0 && skippedSources.length > 0) {
-            // All requested sources were skipped / open / failed
-            if (circuitOpenSources.length > 0) {
-              const names = circuitOpenSources
-                .map((s) => s.source.toUpperCase())
-                .join(", ");
-              onError(
-                `Circuit breaker is OPEN for ${names} due to consecutive failures. Fetch skipped while cooling down.`,
-              );
-            } else {
-              const names = fetchFailedSources
-                .map((s) => s.source.toUpperCase())
-                .join(", ");
-              onError(
-                `Fetch failed for ${names}. The external source may be temporarily unreachable.`,
-              );
-            }
-          } else {
-            posthog.capture("jobs_fetched", {
-              source: selectedSource,
-              jobs_upserted: total,
-            });
-
-            let msg = `Successfully fetched jobs from ${selectedSource.toUpperCase()}! ${total} job(s) updated.`;
-            if (circuitOpenSources.length > 0) {
-              const names = circuitOpenSources
-                .map((s) => s.source.toUpperCase())
-                .join(", ");
-              msg += ` Note: ${names} skipped (circuit breaker open).`;
-            }
-            if (fetchFailedSources.length > 0) {
-              const names = fetchFailedSources
-                .map((s) => s.source.toUpperCase())
-                .join(", ");
-              msg += ` Note: ${names} skipped (fetch failed).`;
-            }
-
-            onSuccess(msg);
-            setIsOpen(false);
-            setTimeout(() => window.location.reload(), 1200);
-          }
+          throw new Error(res.error || `Failed to fetch from ${selectedSource}`);
         }
+
+        const data = res.data;
+        const sources: SourceResult[] = Array.isArray(data?.sources) ? data.sources : [];
+        const open = sources.filter((s) => s.skipped && s.reason === "circuit_open");
+        const failed = sources.filter((s) => s.skipped && s.reason === "fetch_failed");
+        setCircuitOpenSources(open);
+        setFetchFailedSources(failed);
+
+        const total = data?.totalUpserted ?? data?.upserted ?? 0;
+        const successCount = sources.filter((s) => !s.skipped && !s.error).length;
+
+        if (successCount === 0 && sources.length > 0) {
+          throw new Error(
+            open.length > 0
+              ? `Circuit breaker is cooling down for ${open.map((s) => s.source).join(", ")}`
+              : `Fetch failed for ${failed.map((s) => s.source).join(", ")}`
+          );
+        }
+
+        return { total, sources };
       }
-    } catch (err: unknown) {
-      setIsLoading(false);
-      const msg = err instanceof Error ? err.message : "Failed to fetch jobs.";
-      onError(msg);
+    });
+
+    if (result) {
+      posthog.capture("jobs_fetched", {
+        source: selectedSource,
+        jobs_upserted: result.total,
+      });
+      onSuccess(`Successfully fetched ${result.total} job(s) from ${selectedSource.toUpperCase()}!`);
+      setIsOpen(false);
+      setTimeout(() => window.location.reload(), 1200);
     }
   };
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger
-        disabled={isLoading}
+        disabled={retryRunner.isLoading}
         aria-label={t("fetchJobs")}
         className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-3.5 py-2.5 rounded-lg transition shadow-xs inline-flex items-center gap-1.5 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
       >
-        {isLoading ? (
+        {retryRunner.isLoading ? (
           <>
-            <span
-              aria-hidden="true"
-              className="w-1.5 h-1.5 rounded-full bg-white animate-ping"
-            />
+            <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
             <span>{t("fetchingJobs")}</span>
           </>
         ) : (
           <>
-            <span aria-hidden="true" className="text-xs">
-              ⤓
-            </span>
+            <span aria-hidden="true" className="text-xs">⤓</span>
             <span>{t("fetchJobs")}</span>
           </>
         )}
@@ -210,9 +151,9 @@ export function FetchJobsPopover({
 
       <PopoverContent
         align="end"
-        className="w-[92vw] sm:w-120 p-6 sm:p-7 bg-white dark:bg-[#121215] border border-slate-200 dark:border-zinc-800 rounded-3xl shadow-2xl space-y-6"
+        className="w-[92vw] sm:w-120 p-6 sm:p-7 bg-white dark:bg-[#121215] border border-slate-200 dark:border-zinc-800 rounded-3xl shadow-2xl space-y-5"
       >
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-blue-600 dark:bg-blue-400" />
             <span className="text-[11px] font-mono font-bold tracking-widest text-blue-600 dark:text-blue-400 uppercase">
@@ -235,11 +176,23 @@ export function FetchJobsPopover({
           }}
         />
 
-        <form onSubmit={handleFetch} className="space-y-6">
+        <form onSubmit={handleFetch} className="space-y-4">
           <FetchQueryInput
             isKeywordSource={isKeywordSource}
             queryInput={queryInput}
             onQueryChange={setQueryInput}
+          />
+
+          <FetchStatusFeedback
+            status={retryRunner.status}
+            attempt={retryRunner.attempt}
+            totalAttempts={retryRunner.totalAttempts}
+            countdown={retryRunner.countdown}
+            message={retryRunner.message}
+            onRetryNow={retryRunner.retryNow}
+            onCancel={retryRunner.cancelRetry}
+            circuitOpenSources={circuitOpenSources}
+            fetchFailedSources={fetchFailedSources}
           />
 
           <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-zinc-800/80">
@@ -254,10 +207,10 @@ export function FetchJobsPopover({
 
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={retryRunner.isLoading}
               className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl transition shadow-lg shadow-blue-500/25 disabled:opacity-50 flex items-center gap-2 cursor-pointer"
             >
-              {isLoading ? (
+              {retryRunner.isLoading ? (
                 <>
                   <span className="w-2 h-2 rounded-full bg-white animate-ping" />
                   <span>{t("fetching")}</span>

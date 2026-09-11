@@ -1,5 +1,6 @@
 import {
   pgTable,
+  pgEnum,
   uuid,
   text,
   integer,
@@ -7,15 +8,23 @@ import {
   vector,
   index,
   uniqueIndex,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { timestamps } from "./common";
 import { user } from "./auth";
 import { skill } from "./skills";
 import { jobLanguageEnum } from "./job";
+import { tailoredResume } from "./tailoring";
 
 // ─────────────────────────────────────────────────────────────
 // Resume — Multi-persona support
 // ─────────────────────────────────────────────────────────────
+
+export const masterResumeSourceEnum = pgEnum("master_resume_source", [
+  "uploaded",
+  "promoted_tailored",
+]);
 
 export const masterResume = pgTable(
   "master_resume",
@@ -30,13 +39,24 @@ export const masterResume = pgTable(
     isActive: boolean("is_active").default(true).notNull(),
     version: integer("version").default(1).notNull(),
     language: jobLanguageEnum("language").default("en").notNull(),
+    source: masterResumeSourceEnum("source").default("uploaded").notNull(),
+    promotedFromTailoredResumeId: uuid("promoted_from_tailored_resume_id").references(
+      (): AnyPgColumn => tailoredResume.id,
+      { onDelete: "set null" }
+    ),
     embedding: vector("embedding", { dimensions: 1536 }),
     ...timestamps,
   },
   (t) => [
     index("master_resume_user_idx").on(t.userId),
+    uniqueIndex("master_resume_user_active_unique_idx")
+      .on(t.userId)
+      .where(sql`${t.isActive} = true`),
   ]
 );
+
+export type MasterResumeSelect = typeof masterResume.$inferSelect;
+export type MasterResumeInsert = typeof masterResume.$inferInsert;
 
 export const resumeSkill = pgTable(
   "resume_skill",

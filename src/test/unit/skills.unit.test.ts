@@ -1,5 +1,6 @@
-import { diffSkills, normalizeSkill } from "@/services/skills.service";
+import { diffSkills, normalizeSkill, normalizeSkillName } from "@/services/skills.service";
 import * as skillsService from "@/services/skills.service";
+import { normalizeSkillName as normalizeSkillNameDirect } from "@/services/skills/normalize";
 import * as skillsDal from "@/dal/skills.dal";
 import { scoreResultSchema } from "@/services/scoring/types";
 
@@ -20,6 +21,26 @@ async function runSkillsUnitTests() {
   assert(
     typeof skillsService.normalizeSkill === "function",
     "normalizeSkill should be exported from skills.service"
+  );
+  assert(
+    typeof skillsService.normalizeSkillName === "function",
+    "normalizeSkillName should be exported from skills.service"
+  );
+  assert(
+    typeof normalizeSkillNameDirect === "function",
+    "normalizeSkillName should be exported from @/services/skills/normalize"
+  );
+  assert(
+    typeof skillsService.analyzeJobResumeMatch === "function",
+    "analyzeJobResumeMatch should be exported from skills.service"
+  );
+  assert(
+    typeof skillsService.analyzeSkillGap === "function",
+    "analyzeSkillGap should be exported from skills.service"
+  );
+  assert(
+    typeof skillsService.buildMatchAnalysisPrompt === "function",
+    "buildMatchAnalysisPrompt should be exported from skills.service"
   );
   assert(
     typeof skillsService.extractSkillsFromJob === "function",
@@ -61,6 +82,26 @@ async function runSkillsUnitTests() {
   assert(normalizeSkill("Node-JS") === "node js", "normalizeSkill replaces dashes with space");
   assert(normalizeSkill("CI/CD") === "ci cd", "normalizeSkill replaces slashes with space");
   console.log("✓ normalizeSkill correctly handles punctuation and whitespace");
+
+  // Step 12: normalizeSkillName does lowercase/trim/whitespace-collapse only (no synonym resolution)
+  assert(normalizeSkillName("  JavaScript   Core  ") === "javascript core", "normalizeSkillName collapses whitespace and trims");
+  assert(normalizeSkillName("JS") === "js", "normalizeSkillName does not resolve synonyms like JS->JavaScript");
+  assert(normalizeSkillName("PostgreSQL") === "postgresql", "normalizeSkillName lowercases");
+  assert(normalizeSkillName("") === "", "normalizeSkillName handles empty string");
+  console.log("✓ normalizeSkillName does lowercase/trim/whitespace-collapse only (no synonym resolution)");
+
+  // Step 13: Prompt branching for French vs English
+  {
+    const enPrompt = skillsService.buildMatchAnalysisPrompt("Software Engineer", "Resume...", "en");
+    assert(enPrompt.system.includes("expert technical recruiter"), "English prompt should use English system instruction");
+    assert(enPrompt.prompt.includes("TARGET JOB POSTING"), "English prompt should use TARGET JOB POSTING");
+
+    const frPrompt = skillsService.buildMatchAnalysisPrompt("Ingénieur Logiciel", "CV...", "fr");
+    assert(frPrompt.system.includes("recruteur technique expert"), "French prompt should use French system instruction");
+    assert(frPrompt.prompt.includes("OFFRE D'EMPLOI CIBLE"), "French prompt should use OFFRE D'EMPLOI CIBLE");
+    assert(frPrompt.prompt.includes("français"), "French prompt should request explanation in French");
+  }
+  console.log("✓ buildMatchAnalysisPrompt correctly branches between French and English");
 
   // 3. diffSkills test: Exact matches
   {
@@ -157,6 +198,62 @@ async function runSkillsUnitTests() {
     assert(!parsedInvalid.success, "scoreResultSchema should require explanation");
   }
   console.log("✓ scoreResultSchema enforces 'Why this matched' explanation and skill arrays");
+
+  // 7. matchAnalysisSchema validation (Step 13 Option B)
+  {
+    const validMatch = {
+      jobSkills: ["TypeScript", "Next.js"],
+      resumeSkills: ["TypeScript", "React"],
+      explanation: "Matches TypeScript experience but lacks production Next.js background.",
+    };
+    const parsedMatch = skillsService.matchAnalysisSchema.safeParse(validMatch);
+    assert(parsedMatch.success, "matchAnalysisSchema should parse valid payload");
+
+    const invalidMatch = {
+      jobSkills: ["TypeScript"],
+      resumeSkills: ["TypeScript"],
+    };
+    const parsedInvalidMatch = skillsService.matchAnalysisSchema.safeParse(invalidMatch);
+    assert(!parsedInvalidMatch.success, "matchAnalysisSchema requires explanation");
+  }
+  console.log("✓ matchAnalysisSchema validates combined output structure");
+
+  // 8. resolveLanguageModel resolution of provider and model
+  {
+    const origAiProvider = process.env.AI_PROVIDER;
+    const origGeminiKey = process.env.GEMINI_API_KEY;
+    const origAnthropicKey = process.env.ANTHROPIC_API_KEY;
+    const origOpenaiKey = process.env.OPENAI_API_KEY;
+
+    try {
+      process.env.GEMINI_API_KEY = "test-gemini-key";
+      delete process.env.AI_PROVIDER;
+
+      // Default with no preferredProvider and no AI_PROVIDER
+      const defaultResolved = skillsService.resolveLanguageModel();
+      assert(defaultResolved.provider === "gemini", `Expected provider gemini, got ${defaultResolved.provider}`);
+      assert(defaultResolved.modelId.includes("gemini"), `Expected gemini modelId, got ${defaultResolved.modelId}`);
+
+      // When AI_PROVIDER is set and preferredProvider is absent
+      process.env.AI_PROVIDER = "claude";
+      process.env.ANTHROPIC_API_KEY = "test-anthropic-key";
+      const claudeFromEnv = skillsService.resolveLanguageModel();
+      assert(claudeFromEnv.provider === "claude", `Expected provider claude from env, got ${claudeFromEnv.provider}`);
+      assert(claudeFromEnv.modelId === "claude-3-5-sonnet-latest", `Expected claude modelId, got ${claudeFromEnv.modelId}`);
+
+      // When preferredProvider overrides AI_PROVIDER
+      process.env.OPENAI_API_KEY = "test-openai-key";
+      const openaiOverride = skillsService.resolveLanguageModel("openai");
+      assert(openaiOverride.provider === "openai", `Expected provider openai, got ${openaiOverride.provider}`);
+      assert(openaiOverride.modelId === "gpt-4o", `Expected gpt-4o, got ${openaiOverride.modelId}`);
+    } finally {
+      if (origAiProvider !== undefined) process.env.AI_PROVIDER = origAiProvider; else delete process.env.AI_PROVIDER;
+      if (origGeminiKey !== undefined) process.env.GEMINI_API_KEY = origGeminiKey; else delete process.env.GEMINI_API_KEY;
+      if (origAnthropicKey !== undefined) process.env.ANTHROPIC_API_KEY = origAnthropicKey; else delete process.env.ANTHROPIC_API_KEY;
+      if (origOpenaiKey !== undefined) process.env.OPENAI_API_KEY = origOpenaiKey; else delete process.env.OPENAI_API_KEY;
+    }
+  }
+  console.log("✓ resolveLanguageModel accurately resolves provider and model identifiers");
 
   console.log("\n==========================================");
   console.log("✓ All Skills & Explanation unit tests passed successfully!");

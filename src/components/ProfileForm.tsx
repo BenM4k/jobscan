@@ -24,6 +24,10 @@ export interface ProfileFormProps {
   initialExperience?: ExperienceItem[];
   initialAiUsage?: UserAiUsage | null;
   aiUsageError?: boolean;
+  resumeLabel?: string;
+  resumeVersion?: number;
+  resumeLanguage?: string;
+  resumeSource?: string;
 }
 
 export function ProfileForm({
@@ -37,6 +41,10 @@ export function ProfileForm({
   initialExperience = [],
   initialAiUsage,
   aiUsageError = false,
+  resumeLabel = "Default",
+  resumeVersion = 1,
+  resumeLanguage = "en",
+  resumeSource = "uploaded",
 }: ProfileFormProps) {
   const [resumeText, setResumeText] = useState(initialResumeText);
   const [summary, setSummary] = useState(initialSummary);
@@ -120,6 +128,10 @@ export function ProfileForm({
           aiProvider={aiProvider}
           aiUsage={initialAiUsage}
           aiUsageError={aiUsageError}
+          resumeLabel={resumeLabel}
+          resumeVersion={resumeVersion}
+          resumeLanguage={resumeLanguage}
+          resumeSource={resumeSource}
           onEditClick={() => setIsEditing(true)}
           onDeleteClick={() => setDeleteConfirmOpen(true)}
         />

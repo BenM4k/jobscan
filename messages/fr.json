@@ -18,6 +18,7 @@
   },
   "nav": {
     "pipeline": "Pipeline",
+    "resumes": "CVs",
     "addJob": "Ajouter une offre",
     "profile": "Profil & CV",
     "settings": "Paramètres",
@@ -152,7 +153,18 @@
     "deleteJobConfirm": "Supprimer l'offre",
     "missingResumeTitle": "CV Principal Requis",
     "missingResumeDescription": "Vous devez configurer votre CV principal et vos compétences dans votre profil avant d'évaluer les offres avec l'IA Gemini.",
-    "goToProfile": "Configurer le CV dans le Profil →"
+    "goToProfile": "Configurer le CV dans le Profil →",
+    "matchedSkills": "Compétences correspondantes",
+    "missingSkills": "Compétences manquantes",
+    "noneIdentified": "Aucun identifié",
+    "bgIngestionActive": "Ingestion en arrière-plan active",
+    "bgIngestionDesc": "Les plateformes d'emploi sont interrogées en arrière-plan. Vérifiez l'état ci-dessous.",
+    "checkingBgIngestion": "Vérification de l'ingestion en arrière-plan...",
+    "checkForIngestedJobs": "Vérifier les offres ingérées",
+    "circuitBreakerCooldown": "Période de temporisation (Circuit Breaker)",
+    "circuitBreakerDesc": "{sources} en temporisation en raison d'échecs externes consécutifs.",
+    "sourceUnreachable": "Source inaccessible",
+    "sourceUnreachableDesc": "{sources} n'a pas pu être joint."
   },
   "addJob": {
     "sourceManual": "Source : Saisie manuelle",
@@ -226,15 +238,28 @@
     "yearPlaceholder": "Année / Période (ex. 2018 - 2022)",
     "deleteResumeModalTitle": "Effacer le CV principal ?",
     "deleteResumeModalDescription": "Cette action supprimera définitivement votre CV principal enregistré, vos compétences extraites, vos expériences et formations de votre profil. Êtes-vous sûr de vouloir continuer ?",
-    "deleteResumeConfirm": "Effacer le CV"
+    "deleteResumeConfirm": "Effacer le CV",
+    "defaultResumeLabel": "Par défaut",
+    "activeMasterResumeTitle": "CV principal actif",
+    "masterVersionBadge": "Principal : {label} (v{version})",
+    "masterLabel": "Principal : {label}",
+    "promotedBadge": "Promu",
+    "masterFallbackLabel": "Principal",
+    "profileTitleTemplate": "Profil de CV {label}"
   },
   "jobDetail": {
+    "via": "via",
     "backToPipeline": "← Retour au pipeline",
     "statusLabel": "Statut",
     "scoreHeading": "Analyse d'adéquation & Score",
     "scoreWithAi": "Évaluer avec Gemini Flash",
     "scoringWithAi": "Analyse & Évaluation en cours...",
     "reScore": "Ré-évaluer par rapport au CV ↻",
+    "selectScoringPersona": "Sélectionner le profil d'évaluation",
+    "personaLabel": "Profil",
+    "scoringPersonaMenu": "Profil d'évaluation",
+    "activeTag": "actif",
+    "personaPrefix": "Profil :",
     "matchedSkills": "Compétences correspondantes",
     "missingSkills": "Compétences manquantes",
     "gapsAnalysis": "Écarts de qualification & Exigences",
@@ -378,5 +403,13 @@
     "sidebarError": "Impossible de charger les détails d'utilisation de l'IA.",
     "compactError": "Impossible de charger les crédits d'IA.",
     "cardError": "Impossible de charger les détails d'utilisation de l'IA. Veuillez actualiser la page pour réessayer."
+  },
+  "retry": {
+    "attemptCount": "Tentative {attempt} sur {total}",
+    "inSeconds": "dans {seconds}s",
+    "retryNow": "Réessayer maintenant",
+    "cancel": "Annuler",
+    "executingRetry": "Exécution de la tentative {attempt} sur {total}...",
+    "retry": "Réessayer"
   }
 }

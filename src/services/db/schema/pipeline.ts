@@ -5,6 +5,7 @@ import {
   pgEnum,
   index,
   uniqueIndex,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { timestamps } from "./common";
 import { user } from "./auth";
@@ -35,7 +36,7 @@ export const pipelineEntry = pgTable(
       .references(() => job.id, { onDelete: "cascade" })
       .notNull(),
     status: pipelineStatusEnum("status").default("saved").notNull(),
-    resumeIdUsed: uuid("resume_id_used").references(() => masterResume.id, {
+    resumeIdUsed: uuid("resume_id_used").references((): AnyPgColumn => masterResume.id, {
       onDelete: "set null",
     }),
     ...timestamps,

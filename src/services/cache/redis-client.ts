@@ -242,9 +242,74 @@ end
 return { allowed, tostring(remaining), retry_after }
 `;
 
+interface LocalRateLimitBucket {
+  tokens: number;
+  lastRefill: number;
+}
+
+const localRateLimitBuckets = new Map<string, LocalRateLimitBucket>();
+const MAX_LOCAL_BUCKETS = 10000;
+
+/**
+ * Bounded local in-memory token-bucket rate limiter for fallback
+ * when Redis is unconfigured or temporarily unavailable.
+ * Ensures that Redis unavailability does not allow unlimited cost-bearing AI requests.
+ */
+export function executeLocalTokenBucketRateLimit(
+  key: string,
+  capacity: number,
+  refillRatePerSec: number,
+  cost: number = 1
+): TokenBucketRateLimitResult {
+  const now = Date.now();
+  let bucket = localRateLimitBuckets.get(key);
+
+  if (!bucket) {
+    if (localRateLimitBuckets.size >= MAX_LOCAL_BUCKETS) {
+      const firstKey = localRateLimitBuckets.keys().next().value;
+      if (firstKey) localRateLimitBuckets.delete(firstKey);
+    }
+    bucket = { tokens: capacity, lastRefill: now };
+    localRateLimitBuckets.set(key, bucket);
+  }
+
+  // Refill tokens based on elapsed time
+  const elapsedSec = Math.max(0, (now - bucket.lastRefill) / 1000);
+  bucket.tokens = Math.min(capacity, bucket.tokens + elapsedSec * refillRatePerSec);
+  bucket.lastRefill = now;
+
+  if (bucket.tokens >= cost) {
+    bucket.tokens -= cost;
+    return {
+      allowed: true,
+      remaining: Math.max(0, Math.floor(bucket.tokens)),
+      retryAfterSeconds: 0,
+    };
+  }
+
+  const tokensNeeded = cost - bucket.tokens;
+  const retryAfterSeconds =
+    refillRatePerSec > 0
+      ? Math.max(1, Math.ceil(tokensNeeded / refillRatePerSec))
+      : 60;
+
+  return {
+    allowed: false,
+    remaining: Math.max(0, Math.floor(bucket.tokens)),
+    retryAfterSeconds,
+  };
+}
+
+/**
+ * Clear local rate-limiting buckets (useful for test isolation).
+ */
+export function clearLocalRateLimitBuckets(): void {
+  localRateLimitBuckets.clear();
+}
+
 /**
  * Execute an atomic token-bucket rate limit check in Redis.
- * Fails open (allows request) if Redis is unavailable or unconfigured.
+ * Falls back to bounded local in-memory limiter if Redis is unavailable or unconfigured.
  */
 export async function executeTokenBucketRateLimit(
   key: string,
@@ -254,7 +319,7 @@ export async function executeTokenBucketRateLimit(
 ): Promise<TokenBucketRateLimitResult> {
   const client = getRedisClient();
   if (!client) {
-    return { allowed: true, remaining: capacity, retryAfterSeconds: 0 };
+    return executeLocalTokenBucketRateLimit(key, capacity, refillRatePerSec, cost);
   }
 
   try {
@@ -272,9 +337,10 @@ export async function executeTokenBucketRateLimit(
     return { allowed, remaining, retryAfterSeconds };
   } catch (err) {
     console.warn(
-      `[Redis] Rate limit execution failed for key "${key}", failing open:`,
+      `[Redis] Rate limit execution failed for key "${key}", falling back to bounded local limiter:`,
       err instanceof Error ? err.message : err
     );
-    return { allowed: true, remaining: capacity, retryAfterSeconds: 0 };
+    return executeLocalTokenBucketRateLimit(key, capacity, refillRatePerSec, cost);
   }
 }
+

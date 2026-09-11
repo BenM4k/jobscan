@@ -36,7 +36,8 @@ export async function saveTailoredResume(
   pipelineEntryId: string,
   content: string,
   strategyLabel?: string,
-  diffFromPrevious?: unknown
+  diffFromPrevious?: unknown,
+  language?: "en" | "fr"
 ): Promise<Result<TailoredResumeSelect, AppError>> {
   try {
     const existingRes = await getTailoredResume(pipelineEntryId);
@@ -51,6 +52,7 @@ export async function saveTailoredResume(
         .set({
           content,
           strategyLabel: strategyLabel ?? existing.strategyLabel,
+          ...(language ? { language } : {}),
           updatedAt: new Date(),
         })
         .where(eq(tailoredResume.id, existing.id))
@@ -63,6 +65,7 @@ export async function saveTailoredResume(
           pipelineEntryId,
           content,
           strategyLabel,
+          ...(language ? { language } : {}),
         })
         .returning();
       currentRecord = inserted;

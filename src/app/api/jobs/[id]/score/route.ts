@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import * as jobsDal from "@/dal/jobs.dal";
 import { requireSession } from "@/lib/auth-guard";
 import { runWithIdempotency } from "@/services/idempotency.service";
+import { checkAiRateLimit } from "@/services/rate-limit";
 import { ok } from "@/lib/result";
 
 export async function POST(
@@ -20,6 +22,24 @@ export async function POST(
     }
 
     const userId = sessionResult.value.user.id;
+
+    // Rate limiting check before paid operation
+    const rateLimitRes = await checkAiRateLimit(userId, "scoring");
+    if (!rateLimitRes.allowed) {
+      return NextResponse.json(
+        {
+          error: `Rate limit exceeded for AI scoring. Please wait ${rateLimitRes.retryAfterSeconds}s before retrying.`,
+          code: "rate_limited",
+          retryAfterSeconds: rateLimitRes.retryAfterSeconds,
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rateLimitRes.retryAfterSeconds),
+          },
+        }
+      );
+    }
 
     // Extract idempotency key from header or body
     let reqBody: Record<string, unknown> | null = null;
@@ -47,6 +67,23 @@ export async function POST(
       );
     }
 
+    const rawResumeId =
+      typeof reqBody?.resumeId === "string"
+        ? reqBody.resumeId
+        : _req.nextUrl.searchParams.get("resumeId") || undefined;
+
+    let resumeId: string | undefined = undefined;
+    if (rawResumeId) {
+      const parsedResumeId = z.string().uuid().safeParse(rawResumeId);
+      if (!parsedResumeId.success) {
+        return NextResponse.json(
+          { error: "Invalid resume ID format: must be a valid UUID" },
+          { status: 400 }
+        );
+      }
+      resumeId = parsedResumeId.data;
+    }
+
     const result = await runWithIdempotency({
       userId,
       action: "run_scoring",
@@ -54,7 +91,7 @@ export async function POST(
       targetId: id,
       execute: async () => {
         const { scoreJobWithAI } = await import("@/services/job.service");
-        const scoreRes = await scoreJobWithAI(id, userId);
+        const scoreRes = await scoreJobWithAI(id, userId, undefined, resumeId);
         if (!scoreRes.ok) {
           return scoreRes;
         }
@@ -100,6 +137,12 @@ export async function POST(
         return NextResponse.json(
           { error: "Job scoring is currently in progress", inProgress: true },
           { status: 409 }
+        );
+      }
+      if (result.error.code === "NOT_FOUND") {
+        return NextResponse.json(
+          { error: result.error.message || "Requested resume persona not found" },
+          { status: 404 }
         );
       }
       if (result.error.code === "NO_MASTER_RESUME") {

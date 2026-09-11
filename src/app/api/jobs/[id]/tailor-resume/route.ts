@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth-guard";
 import { runWithIdempotency } from "@/services/idempotency.service";
 import { generateTailoredResume } from "@/services/tailoring.service";
+import { checkAiRateLimit } from "@/services/rate-limit";
 import * as jobService from "@/services/job.service";
 import * as jobsDal from "@/dal/jobs.dal";
 import { ok } from "@/lib/result";
@@ -22,6 +23,24 @@ export async function POST(
     }
 
     const userId = sessionResult.value.user.id;
+
+    // Rate limiting check before paid tailoring operation
+    const rateLimitRes = await checkAiRateLimit(userId, "tailored_resume");
+    if (!rateLimitRes.allowed) {
+      return NextResponse.json(
+        {
+          error: `Rate limit exceeded for resume tailoring. Please wait ${rateLimitRes.retryAfterSeconds}s before retrying.`,
+          code: "rate_limited",
+          retryAfterSeconds: rateLimitRes.retryAfterSeconds,
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rateLimitRes.retryAfterSeconds),
+          },
+        }
+      );
+    }
 
     // Extract idempotency key from header or body
     let reqBody: Record<string, unknown> | null = null;
@@ -49,13 +68,18 @@ export async function POST(
       );
     }
 
+    const resumeId =
+      typeof reqBody?.resumeId === "string"
+        ? reqBody.resumeId
+        : _req.nextUrl.searchParams.get("resumeId") || undefined;
+
     const result = await runWithIdempotency({
       userId,
       action: "generate_tailored_resume",
       key: idempotencyKey,
       targetId: id,
       execute: async () => {
-        const tailorRes = await generateTailoredResume(id, userId);
+        const tailorRes = await generateTailoredResume(id, userId, resumeId);
         if (!tailorRes.ok) {
           return tailorRes;
         }
@@ -120,6 +144,7 @@ export async function POST(
       data: result.value.data.job,
       tailoredResume: result.value.data.tailoredResumeText,
       structured: result.value.data.structured,
+      tailoredResumeRecordId: result.value.data.tailoredResumeRecordId,
       isCached: result.value.isCached,
     });
   } catch (error) {

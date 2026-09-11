@@ -4,7 +4,7 @@ import { db } from "@/services/db";
 import { idempotencyKey, IdempotencyKeySelect } from "@/services/db/schema";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 export type BeginIdempotencyResult =
   | { type: "locked"; record: IdempotencyKeySelect; attemptId: string }
@@ -249,3 +249,48 @@ export async function getIdempotencyRecord(
     );
   }
 }
+
+export async function reopenIdempotentAction(
+  id: string,
+  targetId?: string | null
+): Promise<Result<{ record: IdempotencyKeySelect; attemptId: string }, AppError>> {
+  try {
+    const nextAttemptId = crypto.randomUUID();
+    const [updated] = await db
+      .update(idempotencyKey)
+      .set({
+        status: "in_progress",
+        attemptId: nextAttemptId,
+        targetId: targetId || undefined,
+        resultRef: null,
+        createdAt: new Date(),
+      })
+      .where(
+        and(
+          eq(idempotencyKey.id, id),
+          inArray(idempotencyKey.status, ["completed", "failed"])
+        )
+      )
+      .returning();
+
+    if (!updated) {
+      return err(
+        new AppError(
+          "CONFLICT",
+          `Idempotency record ${id} cannot be reopened or is already in_progress`
+        )
+      );
+    }
+
+    return ok({ record: updated, attemptId: nextAttemptId });
+  } catch (error) {
+    return err(
+      new AppError(
+        "DB_ERROR",
+        `Failed to reopen idempotent action ${id}`,
+        error
+      )
+    );
+  }
+}
+

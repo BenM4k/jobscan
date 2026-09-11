@@ -10,41 +10,62 @@ export const DEFAULT_SCORE_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60; // 604,800s
 
 /**
  * Generates the cache key for an AI job score.
- * Key format: score:${jobId}:${resumeVersion}:${modelVersion}
+ * Key format: score:${jobId}:${resumeId}:${resumeVersion}:${modelVersion}
+ * resumeId isolates scores between different resumes/personas.
  * resumeVersion on masterResume automatically invalidates stale scores on resume updates.
  */
 export function getScoreCacheKey(
   jobId: string,
+  resumeId: string,
   resumeVersion: number | string,
   modelVersion: string
 ): string {
-  return `score:${jobId}:${resumeVersion}:${modelVersion}`;
+  return `score:${jobId}:${resumeId}:${resumeVersion}:${modelVersion}`;
 }
 
 /**
- * Retrieves a previously cached AI match score if available.
+ * Retrieves a previously cached match score if available.
+ * Gracefully treats any Redis error as a cache miss (returns null).
  */
-export async function getCachedScore(
+export async function getCachedScore<T = ScoreResult>(
   jobId: string,
+  resumeId: string,
   resumeVersion: number | string,
   modelVersion: string
-): Promise<ScoreResult | null> {
-  const key = getScoreCacheKey(jobId, resumeVersion, modelVersion);
-  return await cacheGet<ScoreResult>(key);
+): Promise<T | null> {
+  try {
+    const key = getScoreCacheKey(jobId, resumeId, resumeVersion, modelVersion);
+    return await cacheGet<T>(key);
+  } catch (err) {
+    console.warn(
+      `[ScoreCache] Error getting score cache for job ${jobId}, treating as miss:`,
+      err instanceof Error ? err.message : err
+    );
+    return null;
+  }
 }
 
 /**
  * Persists an AI match score to Redis with TTL.
+ * Silently catches write failures to ensure Redis errors never block the request.
  */
-export async function setCachedScore(
+export async function setCachedScore<T = ScoreResult>(
   jobId: string,
+  resumeId: string,
   resumeVersion: number | string,
   modelVersion: string,
-  score: ScoreResult,
+  score: T,
   ttlSeconds = DEFAULT_SCORE_CACHE_TTL_SECONDS
 ): Promise<void> {
-  const key = getScoreCacheKey(jobId, resumeVersion, modelVersion);
-  await cacheSet(key, score, ttlSeconds);
+  try {
+    const key = getScoreCacheKey(jobId, resumeId, resumeVersion, modelVersion);
+    await cacheSet(key, score, ttlSeconds);
+  } catch (err) {
+    console.warn(
+      `[ScoreCache] Error writing score cache for job ${jobId}:`,
+      err instanceof Error ? err.message : err
+    );
+  }
 }
 
 /**
@@ -52,9 +73,18 @@ export async function setCachedScore(
  */
 export async function invalidateCachedScore(
   jobId: string,
+  resumeId: string,
   resumeVersion: number | string,
   modelVersion: string
 ): Promise<number> {
-  const key = getScoreCacheKey(jobId, resumeVersion, modelVersion);
-  return await cacheDel(key);
+  try {
+    const key = getScoreCacheKey(jobId, resumeId, resumeVersion, modelVersion);
+    return await cacheDel(key);
+  } catch (err) {
+    console.warn(
+      `[ScoreCache] Error invalidating score cache for job ${jobId}:`,
+      err instanceof Error ? err.message : err
+    );
+    return 0;
+  }
 }

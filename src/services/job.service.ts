@@ -89,15 +89,27 @@ export async function scoreJobWithAI(
   jobId: string,
   userId: string,
   preferredProvider?: "claude" | "gemini" | "openai" | "gateway",
+  resumeId?: string,
 ): Promise<Result<jobsDal.JobSelect, AppError>> {
   const jobResult = await jobsDal.getJobById(jobId, userId);
   if (!jobResult.ok) return jobResult;
   const job = jobResult.value;
 
-  // Gate on master_resume — AI scoring requires an active resume (per AGENTS.md §5)
-  const resumeRes = await resumeDal.getActiveMasterResume(userId);
-  if (!resumeRes.ok) return err(resumeRes.error);
-  const activeResume = resumeRes.value;
+  // Gate on master_resume — resolve specific persona or active resume (per AGENTS.md §5)
+  let activeResume: resumeDal.MasterResumeSelect | null = null;
+  if (resumeId) {
+    const resumeRes = await resumeDal.getMasterResumeById(resumeId, userId);
+    if (!resumeRes.ok) return err(resumeRes.error);
+    if (!resumeRes.value) {
+      return err(new AppError("NOT_FOUND", `Requested resume persona ${resumeId} not found`));
+    }
+    activeResume = resumeRes.value;
+  } else {
+    const resumeRes = await resumeDal.getActiveMasterResume(userId);
+    if (!resumeRes.ok) return err(resumeRes.error);
+    activeResume = resumeRes.value;
+  }
+
   const resumeText = activeResume?.content || "";
   let resumeSkills: string[] = [];
 
@@ -120,7 +132,12 @@ export async function scoreJobWithAI(
   const modelVersion = provider.modelId;
 
   // 1. Check LRU/LFU score cache before calling provider (per AGENTS.md)
-  const cachedScore = await getCachedScore(job.id, resumeVersion, modelVersion);
+  const cachedScore = await getCachedScore(
+    job.id,
+    activeResume.id,
+    resumeVersion,
+    modelVersion
+  );
   let score: ScoreResult;
 
   if (cachedScore) {
@@ -158,7 +175,13 @@ export async function scoreJobWithAI(
     score = scoreResult.value;
 
     // Cache the fresh score in Redis with TTL
-    await setCachedScore(job.id, resumeVersion, modelVersion, score);
+    await setCachedScore(
+      job.id,
+      activeResume.id,
+      resumeVersion,
+      modelVersion,
+      score
+    );
   }
 
   // Extract skills: use the structured JSON output from the scoring LLM call (or fallback to combined extraction)
@@ -215,6 +238,9 @@ export async function scoreJobWithAI(
     modelVersion,
     activeResume?.version,
     userId,
+    undefined,
+    undefined,
+    activeResume.id
   );
 }
 

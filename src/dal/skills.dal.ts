@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "@/services/db";
 import { skill, jobSkill } from "@/services/db/schema/skills";
+import { normalizeSkillName } from "@/services/skills/normalize";
 import { eq } from "drizzle-orm";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
@@ -44,7 +45,7 @@ export async function syncJobSkills(
       const cleanNames = Array.from(
         new Set(
           skillNames
-            .map((n) => n.trim())
+            .map((n) => normalizeSkillName(n))
             .filter((n) => n.length > 0)
         )
       );

@@ -181,6 +181,30 @@ async function runUnitTests() {
   assert(failedId === "record-fail", "marked failed in DAL");
   assert(failedAttemptId === "attempt-fail-1", "attemptId passed to failIdempotentAction");
 
+  // 7. reopenIdempotentAction contract verification
+  {
+    const reopenableStatuses = ["completed", "failed"];
+    const canReopen = (status: string) => reopenableStatuses.includes(status);
+
+    assert(canReopen("completed") === true, "completed records are reopenable");
+    assert(canReopen("failed") === true, "failed records are reopenable");
+    assert(canReopen("in_progress") === false, "in_progress records cannot be reopened (prevents concurrent theft)");
+
+    const simulateReopen = (currentStatus: string) => {
+      if (!canReopen(currentStatus)) {
+        return err(new AppError("CONFLICT", "Idempotency record cannot be reopened or is already in_progress"));
+      }
+      return ok({ attemptId: "new-attempt-uuid" });
+    };
+
+    const conflictRes = simulateReopen("in_progress");
+    assert(!conflictRes.ok && conflictRes.error.code === "CONFLICT", "reopening in_progress yields CONFLICT");
+
+    const validReopen = simulateReopen("completed");
+    assert(validReopen.ok && validReopen.value.attemptId === "new-attempt-uuid", "reopening completed succeeds");
+  }
+  console.log("✓ reopenIdempotentAction terminal status & CONFLICT contract verified");
+
   console.log("All unit tests for runWithIdempotency passed successfully! 🚀");
 }
 

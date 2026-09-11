@@ -22,7 +22,10 @@ export function Navbar({ userId, userEmail, userName }: NavbarProps) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const identifiedUserId = React.useRef<string | null>(null);
-  const identifiedProps = React.useRef<{ email?: string | null; name?: string | null }>({});
+  const identifiedProps = React.useRef<{
+    email?: string | null;
+    name?: string | null;
+  }>({});
   const t = useTranslations("nav");
 
   React.useEffect(() => {
@@ -64,6 +67,7 @@ export function Navbar({ userId, userEmail, userName }: NavbarProps) {
 
   const navLinks = [
     { href: "/dashboard", label: t("pipeline"), icon: "📊" },
+    { href: "/dashboard/resumes", label: t("resumes"), icon: "📄" },
     { href: "/dashboard/add-job", label: t("addJob"), icon: "➕" },
     { href: "/dashboard/profile", label: t("profile"), icon: "👤" },
   ];
@@ -74,7 +78,11 @@ export function Navbar({ userId, userEmail, userName }: NavbarProps) {
       className="border-b border-slate-300 dark:border-zinc-800 bg-white/80 dark:bg-[#0A0A0C]/90 backdrop-blur-xl sticky top-0 z-50 transition-colors duration-300"
     >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        <Link href="/" aria-label="JobPilot Home" className="flex items-center gap-3 group">
+        <Link
+          href="/"
+          aria-label="JobPilot Home"
+          className="flex items-center gap-3 group"
+        >
           <Logo size={36} showText badgeText="PRO" />
         </Link>
 
@@ -127,7 +135,9 @@ export function Navbar({ userId, userEmail, userName }: NavbarProps) {
             aria-label="Toggle mobile menu"
             className="p-2 rounded-xl text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer"
           >
-            <span className="text-xl font-bold">{mobileMenuOpen ? "✕" : "☰"}</span>
+            <span className="text-xl font-bold">
+              {mobileMenuOpen ? "✕" : "☰"}
+            </span>
           </button>
         </div>
       </div>
