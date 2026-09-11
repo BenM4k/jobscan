@@ -5,6 +5,7 @@ import {
   text,
   varchar,
   numeric,
+  bigint,
   timestamp,
   jsonb,
   pgEnum,
@@ -45,6 +46,8 @@ export const jobStatusEnum = pgEnum("job_status", [
   "closed",
 ]);
 
+export const jobLanguageEnum = pgEnum("job_language", ["en", "fr"]);
+
 /** Normalized job — canonical shape every source adapter maps into. */
 export const job = pgTable(
   "job",
@@ -59,6 +62,7 @@ export const job = pgTable(
     url: text("url"),
     postedAt: timestamp("posted_at"),
     status: jobStatusEnum("status").default("active").notNull(),
+    language: jobLanguageEnum("language").default("en").notNull(),
 
     // --- Salary normalization ---
     salaryMin: numeric("salary_min"),
@@ -70,9 +74,9 @@ export const job = pgTable(
 
     // --- Matching (pgvector, SimHash, & Full-Text tsvector) ---
     embedding: vector("embedding", { dimensions: 1536 }),
-    simhash: numeric("simhash"),
+    simhash: bigint("simhash", { mode: "bigint" }),
     descriptionTsv: tsvector("description_tsv").generatedAlwaysAs(
-      sql`to_tsvector('english', "description")`
+      sql`CASE WHEN "language" = 'fr' THEN to_tsvector('french', "description") ELSE to_tsvector('english', "description") END`
     ),
 
     addedByUserId: uuid("added_by_user_id").references(() => user.id, {

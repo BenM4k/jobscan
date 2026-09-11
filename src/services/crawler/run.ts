@@ -12,7 +12,11 @@ import {
   resolveCrawlerKeyword,
   ingestCrawledJob,
 } from "./crawler-utils";
-import { getCircuitBreaker } from "@/lib/circuit-breaker";
+import {
+  canAttempt,
+  recordSuccess,
+  recordFailure,
+} from "@/services/reliability/circuit-breaker";
 
 export const DRC_ONLY_SOURCES = new Set([
   "reliefweb",
@@ -87,12 +91,35 @@ export async function runDrcCrawler(
 
     const fetchSettled = await Promise.allSettled(
       fetchersToRun.map(async ({ name, fetcher }) => {
-        const breaker = getCircuitBreaker(name);
-        return breaker.execute(async () => {
+        const allowed = await canAttempt(name);
+        if (!allowed) {
+          return {
+            name,
+            skipped: true,
+            reason: "circuit_open" as const,
+            message: `Circuit breaker is OPEN for ${name}. Fetch skipped.`,
+            result: null,
+            rawJobs: [],
+          };
+        }
+
+        try {
           const { result, jobs: rawJobs } = await fetcher(targetKeyword);
-          return { name, result, rawJobs };
-        });
-      })
+          await recordSuccess(name);
+          return { name, skipped: false, result, rawJobs };
+        } catch (fetchErr) {
+          await recordFailure(name);
+          return {
+            name,
+            skipped: true,
+            reason: "fetch_failed" as const,
+            message:
+              fetchErr instanceof Error ? fetchErr.message : String(fetchErr),
+            result: null,
+            rawJobs: [],
+          };
+        }
+      }),
     );
 
     for (let i = 0; i < fetchersToRun.length; i++) {
@@ -105,10 +132,26 @@ export async function runDrcCrawler(
           fetched: 0,
           matched: 0,
           upserted: 0,
+          skipped: true,
+          reason: "fetch_failed",
           error:
             settled.reason instanceof Error
               ? settled.reason.message
               : String(settled.reason),
+        });
+        continue;
+      }
+
+      if (settled.value.skipped) {
+        sourceResults.push({
+          source: sourceDef.name,
+          fetched: 0,
+          matched: 0,
+          upserted: 0,
+          skipped: true,
+          reason: settled.value.reason,
+          message: settled.value.message,
+          error: settled.value.message,
         });
         continue;
       }

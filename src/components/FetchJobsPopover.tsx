@@ -34,7 +34,11 @@ export function FetchJobsPopover({
   const t = useTranslations("dashboard");
 
   const isKeywordSource =
-    selectedSource === "remoteok" || selectedSource === "drc";
+    selectedSource === "remoteok" ||
+    selectedSource === "drc" ||
+    selectedSource === "congojob" ||
+    selectedSource === "emploi_cd" ||
+    selectedSource === "unjobs";
 
   const handleFetch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,16 +52,58 @@ export function FetchJobsPopover({
         if (!res.success) {
           onError(res.error || "Failed to crawl DRC local job sources.");
         } else {
-          const total = res.data?.totalUpserted || 0;
-          posthog.capture("jobs_fetched", {
-            source: selectedSource,
-            jobs_upserted: total,
-          });
-          onSuccess(
-            `DRC Job Crawl complete! ${total} job(s) updated in pipeline.`,
+          const sources = res.data?.sources || [];
+          const circuitOpenSources = sources.filter(
+            (s) => s.skipped && s.reason === "circuit_open",
           );
-          setIsOpen(false);
-          setTimeout(() => window.location.reload(), 1200);
+          const fetchFailedSources = sources.filter(
+            (s) => s.skipped && s.reason === "fetch_failed",
+          );
+          const successfulSources = sources.filter(
+            (s) => !s.skipped && !s.error,
+          );
+          const total = res.data?.totalUpserted || 0;
+
+          if (successfulSources.length === 0 && (circuitOpenSources.length > 0 || fetchFailedSources.length > 0)) {
+            if (circuitOpenSources.length > 0) {
+              const names = circuitOpenSources
+                .map((s) => s.source.toUpperCase())
+                .join(", ");
+              onError(
+                `DRC crawl skipped: circuit breaker is OPEN for ${names} due to consecutive failures. Cooling down.`,
+              );
+            } else {
+              const names = fetchFailedSources
+                .map((s) => s.source.toUpperCase())
+                .join(", ");
+              onError(
+                `DRC crawl failed for ${names}. The external source may be temporarily unreachable.`,
+              );
+            }
+          } else {
+            posthog.capture("jobs_fetched", {
+              source: selectedSource,
+              jobs_upserted: total,
+            });
+
+            let msg = `DRC Job Crawl complete! ${total} job(s) updated in pipeline.`;
+            if (circuitOpenSources.length > 0) {
+              const names = circuitOpenSources
+                .map((s) => s.source.toUpperCase())
+                .join(", ");
+              msg += ` Note: ${names} skipped (circuit breaker open).`;
+            }
+            if (fetchFailedSources.length > 0) {
+              const names = fetchFailedSources
+                .map((s) => s.source.toUpperCase())
+                .join(", ");
+              msg += ` Note: ${names} skipped (fetch failed).`;
+            }
+
+            onSuccess(msg);
+            setIsOpen(false);
+            setTimeout(() => window.location.reload(), 1200);
+          }
         }
       } else {
         const formData = new FormData();
@@ -74,16 +120,60 @@ export function FetchJobsPopover({
               `Failed to fetch jobs from ${selectedSource.toUpperCase()}.`,
           );
         } else {
-          const total = Array.isArray(res.data) ? res.data.length : 1;
-          posthog.capture("jobs_fetched", {
-            source: selectedSource,
-            jobs_upserted: total,
-          });
-          onSuccess(
-            `Successfully fetched jobs from ${selectedSource.toUpperCase()}! ${total} job(s) updated.`,
+          const data = res.data;
+          const sources = Array.isArray(data?.sources) ? data.sources : [];
+          const skippedSources = sources.filter((s) => s.skipped);
+          const circuitOpenSources = skippedSources.filter(
+            (s) => s.reason === "circuit_open",
           );
-          setIsOpen(false);
-          setTimeout(() => window.location.reload(), 1200);
+          const fetchFailedSources = skippedSources.filter(
+            (s) => s.reason === "fetch_failed",
+          );
+          const successfulSources = sources.filter((s) => !s.skipped);
+
+          const total = data?.totalUpserted ?? data?.upserted ?? 0;
+
+          if (successfulSources.length === 0 && skippedSources.length > 0) {
+            // All requested sources were skipped / open / failed
+            if (circuitOpenSources.length > 0) {
+              const names = circuitOpenSources
+                .map((s) => s.source.toUpperCase())
+                .join(", ");
+              onError(
+                `Circuit breaker is OPEN for ${names} due to consecutive failures. Fetch skipped while cooling down.`,
+              );
+            } else {
+              const names = fetchFailedSources
+                .map((s) => s.source.toUpperCase())
+                .join(", ");
+              onError(
+                `Fetch failed for ${names}. The external source may be temporarily unreachable.`,
+              );
+            }
+          } else {
+            posthog.capture("jobs_fetched", {
+              source: selectedSource,
+              jobs_upserted: total,
+            });
+
+            let msg = `Successfully fetched jobs from ${selectedSource.toUpperCase()}! ${total} job(s) updated.`;
+            if (circuitOpenSources.length > 0) {
+              const names = circuitOpenSources
+                .map((s) => s.source.toUpperCase())
+                .join(", ");
+              msg += ` Note: ${names} skipped (circuit breaker open).`;
+            }
+            if (fetchFailedSources.length > 0) {
+              const names = fetchFailedSources
+                .map((s) => s.source.toUpperCase())
+                .join(", ");
+              msg += ` Note: ${names} skipped (fetch failed).`;
+            }
+
+            onSuccess(msg);
+            setIsOpen(false);
+            setTimeout(() => window.location.reload(), 1200);
+          }
         }
       }
     } catch (err: unknown) {

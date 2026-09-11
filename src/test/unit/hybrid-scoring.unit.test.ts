@@ -1,7 +1,9 @@
-import { blendHybridScores } from "@/services/job.service";
+import { computeHybridScore, blendHybridScores, DEFAULT_HYBRID_WEIGHTS } from "@/services/job.service";
 import * as jobSchema from "@/services/db/schema/job";
+import * as resumeSchema from "@/services/db/schema/resume";
 import * as jobsDal from "@/dal/jobs.dal";
 import * as jobService from "@/services/job.service";
+import { SOURCE_LANGUAGE } from "@/services/adapters/ingest";
 
 function assert(condition: boolean, msg: string) {
   if (!condition) {
@@ -10,106 +12,119 @@ function assert(condition: boolean, msg: string) {
 }
 
 async function runHybridScoringTests() {
-  console.log("Running Hybrid Scoring unit tests...");
+  console.log("Running Step 10: Dual-Language Hybrid Scoring unit tests...\n");
 
   // 1. Export verification: schema and DAL contracts
+  console.log("1. Verifying dual-language schema exports...");
   assert(
-    typeof jobSchema.tsvector === "function",
-    "tsvector customType should be exported from schema/job"
+    typeof jobSchema.jobLanguageEnum !== "undefined",
+    "jobLanguageEnum should be exported from schema/job"
+  );
+  assert(
+    JSON.stringify(jobSchema.jobLanguageEnum.enumValues) === JSON.stringify(["en", "fr"]),
+    "jobLanguageEnum must have enum values ['en', 'fr']"
+  );
+  assert(
+    jobSchema.job.language !== undefined,
+    "job.language column should be defined on the job table"
+  );
+  assert(
+    resumeSchema.masterResume.language !== undefined,
+    "masterResume.language column should be defined on the master_resume table"
   );
   assert(
     jobSchema.job.descriptionTsv !== undefined,
     "job.descriptionTsv column should be defined on the job table"
   );
+  console.log("   ✓ Schema definition verified with job_language enum and language columns.");
+
+  // 2. Static source-to-language map verification
+  console.log("2. Verifying static source-to-language map...");
+  assert(SOURCE_LANGUAGE.ashby === "en", "ashby -> en");
+  assert(SOURCE_LANGUAGE.greenhouse === "en", "greenhouse -> en");
+  assert(SOURCE_LANGUAGE.remoteok === "en", "remoteok -> en");
+  assert(SOURCE_LANGUAGE.lever === "en", "lever -> en");
+  assert(SOURCE_LANGUAGE.unjobs === "en", "unjobs -> en");
+  assert(SOURCE_LANGUAGE.manual === "en", "manual -> en");
+  assert(SOURCE_LANGUAGE.reliefweb === "en", "reliefweb -> en");
+  assert(SOURCE_LANGUAGE.congojob === "fr", "congojob -> fr");
+  assert(SOURCE_LANGUAGE.emploi_cd === "fr", "emploi_cd -> fr");
+  assert(SOURCE_LANGUAGE["emploi-cd"] === "fr", "emploi-cd -> fr");
+  assert(SOURCE_LANGUAGE.fecrdc === "fr", "fecrdc -> fr");
+  console.log("   ✓ Static source-to-language map verified (DRC boards -> fr, ATS -> en).");
+
+  // 3. DAL function contracts
+  console.log("3. Verifying DAL function contracts...");
   assert(
     typeof jobsDal.getJobResumeTsRank === "function",
     "getJobResumeTsRank should be exported from jobs.dal"
+  );
+  assert(
+    typeof jobsDal.findJobsRankedByKeyword === "function",
+    "findJobsRankedByKeyword should be exported from jobs.dal"
   );
   assert(
     typeof jobsDal.getJobHybridScores === "function",
     "getJobHybridScores should be exported from jobs.dal"
   );
   assert(
-    typeof jobsDal.saveHybridScore === "function",
-    "saveHybridScore should be exported from jobs.dal"
-  );
-  assert(
-    typeof jobsDal.recalculateScoreWithWeights === "function",
-    "recalculateScoreWithWeights should be exported from jobs.dal"
+    typeof jobService.computeHybridScore === "function",
+    "computeHybridScore should be exported from job.service"
   );
   assert(
     typeof jobService.scoreJobHybrid === "function",
     "scoreJobHybrid should be exported from job.service"
   );
-  assert(
-    typeof jobService.blendHybridScores === "function",
-    "blendHybridScores should be exported from job.service"
-  );
-  assert(
-    typeof jobService.tuneScoreWeights === "function",
-    "tuneScoreWeights should be exported from job.service"
-  );
+  console.log("   ✓ DAL and service functions correctly exported.");
 
-  // 2. Hybrid formula tests: finalScore = w1*cosine + w2*ts_rank
-  // Default weights: w1 = 0.7, w2 = 0.3
-  // 0.7 * 0.8 + 0.3 * 0.5 = 0.56 + 0.15 = 0.71 -> 71
-  const score1 = blendHybridScores(0.8, 0.5, 0.7, 0.3);
-  assert(score1 === 71, `Expected 71, got ${score1}`);
+  // 4. Starting weights: W_SEMANTIC = 0.6, W_KEYWORD = 0.4
+  console.log("4. Verifying starting weights (0.6 / 0.4)...");
+  assert(DEFAULT_HYBRID_WEIGHTS.wSemantic === 0.6, "Default wSemantic must be 0.6");
+  assert(DEFAULT_HYBRID_WEIGHTS.wKeyword === 0.4, "Default wKeyword must be 0.4");
 
-  // Equal weights: w1 = 0.5, w2 = 0.5
-  // 0.5 * 0.8 + 0.5 * 0.4 = 0.4 + 0.2 = 0.6 -> 60
-  const score2 = blendHybridScores(0.8, 0.4, 0.5, 0.5);
-  assert(score2 === 60, `Expected 60, got ${score2}`);
+  // Matching languages: 0.6 * 0.8 + 0.4 * 0.5 = 0.48 + 0.20 = 0.68 -> 68
+  const scoreMatch = computeHybridScore(0.8, 0.5, "en", "en");
+  assert(scoreMatch === 68, `Expected 68 for matching languages with default weights, got ${scoreMatch}`);
 
-  // Integer weights: w1 = 70, w2 = 30
-  // (70*0.8 + 30*0.5) / 100 = 0.71 -> 71
-  const score3 = blendHybridScores(0.8, 0.5, 70, 30);
-  assert(score3 === 71, `Expected 71 with integer weights, got ${score3}`);
+  const scoreMatchFr = computeHybridScore(0.9, 0.7, "fr", "fr");
+  // 0.6 * 0.9 + 0.4 * 0.7 = 0.54 + 0.28 = 0.82 -> 82
+  assert(scoreMatchFr === 82, `Expected 82 for matching fr/fr, got ${scoreMatchFr}`);
+  console.log("   ✓ Matching language blending (0.6/0.4) verified.");
 
-  // Pure cosine focus: w1 = 1.0, w2 = 0.0
-  const scoreCosineOnly = blendHybridScores(0.85, 0.1, 1.0, 0.0);
-  assert(scoreCosineOnly === 85, `Expected 85, got ${scoreCosineOnly}`);
+  // 5. Per-candidate language mismatch fallback (100% semantic score)
+  console.log("5. Testing cross-lingual fallback (jobLanguage !== resumeLanguage)...");
+  // Candidate resume is French ("fr"), Job description is English ("en")
+  // Should NOT penalize with 0 keyword score; returns 100% semantic score
+  const scoreMismatch1 = computeHybridScore(0.85, 0.0, "en", "fr");
+  assert(scoreMismatch1 === 85, `Expected 85 (100% semantic score), got ${scoreMismatch1}`);
 
-  // Pure lexical focus: w1 = 0.0, w2 = 1.0
-  const scoreBm25Only = blendHybridScores(0.1, 0.75, 0.0, 1.0);
-  assert(scoreBm25Only === 75, `Expected 75, got ${scoreBm25Only}`);
+  // Candidate resume is English ("en"), Job description is French ("fr")
+  const scoreMismatch2 = computeHybridScore(0.74, null, "fr", "en");
+  assert(scoreMismatch2 === 74, `Expected 74 (100% semantic score), got ${scoreMismatch2}`);
 
-  // 3. Graceful fallback on missing/null metrics
-  // When cosine is null (no embedding yet)
-  const scoreNullCosine = blendHybridScores(null, 0.65, 0.7, 0.3);
-  assert(scoreNullCosine === 65, `Expected 65 when cosine is null, got ${scoreNullCosine}`);
+  // When semantic score is null under language mismatch
+  const scoreMismatchNull = computeHybridScore(null, 0.99, "fr", "en");
+  assert(scoreMismatchNull === 0, `Expected 0 when semantic is null under mismatch, got ${scoreMismatchNull}`);
+  console.log("   ✓ Cross-lingual mismatch correctly redistributes 100% weight to semantic score without penalty.");
 
-  // When bm25 is null (no text match)
-  const scoreNullBm25 = blendHybridScores(0.92, null, 0.7, 0.3);
-  assert(scoreNullBm25 === 92, `Expected 92 when bm25 is null, got ${scoreNullBm25}`);
+  // 6. Graceful fallbacks and bounds
+  console.log("6. Testing bounds and null fallbacks...");
+  assert(computeHybridScore(null, 0.5, "en", "en") === 50, "Null semantic falls back to keyword");
+  assert(computeHybridScore(0.75, null, "en", "en") === 75, "Null keyword falls back to semantic");
+  assert(computeHybridScore(null, null, "en", "en") === 0, "Both null returns 0");
+  assert(computeHybridScore(1.5, 1.2, "en", "en") === 100, "Clamp to 100");
+  assert(computeHybridScore(-0.5, 0.0, "en", "en") === 0, "Clamp to 0");
+  console.log("   ✓ Bounds and null fallbacks verified.");
 
-  // When both are null
-  const scoreBothNull = blendHybridScores(null, null, 0.7, 0.3);
-  assert(scoreBothNull === 0, `Expected 0 when both are null, got ${scoreBothNull}`);
+  // 7. Backward-compatible alias
+  console.log("7. Verifying blendHybridScores compatibility alias...");
+  const aliasScore = blendHybridScores(0.8, 0.5, 0.6, 0.4);
+  assert(aliasScore === 68, `Expected 68 from blendHybridScores, got ${aliasScore}`);
+  console.log("   ✓ blendHybridScores alias functions identically to computeHybridScore.");
 
-  // 4. Clamping bounds [0, 100]
-  const scoreMaxClamp = blendHybridScores(1.5, 1.2, 0.7, 0.3);
-  assert(scoreMaxClamp === 100, `Expected clamp to 100, got ${scoreMaxClamp}`);
-
-  const scoreMinClamp = blendHybridScores(-0.5, 0.0, 0.7, 0.3);
-  assert(scoreMinClamp === 0, `Expected clamp to 0, got ${scoreMinClamp}`);
-
-  // 5. Simulating weight retuning without re-running AI calls
-  // Suppose stored values in score table are:
-  const storedCosine = 0.82;
-  const storedBm25 = 0.45;
-
-  // With initial weights: 80% dense, 20% sparse
-  const initialFit = blendHybridScores(storedCosine, storedBm25, 0.8, 0.2);
-  // (0.8 * 0.82 + 0.2 * 0.45) = 0.656 + 0.09 = 0.746 -> 75
-  assert(initialFit === 75, `Expected 75 for initial weights, got ${initialFit}`);
-
-  // Later user adjusts weights: 40% dense, 60% sparse (without any AI provider call)
-  const retunedFit = blendHybridScores(storedCosine, storedBm25, 0.4, 0.6);
-  // (0.4 * 0.82 + 0.6 * 0.45) = 0.328 + 0.27 = 0.598 -> 60
-  assert(retunedFit === 60, `Expected 60 for retuned weights, got ${retunedFit}`);
-
-  console.log("✓ All Hybrid Scoring unit tests passed successfully!");
+  console.log("\n=================================================");
+  console.log("✨ All Step 10 Dual-Language Hybrid Scoring tests passed!");
+  console.log("=================================================\n");
 }
 
 runHybridScoringTests()

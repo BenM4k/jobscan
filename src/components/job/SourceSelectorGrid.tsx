@@ -2,18 +2,29 @@
 
 import React from "react";
 
-export type FetchSource = "remoteok" | "drc" | "greenhouse" | "lever" | "ashby";
+export type FetchSource =
+  | "remoteok"
+  | "drc"
+  | "greenhouse"
+  | "lever"
+  | "ashby"
+  | "congojob"
+  | "emploi_cd"
+  | "unjobs";
 
 export interface FetchSourceOption {
   id: FetchSource;
   title: string;
   icon: string;
-  type: "KEYWORD FILTER" | "COMPANY BOARD";
+  type: "KEYWORD FILTER" | "COMPANY BOARD" | "LOCAL SCRAPER";
 }
 
 export const FETCH_SOURCES: FetchSourceOption[] = [
   { id: "remoteok", title: "RemoteOK", icon: "🌐", type: "KEYWORD FILTER" },
-  { id: "drc", title: "DRC Local", icon: "🗺️", type: "KEYWORD FILTER" },
+  { id: "drc", title: "DRC All", icon: "🗺️", type: "KEYWORD FILTER" },
+  { id: "congojob", title: "CongoJob", icon: "🇨🇩", type: "LOCAL SCRAPER" },
+  { id: "emploi_cd", title: "Emploi.cd", icon: "📄", type: "LOCAL SCRAPER" },
+  { id: "unjobs", title: "UNjobs", icon: "🇺🇳", type: "LOCAL SCRAPER" },
   { id: "greenhouse", title: "Greenhouse", icon: "🌿", type: "COMPANY BOARD" },
   { id: "lever", title: "Lever", icon: "⚡", type: "COMPANY BOARD" },
   { id: "ashby", title: "Ashby", icon: "🚀", type: "COMPANY BOARD" },
@@ -59,11 +70,11 @@ export function SourceSelectorGrid({
 
   return (
     <div className="space-y-2.5">
-      <div className="grid grid-cols-3 gap-2.5">
-        {FETCH_SOURCES.slice(0, 3).map(renderCard)}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        {FETCH_SOURCES.slice(0, 4).map(renderCard)}
       </div>
-      <div className="grid grid-cols-2 gap-2.5">
-        {FETCH_SOURCES.slice(3, 5).map(renderCard)}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        {FETCH_SOURCES.slice(4, 8).map(renderCard)}
       </div>
     </div>
   );

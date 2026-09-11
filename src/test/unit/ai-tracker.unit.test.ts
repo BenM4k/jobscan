@@ -47,13 +47,10 @@ async function runAiTrackerUnitTests() {
 
   // Spy on opsDal.logAiCall
   const loggedCalls: opsDal.LogAiCallParams[] = [];
-  const originalLogAiCall = opsDal.logAiCall;
-  (opsDal as { logAiCall: typeof opsDal.logAiCall }).logAiCall = async (
-    params: opsDal.LogAiCallParams
-  ) => {
+  opsDal.setLogAiCallImplementation(async (params: opsDal.LogAiCallParams) => {
     loggedCalls.push(params);
     return ok(undefined);
-  };
+  });
 
   try {
     // 2. withAiTracking wrapper preserving output with _usage
@@ -155,7 +152,7 @@ async function runAiTrackerUnitTests() {
     assert(call3.outputTokens === 250, "call3.outputTokens from Result.value must match");
     console.log("✓ Result unwrapping: successfully inspects Result.value for _usage");
   } finally {
-    (opsDal as { logAiCall: typeof opsDal.logAiCall }).logAiCall = originalLogAiCall;
+    opsDal.setLogAiCallImplementation();
   }
 
   console.log("\nAll AI Cost & Token Tracking tests passed successfully! 🎉");

@@ -1,7 +1,11 @@
 import { SimHash, HashFunction } from "@counterrealist/simhash";
+import { normalizeText } from "@/services/dedup/normalize-text";
+
+export { normalizeText };
 
 /** Default Hamming distance threshold for 64-bit near-duplicate detection */
-export const DEFAULT_SIMHASH_THRESHOLD = 3;
+export const MAX_HAMMING_DISTANCE = 4;
+export const DEFAULT_SIMHASH_THRESHOLD = 4;
 
 const simhasher = new SimHash({
   ngramSize: 3,
@@ -16,36 +20,31 @@ export interface SimhashResult {
 
 /**
  * Normalizes text content for stable SimHash generation across minor whitespace/casing variations.
+ * Strips HTML, converts to lowercase, strips punctuation, and collapses whitespace.
  */
-export function normalizeTextForSimhash(text: string): string {
-  if (!text) return "";
-  return text
-    .toLowerCase()
-    .replace(/<[^>]+>/g, " ") // strip HTML tags if present in descriptions
-    .replace(/\s+/g, " ") // collapse all whitespace
-    .trim();
-}
+export const normalizeTextForSimhash = normalizeText;
 
 /**
- * Builds canonical concatenated string for job deduplication.
+ * Builds canonical concatenated string for job deduplication:
+ * title + company + description (normalized).
  */
 export function buildJobSimhashText(
   title: string,
   company: string,
   description?: string | null
 ): string {
-  const normTitle = normalizeTextForSimhash(title || "");
-  const normCompany = normalizeTextForSimhash(company || "");
-  const normDesc = normalizeTextForSimhash(description || "");
+  const normTitle = normalizeText(title || "");
+  const normCompany = normalizeText(company || "");
+  const normDesc = normalizeText(description || "");
   return `${normTitle} ${normCompany} ${normDesc}`.trim();
 }
 
 /**
  * Computes 64-bit SimHash for given text using shingling and weighted bit voting.
- * Returns signedBigInt and string representation suitable for PostgreSQL bigint/numeric.
+ * Returns signedBigInt (bigint) and string representation suitable for PostgreSQL bigint.
  */
 export function computeSimhash(text: string): SimhashResult {
-  const normalized = normalizeTextForSimhash(text);
+  const normalized = normalizeText(text);
 
   // @counterrealist/simhash requires text length >= ngramSize (3)
   const safeText =

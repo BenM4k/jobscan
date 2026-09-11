@@ -12,6 +12,8 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "crawl": "NODE_OPTIONS='--conditions=react-server' tsx scripts/crawl.ts",
+    "backfill:embeddings": "NODE_OPTIONS='--conditions=react-server' tsx scripts/backfill-embeddings.ts",
+    "verify:hnsw": "NODE_OPTIONS='--conditions=react-server' tsx scripts/verify-hnsw.ts",
     "inngest:dev": "npx inngest-cli@latest dev -u http://localhost:3000/api/inngest"
   },
   "dependencies": {
@@ -22,6 +24,7 @@
     "@base-ui/react": "^1.7.0",
     "@counterrealist/simhash": "^1.0.2",
     "@hookform/resolvers": "^5.7.1",
+    "@upstash/redis": "^1.38.4",
     "ai": "^7.0.66",
     "better-auth": "^1.6.25",
     "cheerio": "^1.2.0",
@@ -31,7 +34,6 @@
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "inngest": "^4.15.0",
-    "ioredis": "^6.0.0",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.28.0",
     "mammoth": "^1.12.0",

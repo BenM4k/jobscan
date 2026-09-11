@@ -1,6 +1,7 @@
 import { CrawledJob, CrawlSourceResult } from "../types";
 import { GREENHOUSE_COMPANIES } from "../config";
 import { isEligibleCandidate, parseLocationFromText } from "../crawler-utils";
+export { fetchRaw, normalize } from "@/services/adapters/greenhouse.adapter";
 
 function parseGreenhouseJob(raw: Record<string, unknown>, companyName: string): CrawledJob {
   const content = typeof raw.content === "string" ? raw.content : "No description provided.";

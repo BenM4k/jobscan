@@ -2,29 +2,19 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
+import { formatSourceName } from "@/lib/format-source";
 
 interface JobCardBadgesProps {
   locationText?: string;
   workplaceLabel?: string;
   source?: string | null;
   postedDate?: string | null;
+  alsoPostedOn?: string[] | null;
 }
 
 function formatSource(source?: string | null, viaPrefix: string = "via"): string | null {
   if (!source) return null;
-  const map: Record<string, string> = {
-    remoteok: "RemoteOK",
-    greenhouse: "Greenhouse",
-    reliefweb: "ReliefWeb",
-    emploicd: "Emploi.cd",
-    congojob: "CongoJob",
-    unjobs: "UNJobs",
-    ashby: "Ashby",
-    lever: "Lever",
-    manual: "Manual",
-  };
-  const clean = source.toLowerCase();
-  const name = map[clean] || (source.charAt(0).toUpperCase() + source.slice(1));
+  const name = formatSourceName(source);
   const prefix = viaPrefix.charAt(0).toUpperCase() + viaPrefix.slice(1);
   return `${prefix} ${name}`;
 }
@@ -43,14 +33,16 @@ export function JobCardBadges({
   workplaceLabel,
   source,
   postedDate,
+  alsoPostedOn,
 }: JobCardBadgesProps) {
   const t = useTranslations("dashboard");
   const workplace = workplaceLabel ? formatWorkplace(workplaceLabel) : null;
   const sourceText = formatSource(source, t("via") || "via");
   const hasGroup1 = Boolean(locationText || workplace);
   const hasGroup2 = Boolean(sourceText || postedDate);
+  const hasAlsoPosted = Boolean(alsoPostedOn && alsoPostedOn.length > 0);
 
-  if (!hasGroup1 && !hasGroup2) return null;
+  if (!hasGroup1 && !hasGroup2 && !hasAlsoPosted) return null;
 
   return (
     <div className="mt-3 flex flex-wrap items-center gap-x-4 sm:gap-x-5 gap-y-1.5 text-xs text-muted-foreground dark:text-zinc-400 font-normal font-sans">
@@ -73,6 +65,21 @@ export function JobCardBadges({
             <span className="text-muted-foreground/40 select-none">·</span>
           )}
           {postedDate && <span>{postedDate}</span>}
+        </div>
+      )}
+
+      {/* Group 3: Also posted on */}
+      {hasAlsoPosted && (
+        <div className="flex items-center gap-1.5">
+          {(hasGroup1 || hasGroup2) && (
+            <span className="text-muted-foreground/40 select-none">·</span>
+          )}
+          <span>
+            {t("alsoPostedOn") || "Also posted on:"}{" "}
+            <span className="font-medium text-slate-700 dark:text-zinc-200">
+              {alsoPostedOn!.map(formatSourceName).join(", ")}
+            </span>
+          </span>
         </div>
       )}
     </div>

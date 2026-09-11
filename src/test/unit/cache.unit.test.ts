@@ -9,11 +9,12 @@ function assert(condition: boolean, msg: string) {
 }
 
 async function runCacheUnitTests() {
-  console.log("Running Redis Cache & SDK Isolation unit tests...\n");
+  console.log("Running Upstash Redis Cache & SDK Isolation unit tests...\n");
 
-  // 1. Verify single point of import for ioredis across the entire codebase
+  // 1. Verify single point of import for @upstash/redis across the entire codebase
   const srcDir = path.resolve(process.cwd(), "src");
-  const foundImports: string[] = [];
+  const foundUpstashImports: string[] = [];
+  const foundIoRedisImports: string[] = [];
 
   function scanDirectory(dir: string) {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -23,27 +24,40 @@ async function runCacheUnitTests() {
         scanDirectory(fullPath);
       } else if (/\.(ts|tsx|js|mjs)$/.test(entry.name)) {
         const content = fs.readFileSync(fullPath, "utf-8");
+        if (/from\s+['"]@upstash\/redis['"]|require\(['"]@upstash\/redis['"]\)/.test(content)) {
+          foundUpstashImports.push(path.relative(process.cwd(), fullPath));
+        }
         if (/from\s+['"]ioredis['"]|require\(['"]ioredis['"]\)/.test(content)) {
-          foundImports.push(path.relative(process.cwd(), fullPath));
+          foundIoRedisImports.push(path.relative(process.cwd(), fullPath));
         }
       }
     }
   }
 
   scanDirectory(srcDir);
-  console.log("Files importing ioredis:", foundImports);
+  console.log("Files importing @upstash/redis:", foundUpstashImports);
 
   assert(
-    foundImports.length === 1,
-    `Expected exactly 1 file to import ioredis, but found ${foundImports.length}: ${foundImports.join(", ")}`
+    foundUpstashImports.length === 1,
+    `Expected exactly 1 file to import @upstash/redis, but found ${foundUpstashImports.length}: ${foundUpstashImports.join(", ")}`
   );
   assert(
-    foundImports[0] === "src/services/cache/redis-client.ts",
-    `Expected src/services/cache/redis-client.ts to be the sole importer of ioredis, but found ${foundImports[0]}`
+    foundUpstashImports[0] === "src/services/cache/redis-client.ts",
+    `Expected src/services/cache/redis-client.ts to be the sole importer of @upstash/redis, but found ${foundUpstashImports[0]}`
   );
-  console.log("✓ SDK Isolation: src/services/cache/redis-client.ts is the ONLY file importing ioredis");
+  assert(
+    foundIoRedisImports.length === 0,
+    `ioredis should no longer be imported anywhere, but found: ${foundIoRedisImports.join(", ")}`
+  );
+  console.log("✓ SDK Isolation: src/services/cache/redis-client.ts is the ONLY file importing @upstash/redis directly");
 
   // 2. Verify exports in src/services/cache/redis-client.ts
+  assert(
+    Boolean(redisClient.redis),
+    "Expected 'redis' instance to be exported from @/services/cache/redis-client"
+  );
+  console.log("✓ Single configured redis instance exported directly");
+
   const requiredFunctions = [
     "getRedisClient",
     "cacheGet",
@@ -53,6 +67,7 @@ async function runCacheUnitTests() {
     "ensureMaxMemoryPolicy",
     "getRedisHealth",
     "closeRedisConnection",
+    "executeTokenBucketRateLimit",
   ];
 
   for (const fn of requiredFunctions) {
@@ -61,20 +76,30 @@ async function runCacheUnitTests() {
       `Expected ${fn} to be a function in @/services/cache/redis-client`
     );
   }
-  console.log("✓ Exports check: all required cache methods and health checks are exported");
+  console.log("✓ Exports check: all required cache methods, rate limiter, and health checks are exported");
 
-  // 3. Verify graceful degradation when REDIS_URL is not set
-  const originalRedisUrl = process.env.REDIS_URL;
-  delete process.env.REDIS_URL;
+  // 3. Verify maxmemory-policy reporting
+  const policyCheck = await redisClient.ensureMaxMemoryPolicy();
+  assert(
+    policyCheck.policy === "allkeys-lru",
+    `Expected policy 'allkeys-lru', got '${policyCheck.policy}'`
+  );
+  console.log("✓ Policy check: allkeys-lru confirmed for Upstash dashboard management");
+
+  // 4. Verify graceful degradation when Upstash env vars are not set
+  const origUrl = process.env.UPSTASH_REDIS_REST_URL;
+  const origToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+  delete process.env.UPSTASH_REDIS_REST_URL;
+  delete process.env.UPSTASH_REDIS_REST_TOKEN;
 
   const healthDisabled = await redisClient.getRedisHealth();
   assert(
     healthDisabled.status === "disabled",
-    `Expected health status 'disabled' when REDIS_URL is unset, got '${healthDisabled.status}'`
+    `Expected health status 'disabled' when Upstash env vars are unset, got '${healthDisabled.status}'`
   );
 
   const getNull = await redisClient.cacheGet("test:missing:key");
-  assert(getNull === null, "cacheGet should return null when REDIS_URL is not set");
+  assert(getNull === null, "cacheGet should return null when Upstash is not configured");
 
   const remembered = await redisClient.cacheRemember("test:compute", 60, async () => {
     return { calculated: 42 };
@@ -85,12 +110,11 @@ async function runCacheUnitTests() {
   );
   console.log("✓ Graceful degradation: cache helpers gracefully bypass when Redis is unconfigured");
 
-  // Restore REDIS_URL if it was set
-  if (originalRedisUrl) {
-    process.env.REDIS_URL = originalRedisUrl;
-  }
+  // Restore env if it was set
+  if (origUrl) process.env.UPSTASH_REDIS_REST_URL = origUrl;
+  if (origToken) process.env.UPSTASH_REDIS_REST_TOKEN = origToken;
 
-  console.log("\nAll Redis cache & isolation tests passed successfully! 🎉");
+  console.log("\nAll Upstash Redis cache & isolation tests passed successfully! 🎉");
 }
 
 runCacheUnitTests().catch((err) => {

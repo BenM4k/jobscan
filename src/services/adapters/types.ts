@@ -3,12 +3,22 @@ import type { Result } from "@/lib/result";
 import type { AppError } from "@/lib/errors";
 import type { CircuitBreaker } from "@/lib/circuit-breaker";
 
-export interface NormalizedJob {
+export type SupportedJobSource =
+  | "greenhouse"
+  | "remoteok"
+  | "lever"
+  | "ashby"
+  | "congojob"
+  | "emploi_cd"
+  | "fecrdc"
+  | "unjobs";
+
+export interface NormalizedJobInput {
   externalId: string;
-  source: "greenhouse" | "remoteok" | "lever" | "ashby";
+  source: SupportedJobSource;
   title: string;
   company: string;
-  url: string;
+  url?: string;
   description: string;
   postedAt?: Date;
   country?: string;
@@ -16,20 +26,62 @@ export interface NormalizedJob {
   city?: string;
   workplaceType?: "remote" | "on-site" | "hybrid";
   remoteRegions?: string[];
+  salaryMin?: string | number | null;
+  salaryMax?: string | number | null;
+  salaryCurrency?: string | null;
+  salaryPeriod?: string | null;
+  salaryNormalizedYearlyUsd?: string | number | null;
+  rawSalaryText?: string | null;
+}
+
+export interface RawJobItem {
+  externalId: string;
+  payload: unknown;
+}
+
+export interface NormalizedJob extends NormalizedJobInput {
+  source: SupportedJobSource;
+  url: string;
+}
+
+export interface IngestResult {
+  source: string;
+  fetched: number;
+  upserted: number;
+  failed: number;
+  skipped?: boolean;
+  reason?: "circuit_open" | "fetch_failed";
+  message?: string;
+}
+
+export interface IngestionAggregatedResult {
+  totalFetched: number;
+  totalUpserted: number;
+  totalFailed: number;
+  sources: IngestResult[];
+  fetched: number;
+  upserted: number;
+  failed: number;
+}
+
+export interface FunctionalJobAdapter {
+  id: SupportedJobSource;
+  fetchRaw(options?: { target?: string; keyword?: string; category?: string }): Promise<RawJobItem[]>;
+  normalize(raw: unknown): NormalizedJobInput;
 }
 
 export interface JobSource {
-  id: "greenhouse" | "remoteok" | "lever" | "ashby";
+  id: SupportedJobSource;
   fetchRaw(target?: string): Promise<unknown[]>;
-  normalize(raw: unknown): NormalizedJob;
+  normalize(raw: unknown): NormalizedJobInput;
 }
 
 export interface JobSourceAdapter<TRaw = unknown> extends JobSource {
-  id: "greenhouse" | "remoteok" | "lever" | "ashby";
+  id: SupportedJobSource;
   readonly circuitBreaker?: CircuitBreaker;
   fetchRaw(target?: string): Promise<TRaw[]>;
   extractExternalId(raw: TRaw): string;
-  normalize(raw: TRaw): NormalizedJob;
+  normalize(raw: TRaw): NormalizedJobInput;
 
   /** DB Call 1: Write untouched external response to raw_job_payload */
   saveRaw(raw: TRaw): Promise<Result<RawJobPayloadSelect, AppError>>;

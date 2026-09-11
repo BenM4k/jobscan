@@ -1,18 +1,18 @@
 import { CrawledJob, CrawlSourceResult } from "../types";
+import { fetchRaw, normalize } from "@/services/adapters/fecrdc.adapter";
 
-/**
- * FEC RDC (Fédération des Entreprises du Congo) Source Scraper
- * Inspected on 2026-08-06:
- * https://fec-rdc.com is an institutional website publishing news, economic press releases,
- * and organizational announcements. It does not host a structured, dedicated job board or vacancies section.
- * To avoid scraping irrelevant news articles, this source returns an empty list gracefully.
- */
-export async function fetchFecRdcJobs(): Promise<{ jobs: CrawledJob[]; result: CrawlSourceResult }> {
+export { fetchRaw, normalize };
+
+export async function fetchFecRdcJobs(): Promise<{
+  jobs: CrawledJob[];
+  result: CrawlSourceResult;
+}> {
+  const rawItems = await fetchRaw();
   return {
     jobs: [],
     result: {
       source: "fecrdc",
-      fetched: 0,
+      fetched: rawItems.length,
       matched: 0,
       upserted: 0,
     },

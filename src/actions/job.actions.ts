@@ -8,8 +8,15 @@ import { runWithIdempotency } from "@/services/idempotency.service";
 import { checkAiRateLimit } from "@/services/rate-limit";
 import { ok } from "@/lib/result";
 
+import {
+  ALL_JOB_SOURCES,
+  type SupportedSourceId,
+} from "@/inngest/functions/job-fetch";
+
+export type { SupportedSourceId };
+
 const triggerFetchSchema = z.object({
-  sourceId: z.enum(["greenhouse", "remoteok", "lever", "ashby"]),
+  sourceId: z.string().min(1),
   target: z.string().optional(),
 });
 
@@ -65,8 +72,36 @@ export async function triggerJobFetchAction(formData: FormData) {
     return { success: false, error: "Invalid source or target selected" };
   }
 
-  const result = await jobService.fetchAndUpsertJobs(
-    parsed.data.sourceId,
+  let requestedSources: string[] = [];
+  const rawSources = formData
+    .getAll("sources")
+    .map((s) => s.toString().trim())
+    .filter(Boolean);
+
+  if (rawSources.length > 0) {
+    requestedSources = rawSources;
+  } else if (parsed.data.sourceId === "all") {
+    requestedSources = [...ALL_JOB_SOURCES];
+  } else if (parsed.data.sourceId.includes(",")) {
+    requestedSources = parsed.data.sourceId
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  } else {
+    requestedSources = [parsed.data.sourceId];
+  }
+
+  const validSourceSet = new Set<string>(ALL_JOB_SOURCES);
+  const sanitizedSources = Array.from(
+    new Set(requestedSources.filter((s) => validSourceSet.has(s)))
+  ).slice(0, ALL_JOB_SOURCES.length);
+
+  if (sanitizedSources.length === 0) {
+    return { success: false, error: "No valid job sources selected" };
+  }
+
+  const result = await jobService.fetchAndUpsertJobsAcrossSources(
+    sanitizedSources,
     parsed.data.target,
     sessionResult.value.user.id,
   );
@@ -391,6 +426,7 @@ const addManualJobSchema = z.object({
   location: z.string().optional(),
   workplaceType: z.string().optional(),
   rawSalaryText: z.string().optional(),
+  language: z.enum(["en", "fr"]).default("en"),
   url: z.url("Invalid application URL format").optional().or(z.literal("")),
   description: z
     .string()
@@ -411,6 +447,9 @@ export async function addManualJobAction(formData: FormData) {
     validatedUrl = `https://${validatedUrl}`;
   }
 
+  const rawLanguage = formData.get("language")?.toString()?.trim()?.toLowerCase();
+  const validatedLanguage = rawLanguage === "fr" ? "fr" : "en";
+
   const parsed = addManualJobSchema.safeParse({
     title: formData.get("title")?.toString()?.trim() || "",
     company: formData.get("company")?.toString()?.trim() || "",
@@ -421,6 +460,7 @@ export async function addManualJobAction(formData: FormData) {
       formData.get("salary")?.toString()?.trim() ||
       formData.get("rawSalaryText")?.toString()?.trim() ||
       undefined,
+    language: validatedLanguage,
     url: validatedUrl || undefined,
     description: formData.get("description")?.toString()?.trim() || "",
   });
@@ -444,6 +484,7 @@ export async function addManualJobAction(formData: FormData) {
     city: parsed.data.location,
     workplaceType: parsed.data.workplaceType,
     rawSalaryText: parsed.data.rawSalaryText,
+    language: parsed.data.language,
     url: parsed.data.url,
     description: parsed.data.description,
     postedAt: new Date(),

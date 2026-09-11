@@ -1,6 +1,7 @@
 import { CrawledJob, CrawlSourceResult } from "../types";
 import { ASHBY_COMPANIES } from "../config";
 import { isEligibleCandidate } from "../crawler-utils";
+export { fetchRaw, normalize } from "@/services/adapters/ashby.adapter";
 
 function parseAshbyJob(raw: Record<string, unknown>, companyName: string): CrawledJob {
   const address = raw.address as Record<string, unknown> | undefined;

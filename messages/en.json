@@ -135,6 +135,7 @@
     "onSite": "On-site",
     "status": "Status",
     "via": "via",
+    "alsoPostedOn": "Also posted on:",
     "dateRangeAll": "Date Range: All",
     "filterByDate": "Filter by Date",
     "clearFilter": "Clear Filter",

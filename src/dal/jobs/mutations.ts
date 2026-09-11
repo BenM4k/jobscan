@@ -11,7 +11,7 @@ import {
 } from "@/services/db/schema";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
-import { eq, and, sql, or, desc } from "drizzle-orm";
+import { eq, and, sql, or, desc, gte } from "drizzle-orm";
 import { isOlderThanOneMonth } from "@/lib/date-utils";
 import * as pipelineDal from "@/dal/pipeline.dal";
 import * as tailoringDal from "@/dal/tailoring.dal";
@@ -42,9 +42,22 @@ export async function upsertCanonicalJob(
       description: data.description || "",
       postedAt: data.postedAt || null,
       location,
+      salaryMin: data.salaryMin ? String(data.salaryMin) : null,
+      salaryMax: data.salaryMax ? String(data.salaryMax) : null,
+      salaryCurrency: data.salaryCurrency || null,
+      salaryPeriod: data.salaryPeriod || null,
+      salaryNormalizedYearlyUsd: data.salaryNormalizedYearlyUsd
+        ? String(data.salaryNormalizedYearlyUsd)
+        : null,
       rawSalaryText: data.rawSalaryText || null,
       status: "active",
-      simhash: data.simhash ? sql`${data.simhash}::numeric` : null,
+      language: (data.language as "en" | "fr") || "en",
+      simhash:
+        data.simhash != null
+          ? typeof data.simhash === "bigint"
+            ? data.simhash
+            : BigInt(data.simhash)
+          : null,
       addedByUserId: data.source === "manual" ? data.userId || null : null,
     })
     .onConflictDoUpdate({
@@ -56,13 +69,37 @@ export async function upsertCanonicalJob(
         description: data.description || "",
         postedAt: data.postedAt || null,
         location,
+        language:
+          data.language !== undefined
+            ? (data.language as "en" | "fr")
+            : sql`${job.language}`,
+        salaryMin:
+          data.salaryMin !== undefined
+            ? (data.salaryMin ? String(data.salaryMin) : null)
+            : sql`${job.salaryMin}`,
+        salaryMax:
+          data.salaryMax !== undefined
+            ? (data.salaryMax ? String(data.salaryMax) : null)
+            : sql`${job.salaryMax}`,
+        salaryCurrency:
+          data.salaryCurrency !== undefined
+            ? (data.salaryCurrency || null)
+            : sql`${job.salaryCurrency}`,
+        salaryPeriod:
+          data.salaryPeriod !== undefined
+            ? (data.salaryPeriod || null)
+            : sql`${job.salaryPeriod}`,
+        salaryNormalizedYearlyUsd:
+          data.salaryNormalizedYearlyUsd !== undefined
+            ? (data.salaryNormalizedYearlyUsd
+                ? String(data.salaryNormalizedYearlyUsd)
+                : null)
+            : sql`${job.salaryNormalizedYearlyUsd}`,
         rawSalaryText:
           data.rawSalaryText !== undefined
             ? (data.rawSalaryText || null)
             : sql`${job.rawSalaryText}`,
-        simhash: data.simhash
-          ? sql`${data.simhash}::numeric`
-          : sql`${job.simhash}`,
+        status: "active",
         updatedAt: new Date(),
       },
     })
@@ -100,14 +137,90 @@ export async function upsertCanonicalJobWithSimhashDedup(
       // Advisory transaction lock serialized per Postgres connection
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('simhash_job_dedup_lock'))`);
 
-      // 1. Recheck for near-duplicate within transaction
+      // 1. Routine re-fetch check: if (source, externalId) already exists in job, update directly without dedup
+      if (data.externalId) {
+        const [existing] = await tx
+          .select()
+          .from(job)
+          .where(
+            and(
+              eq(job.source, data.source as JobSource),
+              eq(job.externalId, data.externalId)
+            )
+          )
+          .limit(1);
+
+        if (existing) {
+          const [updated] = await tx
+            .update(job)
+            .set({
+              title: data.title,
+              company: data.company,
+              url: data.url || null,
+              description: data.description || "",
+              postedAt: data.postedAt || null,
+              location,
+              status: "active",
+              language:
+                data.language !== undefined
+                  ? (data.language as "en" | "fr")
+                  : sql`${job.language}`,
+              salaryMin:
+                data.salaryMin !== undefined
+                  ? (data.salaryMin != null ? String(data.salaryMin) : null)
+                  : sql`${job.salaryMin}`,
+              salaryMax:
+                data.salaryMax !== undefined
+                  ? (data.salaryMax != null ? String(data.salaryMax) : null)
+                  : sql`${job.salaryMax}`,
+              salaryCurrency:
+                data.salaryCurrency !== undefined
+                  ? (data.salaryCurrency || null)
+                  : sql`${job.salaryCurrency}`,
+              salaryPeriod:
+                data.salaryPeriod !== undefined
+                  ? (data.salaryPeriod || null)
+                  : sql`${job.salaryPeriod}`,
+              salaryNormalizedYearlyUsd:
+                data.salaryNormalizedYearlyUsd !== undefined
+                  ? (data.salaryNormalizedYearlyUsd != null
+                      ? String(data.salaryNormalizedYearlyUsd)
+                      : null)
+                  : sql`${job.salaryNormalizedYearlyUsd}`,
+              rawSalaryText:
+                data.rawSalaryText !== undefined
+                  ? (data.rawSalaryText || null)
+                  : sql`${job.rawSalaryText}`,
+              simhash:
+                data.simhash != null
+                  ? typeof data.simhash === "bigint"
+                    ? data.simhash
+                    : BigInt(data.simhash)
+                  : null,
+              updatedAt: new Date(),
+            })
+            .where(eq(job.id, existing.id))
+            .returning();
+
+          return { isDuplicate: false, canonicalJob: updated };
+        }
+      }
+
+      // 2. For confirmed new (source, externalId), check for near-duplicate within 30 days
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 30);
+
       const [matched] = await tx
         .select()
         .from(job)
         .where(
           and(
             sql`${job.simhash} IS NOT NULL`,
-            sql`bit_count((${job.simhash}::bigint # ${sql.raw(targetBigIntStr)}::bigint)::bit(64)) <= ${maxDistance}`
+            sql`bit_count((${job.simhash}::bigint # ${sql.raw(targetBigIntStr)}::bigint)::bit(64)) <= ${maxDistance}`,
+            or(
+              gte(job.postedAt, cutoff),
+              and(sql`${job.postedAt} IS NULL`, gte(job.createdAt, cutoff))
+            )!
           )
         )
         .orderBy(
@@ -130,10 +243,23 @@ export async function upsertCanonicalJobWithSimhashDedup(
           url: data.url || null,
           description: data.description || "",
           postedAt: data.postedAt || null,
-          location,
+          salaryMin: data.salaryMin != null ? String(data.salaryMin) : null,
+          salaryMax: data.salaryMax != null ? String(data.salaryMax) : null,
+          salaryCurrency: data.salaryCurrency || null,
+          salaryPeriod: data.salaryPeriod || null,
+          salaryNormalizedYearlyUsd:
+            data.salaryNormalizedYearlyUsd != null
+              ? String(data.salaryNormalizedYearlyUsd)
+              : null,
           rawSalaryText: data.rawSalaryText || null,
           status: "active",
-          simhash: data.simhash ? sql`${data.simhash}::numeric` : null,
+          language: (data.language as "en" | "fr") || "en",
+          simhash:
+            data.simhash != null
+              ? typeof data.simhash === "bigint"
+                ? data.simhash
+                : BigInt(data.simhash)
+              : null,
           addedByUserId: data.source === "manual" ? data.userId || null : null,
         })
         .onConflictDoUpdate({
@@ -145,13 +271,37 @@ export async function upsertCanonicalJobWithSimhashDedup(
             description: data.description || "",
             postedAt: data.postedAt || null,
             location,
+            language:
+              data.language !== undefined
+                ? (data.language as "en" | "fr")
+                : sql`${job.language}`,
+            salaryMin:
+              data.salaryMin !== undefined
+                ? (data.salaryMin != null ? String(data.salaryMin) : null)
+                : sql`${job.salaryMin}`,
+            salaryMax:
+              data.salaryMax !== undefined
+                ? (data.salaryMax != null ? String(data.salaryMax) : null)
+                : sql`${job.salaryMax}`,
+            salaryCurrency:
+              data.salaryCurrency !== undefined
+                ? (data.salaryCurrency || null)
+                : sql`${job.salaryCurrency}`,
+            salaryPeriod:
+              data.salaryPeriod !== undefined
+                ? (data.salaryPeriod || null)
+                : sql`${job.salaryPeriod}`,
+            salaryNormalizedYearlyUsd:
+              data.salaryNormalizedYearlyUsd !== undefined
+                ? (data.salaryNormalizedYearlyUsd != null
+                    ? String(data.salaryNormalizedYearlyUsd)
+                    : null)
+                : sql`${job.salaryNormalizedYearlyUsd}`,
             rawSalaryText:
               data.rawSalaryText !== undefined
                 ? (data.rawSalaryText || null)
                 : sql`${job.rawSalaryText}`,
-            simhash: data.simhash
-              ? sql`${data.simhash}::numeric`
-              : sql`${job.simhash}`,
+            status: "active",
             updatedAt: new Date(),
           },
         })
@@ -900,3 +1050,5 @@ export async function deleteCanonicalJobAndRefs(
     return err(new AppError("DB_ERROR", `Failed to delete canonical job ${jobId}`, error));
   }
 }
+
+

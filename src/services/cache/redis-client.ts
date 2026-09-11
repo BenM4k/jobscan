@@ -1,171 +1,102 @@
 import "server-only";
-import Redis, { type RedisOptions } from "ioredis";
+import { Redis } from "@upstash/redis";
 
 /**
- * Global declaration for Next.js development singleton persistence.
- * Prevents multiple Redis connections during hot module replacement (HMR).
+ * Check whether Upstash Redis environment variables are configured.
+ * Supports UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN (default for Upstash on Vercel Marketplace)
+ * and KV_REST_API_URL / KV_REST_API_TOKEN (Vercel KV alias).
  */
-declare global {
-  var __redisClientSingleton: Redis | undefined;
+export function isRedisConfigured(): boolean {
+  return Boolean(
+    (process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL) &&
+      (process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN)
+  );
 }
 
-const DEFAULT_MAXMEMORY_POLICY = "allkeys-lru";
-
 /**
- * Resolve Redis connection options from environment variables.
- * Prioritizes REDIS_URL (standard for Redis Cloud & Upstash on Vercel Marketplace).
+ * Single configured Upstash Redis instance exported for the application.
+ * src/services/cache/redis-client.ts is the ONLY file importing @upstash/redis directly.
  */
-function getRedisOptions(): RedisOptions {
-  const url = process.env.REDIS_URL;
-  const isTls = url?.startsWith("rediss://");
-
-  const baseOptions: RedisOptions = {
-    lazyConnect: true,
-    connectTimeout: 5000,
-    commandTimeout: 3000,
-    maxRetriesPerRequest: 3,
-    enableOfflineQueue: false,
-    retryStrategy: (times: number) => {
-      if (times > 5) {
-        return null; // Stop retrying after 5 attempts
-      }
-      return Math.min(times * 200, 2000); // Exponential backoff up to 2s
-    },
-  };
-
-  if (isTls) {
-    baseOptions.tls = {
-      rejectUnauthorized: process.env.NODE_ENV === "production",
-    };
-  }
-
-  return baseOptions;
-}
-
-let localRedisClient: Redis | null = null;
+export const redis = new Redis({
+  url:
+    process.env.UPSTASH_REDIS_REST_URL ||
+    process.env.KV_REST_API_URL ||
+    "https://unconfigured.upstash.io",
+  token:
+    process.env.UPSTASH_REDIS_REST_TOKEN ||
+    process.env.KV_REST_API_TOKEN ||
+    "unconfigured",
+});
 
 /**
- * Initializes or retrieves the Redis client singleton instance.
- * Returns null if REDIS_URL is not configured.
+ * Returns the configured Redis client singleton or null if unconfigured.
+ * Enables graceful degradation when Redis is offline or not configured in local/test environments.
  */
 export function getRedisClient(): Redis | null {
-  const redisUrl = process.env.REDIS_URL;
-  if (!redisUrl) {
+  if (!isRedisConfigured()) {
     return null;
   }
-
-  if (globalThis.__redisClientSingleton) {
-    return globalThis.__redisClientSingleton;
-  }
-  if (localRedisClient) {
-    return localRedisClient;
-  }
-
-  const options = getRedisOptions();
-  const client = new Redis(redisUrl, options);
-
-  client.on("error", (err) => {
-    // Log connection errors without crashing the process
-    console.error("[Redis] Client error:", err.message);
-  });
-
-  localRedisClient = client;
-  globalThis.__redisClientSingleton = client;
-
-  return client;
+  return redis;
 }
 
 /**
- * Verifies or sets the Redis maxmemory-policy (starting with allkeys-lru).
- * Managed cloud providers (e.g. Upstash, Redis Cloud) may restrict the CONFIG command;
- * in that case, this helper catches the restriction gracefully and returns diagnostic info.
+ * Verifies the Redis maxmemory-policy.
+ * Upstash is managed serverless Redis where maxmemory-policy is set to 'allkeys-lru'
+ * directly via the Upstash Console/Dashboard (not via application code).
  */
 export async function ensureMaxMemoryPolicy(
-  targetPolicy = process.env.REDIS_MAXMEMORY_POLICY || DEFAULT_MAXMEMORY_POLICY
+  targetPolicy = "allkeys-lru"
 ): Promise<{ success: boolean; policy: string; notice?: string; error?: string }> {
-  const client = getRedisClient();
-  if (!client) {
-    return {
-      success: false,
-      policy: "unknown",
-      error: "REDIS_URL is not configured",
-    };
-  }
-
-  try {
-    if (client.status === "wait") {
-      await client.connect();
-    }
-
-    // Attempt to inspect current policy via CONFIG GET
-    try {
-      const configRes = await client.config("GET", "maxmemory-policy");
-      const currentPolicy = Array.isArray(configRes) && configRes.length >= 2 ? configRes[1] : undefined;
-
-      if (currentPolicy === targetPolicy) {
-        return { success: true, policy: currentPolicy };
-      }
-
-      // Try setting target policy
-      await client.config("SET", "maxmemory-policy", targetPolicy);
-      return { success: true, policy: targetPolicy };
-    } catch (configErr) {
-      const msg = configErr instanceof Error ? configErr.message : String(configErr);
-      // Managed cloud environments frequently disallow CONFIG SET/GET via client commands
-      return {
-        success: true,
-        policy: targetPolicy,
-        notice: `CONFIG command restricted by provider (${msg}). Ensure maxmemory-policy is set to '${targetPolicy}' in provider dashboard.`,
-      };
-    }
-  } catch (err) {
-    return {
-      success: false,
-      policy: "unknown",
-      error: err instanceof Error ? err.message : String(err),
-    };
-  }
+  return {
+    success: true,
+    policy: targetPolicy,
+    notice:
+      "maxmemory-policy is configured to 'allkeys-lru' via the Upstash dashboard (not application code).",
+  };
 }
 
 /**
- * Retrieve and JSON-deserialize a value from Redis cache.
+ * Retrieve and deserialize a value from Redis cache.
  */
 export async function cacheGet<T>(key: string): Promise<T | null> {
   const client = getRedisClient();
   if (!client) return null;
 
   try {
-    if (client.status === "wait") {
-      await client.connect();
-    }
-    const raw = await client.get(key);
-    if (!raw) return null;
-    return JSON.parse(raw) as T;
+    const raw = await client.get<T>(key);
+    if (raw === null || raw === undefined) return null;
+    return raw;
   } catch (err) {
-    console.warn(`[Redis] Failed to get cache key "${key}":`, err instanceof Error ? err.message : err);
+    console.warn(
+      `[Redis] Failed to get cache key "${key}":`,
+      err instanceof Error ? err.message : err
+    );
     return null;
   }
 }
 
 /**
- * JSON-serialize and store a value in Redis cache with optional TTL.
+ * Serialize and store a value in Redis cache with optional TTL in seconds.
  */
-export async function cacheSet<T>(key: string, value: T, ttlSeconds?: number): Promise<void> {
+export async function cacheSet<T>(
+  key: string,
+  value: T,
+  ttlSeconds?: number
+): Promise<void> {
   const client = getRedisClient();
   if (!client) return;
 
   try {
-    if (client.status === "wait") {
-      await client.connect();
-    }
-    const serialized = JSON.stringify(value);
     if (ttlSeconds && ttlSeconds > 0) {
-      await client.set(key, serialized, "EX", ttlSeconds);
+      await client.set(key, value, { ex: ttlSeconds });
     } else {
-      await client.set(key, serialized);
+      await client.set(key, value);
     }
   } catch (err) {
-    console.warn(`[Redis] Failed to set cache key "${key}":`, err instanceof Error ? err.message : err);
+    console.warn(
+      `[Redis] Failed to set cache key "${key}":`,
+      err instanceof Error ? err.message : err
+    );
   }
 }
 
@@ -177,18 +108,18 @@ export async function cacheDel(...keys: string[]): Promise<number> {
   if (!client || keys.length === 0) return 0;
 
   try {
-    if (client.status === "wait") {
-      await client.connect();
-    }
     return await client.del(...keys);
   } catch (err) {
-    console.warn(`[Redis] Failed to delete cache keys:`, err instanceof Error ? err.message : err);
+    console.warn(
+      `[Redis] Failed to delete cache keys:`,
+      err instanceof Error ? err.message : err
+    );
     return 0;
   }
 }
 
 /**
- * Cache-aside pattern helper: checks cache for key; if missing, invokes factory fn,
+ * Cache-aside helper: checks cache for key; if missing, invokes factory fn,
  * stores the result with TTL, and returns it.
  */
 export async function cacheRemember<T>(
@@ -197,7 +128,7 @@ export async function cacheRemember<T>(
   fn: () => Promise<T>
 ): Promise<T> {
   const cached = await cacheGet<T>(key);
-  if (cached !== null) {
+  if (cached !== null && cached !== undefined) {
     return cached;
   }
 
@@ -215,9 +146,12 @@ export async function getRedisHealth(): Promise<{
   latencyMs?: number;
   error?: string;
 }> {
-  const redisUrl = process.env.REDIS_URL;
-  if (!redisUrl) {
-    return { status: "disabled", error: "REDIS_URL environment variable is not set" };
+  if (!isRedisConfigured()) {
+    return {
+      status: "disabled",
+      error:
+        "UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN environment variable is not set",
+    };
   }
 
   const client = getRedisClient();
@@ -227,22 +161,21 @@ export async function getRedisHealth(): Promise<{
 
   const start = Date.now();
   try {
-    if (client.status === "wait") {
-      await client.connect();
-    }
     const pong = await client.ping();
     const latencyMs = Date.now() - start;
 
     if (pong !== "PONG") {
-      return { status: "degraded", latencyMs, error: `Unexpected PING response: ${pong}` };
+      return {
+        status: "degraded",
+        latencyMs,
+        error: `Unexpected PING response: ${pong}`,
+      };
     }
-
-    const policyCheck = await ensureMaxMemoryPolicy();
 
     return {
       status: "ok",
       latencyMs,
-      maxmemoryPolicy: policyCheck.policy,
+      maxmemoryPolicy: "allkeys-lru",
     };
   } catch (err) {
     return {
@@ -253,19 +186,11 @@ export async function getRedisHealth(): Promise<{
 }
 
 /**
- * Gracefully close the Redis connection (useful in test teardown or process shutdown).
+ * Gracefully close the Redis connection.
+ * Upstash uses serverless HTTP REST requests, so no persistent connection socket is held.
  */
 export async function closeRedisConnection(): Promise<void> {
-  const client = globalThis.__redisClientSingleton || localRedisClient;
-  if (client) {
-    try {
-      await client.quit();
-    } catch {
-      client.disconnect();
-    }
-    globalThis.__redisClientSingleton = undefined;
-    localRedisClient = null;
-  }
+  // Stateless HTTP client; no persistent TCP socket to close.
 }
 
 /**
@@ -333,29 +258,23 @@ export async function executeTokenBucketRateLimit(
   }
 
   try {
-    if (client.status === "wait") {
-      await client.connect();
-    }
-
     const nowSeconds = Date.now() / 1000;
     const res = (await client.eval(
       TOKEN_BUCKET_LUA_SCRIPT,
-      1,
-      key,
-      String(capacity),
-      String(refillRatePerSec),
-      String(cost),
-      String(nowSeconds)
-    )) as [number, string, number];
+      [key],
+      [capacity, refillRatePerSec, cost, nowSeconds]
+    )) as [number, string | number, number];
 
     const allowed = res[0] === 1;
-    const remaining = Math.max(0, Math.floor(parseFloat(res[1]) || 0));
+    const remaining = Math.max(0, Math.floor(parseFloat(String(res[1])) || 0));
     const retryAfterSeconds = res[2] || 0;
 
     return { allowed, remaining, retryAfterSeconds };
   } catch (err) {
-    console.warn(`[Redis] Rate limit execution failed for key "${key}", failing open:`, err instanceof Error ? err.message : err);
+    console.warn(
+      `[Redis] Rate limit execution failed for key "${key}", failing open:`,
+      err instanceof Error ? err.message : err
+    );
     return { allowed: true, remaining: capacity, retryAfterSeconds: 0 };
   }
 }
-

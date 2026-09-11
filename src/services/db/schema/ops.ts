@@ -102,3 +102,27 @@ export const idempotencyKey = pgTable(
 
 export type IdempotencyKeySelect = typeof idempotencyKey.$inferSelect;
 export type IdempotencyKeyInsert = typeof idempotencyKey.$inferInsert;
+
+// ─────────────────────────────────────────────────────────────
+// Reliability: Postgres-backed Adapter Circuit Breaker
+// ─────────────────────────────────────────────────────────────
+
+export const circuitBreakerStateEnum = pgEnum("circuit_breaker_state", [
+  "closed",
+  "open",
+  "half_open",
+]);
+
+export const adapterCircuitBreaker = pgTable("adapter_circuit_breaker", {
+  source: text("source").primaryKey(),
+  state: circuitBreakerStateEnum("state").default("closed").notNull(),
+  consecutiveFailures: integer("consecutive_failures").default(0).notNull(),
+  consecutiveOpens: integer("consecutive_opens").default(0).notNull(),
+  openedAt: timestamp("opened_at"),
+  ...timestamps,
+});
+
+export type AdapterCircuitBreakerSelect = typeof adapterCircuitBreaker.$inferSelect;
+export type AdapterCircuitBreakerInsert = typeof adapterCircuitBreaker.$inferInsert;
+export type CircuitBreakerState = (typeof circuitBreakerStateEnum.enumValues)[number];
+

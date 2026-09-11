@@ -1,7 +1,13 @@
 import "server-only";
 
 import { db } from "@/services/db";
-import { job, rawJobPayload, pipelineEntry, masterResume } from "@/services/db/schema";
+import {
+  job,
+  rawJobPayload,
+  pipelineEntry,
+  masterResume,
+  jobSourceRef,
+} from "@/services/db/schema";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 import { eq, and, desc, sql, or, ilike, count, gte, lte } from "drizzle-orm";
@@ -19,7 +25,7 @@ export function buildUnscopedJobConditions(
   sourceFilter?: string,
   startDate?: string,
   endDate?: string,
-  queryFilter?: string
+  queryFilter?: string,
 ) {
   const conditions = [];
   if (sourceFilter && sourceFilter !== "all") {
@@ -29,7 +35,7 @@ export function buildUnscopedJobConditions(
     const start = new Date(startDate);
     if (!isNaN(start.getTime())) {
       conditions.push(
-        gte(sql`COALESCE(${job.postedAt}, ${job.createdAt})`, start)
+        gte(sql`COALESCE(${job.postedAt}, ${job.createdAt})`, start),
       );
     }
   }
@@ -38,7 +44,7 @@ export function buildUnscopedJobConditions(
     if (!isNaN(end.getTime())) {
       end.setHours(23, 59, 59, 999);
       conditions.push(
-        lte(sql`COALESCE(${job.postedAt}, ${job.createdAt})`, end)
+        lte(sql`COALESCE(${job.postedAt}, ${job.createdAt})`, end),
       );
     }
   }
@@ -49,8 +55,8 @@ export function buildUnscopedJobConditions(
         ilike(job.title, q),
         ilike(job.company, q),
         ilike(job.description, q),
-        ilike(job.location, q)
-      )!
+        ilike(job.location, q),
+      )!,
     );
   }
   return conditions;
@@ -58,7 +64,7 @@ export function buildUnscopedJobConditions(
 
 export async function getJobById(
   id: string,
-  userId?: string
+  userId?: string,
 ): Promise<Result<JobSelect, AppError>> {
   try {
     if (userId) {
@@ -69,22 +75,26 @@ export async function getJobById(
       }
 
       // 2. Try finding pipeline entry by job ID
-      const byJobId = await pipelineDal.getPipelineEntryByUserAndJob(userId, id);
+      const byJobId = await pipelineDal.getPipelineEntryByUserAndJob(
+        userId,
+        id,
+      );
       if (byJobId.ok && byJobId.value) {
         return ok(pipelineEntryToJobSelect(byJobId.value));
       }
     }
 
     // 3. Fallback to direct job table query
-    const [found] = await db
-      .select()
-      .from(job)
-      .where(eq(job.id, id))
-      .limit(1);
+    const [found] = await db.select().from(job).where(eq(job.id, id)).limit(1);
 
     if (!found) {
       return err(new AppError("NOT_FOUND", `Job with ID ${id} not found`));
     }
+
+    const alsoPostedOn = await pipelineDal.getAlsoPostedOnForJob(
+      found.id,
+      found.source
+    );
 
     return ok({
       id: found.id,
@@ -110,8 +120,10 @@ export async function getJobById(
       tailoredResume: null,
       tailoredResumeData: null,
       status: found.status,
+      language: found.language,
       createdAt: found.createdAt,
       updatedAt: found.updatedAt,
+      alsoPostedOn,
     });
   } catch (error) {
     return err(new AppError("DB_ERROR", `Failed to get job ${id}`, error));
@@ -126,7 +138,7 @@ export async function listJobs(
   startDate?: string,
   endDate?: string,
   queryFilter?: string,
-  userId?: string
+  userId?: string,
 ): Promise<Result<JobSelect[], AppError>> {
   try {
     if (userId) {
@@ -149,7 +161,7 @@ export async function listJobs(
       sourceFilter,
       startDate,
       endDate,
-      queryFilter
+      queryFilter,
     );
 
     const rows = await db
@@ -187,7 +199,7 @@ export async function listJobs(
         status: j.status,
         createdAt: j.createdAt,
         updatedAt: j.updatedAt,
-      }))
+      })),
     );
   } catch (error) {
     return err(new AppError("DB_ERROR", "Failed to list jobs", error));
@@ -200,7 +212,7 @@ export async function countJobs(
   startDate?: string,
   endDate?: string,
   queryFilter?: string,
-  userId?: string
+  userId?: string,
 ): Promise<Result<number, AppError>> {
   try {
     if (userId) {
@@ -217,7 +229,7 @@ export async function countJobs(
       sourceFilter,
       startDate,
       endDate,
-      queryFilter
+      queryFilter,
     );
     const [res] = await db
       .select({ value: count() })
@@ -232,7 +244,7 @@ export async function countJobs(
 export async function isJobDeleted(
   source: string,
   externalId: string,
-  userId: string
+  userId: string,
 ): Promise<boolean> {
   try {
     const [found] = await db
@@ -243,8 +255,8 @@ export async function isJobDeleted(
         and(
           eq(pipelineEntry.userId, userId),
           eq(job.source, source as JobSource),
-          eq(job.externalId, externalId)
-        )
+          eq(job.externalId, externalId),
+        ),
       )
       .limit(1);
 
@@ -260,7 +272,7 @@ export async function isJobDeleted(
 
 export async function searchJobsByVector(
   embedding: number[],
-  limit: number = 10
+  limit: number = 10,
 ): Promise<Result<CanonicalJobSelect[], AppError>> {
   try {
     const vectorLiteral = `[${embedding.join(",")}]`;
@@ -274,7 +286,7 @@ export async function searchJobsByVector(
     return ok(rows);
   } catch (error) {
     return err(
-      new AppError("DB_ERROR", "Failed vector similarity search", error)
+      new AppError("DB_ERROR", "Failed vector similarity search", error),
     );
   }
 }
@@ -285,7 +297,7 @@ export async function searchJobsByVector(
  */
 export async function searchJobsByCosineSimilarity(
   embedding: number[],
-  options: { limit?: number; minSimilarity?: number } = {}
+  options: { limit?: number; minSimilarity?: number } = {},
 ): Promise<Result<JobWithSimilarity[], AppError>> {
   try {
     const limit = options.limit ?? 10;
@@ -296,7 +308,7 @@ export async function searchJobsByCosineSimilarity(
     const conditions = [sql`${job.embedding} IS NOT NULL`];
     if (options.minSimilarity !== undefined) {
       conditions.push(
-        sql`(1 - (${job.embedding} <=> ${vectorLiteral}::vector)) >= ${options.minSimilarity}`
+        sql`(1 - (${job.embedding} <=> ${vectorLiteral}::vector)) >= ${options.minSimilarity}`,
       );
     }
 
@@ -314,13 +326,23 @@ export async function searchJobsByCosineSimilarity(
       rows.map((r) => ({
         ...r.job,
         similarity: Number(r.similarity),
-      }))
+      })),
     );
   } catch (error) {
     return err(
-      new AppError("DB_ERROR", "Failed cosine similarity search", error)
+      new AppError("DB_ERROR", "Failed cosine similarity search", error),
     );
   }
+}
+
+/**
+ * Query jobs ranked by cosine similarity using pgvector's <=> operator via raw SQL template.
+ */
+export async function findJobsRankedBySimilarity(
+  embedding: number[],
+  limit = 20,
+): Promise<Result<JobWithSimilarity[], AppError>> {
+  return searchJobsByCosineSimilarity(embedding, { limit });
 }
 
 /**
@@ -328,7 +350,7 @@ export async function searchJobsByCosineSimilarity(
  */
 export async function findJobsSimilarToResume(
   resumeId: string,
-  options: { limit?: number; minSimilarity?: number } = {}
+  options: { limit?: number; minSimilarity?: number } = {},
 ): Promise<Result<JobWithSimilarity[], AppError>> {
   try {
     const [found] = await db
@@ -341,8 +363,8 @@ export async function findJobsSimilarToResume(
       return err(
         new AppError(
           "NOT_FOUND",
-          `Master resume ${resumeId} has no embedding generated`
-        )
+          `Master resume ${resumeId} has no embedding generated`,
+        ),
       );
     }
 
@@ -352,8 +374,8 @@ export async function findJobsSimilarToResume(
       new AppError(
         "DB_ERROR",
         `Failed to find jobs similar to resume ${resumeId}`,
-        error
-      )
+        error,
+      ),
     );
   }
 }
@@ -363,7 +385,7 @@ export async function findJobsSimilarToResume(
  */
 export async function getJobResumeSimilarity(
   jobId: string,
-  resumeId: string
+  resumeId: string,
 ): Promise<Result<number | null, AppError>> {
   try {
     const [row] = await db
@@ -377,8 +399,8 @@ export async function getJobResumeSimilarity(
           eq(job.id, jobId),
           eq(masterResume.id, resumeId),
           sql`${job.embedding} IS NOT NULL`,
-          sql`${masterResume.embedding} IS NOT NULL`
-        )
+          sql`${masterResume.embedding} IS NOT NULL`,
+        ),
       )
       .limit(1);
 
@@ -392,53 +414,52 @@ export async function getJobResumeSimilarity(
       new AppError(
         "DB_ERROR",
         "Failed to compute job-resume cosine similarity",
-        error
-      )
+        error,
+      ),
     );
   }
 }
 
 export async function searchJobsFullText(
   queryString: string,
-  limit: number = 20
+  limit: number = 20,
 ): Promise<Result<CanonicalJobSelect[], AppError>> {
   try {
     const rows = await db
       .select()
       .from(job)
       .where(
-        sql`${job.descriptionTsv} @@ plainto_tsquery('english', ${queryString})`
+        sql`${job.descriptionTsv} @@ plainto_tsquery('english', ${queryString})`,
       )
       .orderBy(
-        sql`ts_rank(${job.descriptionTsv}, plainto_tsquery('english', ${queryString}), 32) DESC`
+        sql`ts_rank(${job.descriptionTsv}, plainto_tsquery('english', ${queryString}), 32) DESC`,
       )
       .limit(limit);
 
     return ok(rows);
   } catch (error) {
-    return err(
-      new AppError("DB_ERROR", "Failed full-text search", error)
-    );
+    return err(new AppError("DB_ERROR", "Failed full-text search", error));
   }
 }
 
 /**
  * Calculate ts_rank between a job's description_tsv and a query string (or resume keywords).
- * Uses normalization flag 32 (divides rank by rank + 1) to map the score cleanly to [0, 1).
+ * Uses language-appropriate dictionary ('french' vs 'english') and normalization flag 32.
  */
 export async function getJobResumeTsRank(
   jobId: string,
-  queryOrKeywords: string
+  queryOrKeywords: string,
+  language: "en" | "fr" = "en",
 ): Promise<Result<number | null, AppError>> {
   try {
     if (!queryOrKeywords || !queryOrKeywords.trim()) {
       return ok(0);
     }
 
-    // Use websearch_to_tsquery for graceful query parsing (supports quotes, OR, without throwing on special chars)
+    const regconfig = language === "fr" ? "french" : "english";
     const [row] = await db
       .select({
-        rank: sql<number>`ts_rank(${job.descriptionTsv}, websearch_to_tsquery('english', ${queryOrKeywords}), 32)`,
+        rank: sql<number>`ts_rank(${job.descriptionTsv}, websearch_to_tsquery(${regconfig}::regconfig, ${queryOrKeywords}), 32)`,
       })
       .from(job)
       .where(eq(job.id, jobId))
@@ -454,8 +475,59 @@ export async function getJobResumeTsRank(
       new AppError(
         "DB_ERROR",
         "Failed to compute job full-text ts_rank",
-        error
+        error,
+      ),
+    );
+  }
+}
+
+/**
+ * Query jobs ranked by full-text keyword search matching candidate resume language.
+ * Filters WHERE language = resumeLanguage and uses matching text-search config.
+ * Cross-language keyword matching is deliberately NOT attempted (embeddings carry that case).
+ */
+export async function findJobsRankedByKeyword(
+  queryOrKeywords: string,
+  resumeLanguage: "en" | "fr" = "en",
+  limit: number = 20,
+): Promise<Result<Array<CanonicalJobSelect & { bm25Rank: number }>, AppError>> {
+  try {
+    if (!queryOrKeywords || !queryOrKeywords.trim()) {
+      return ok([]);
+    }
+
+    const regconfig = resumeLanguage === "fr" ? "french" : "english";
+    const tsquery = sql`websearch_to_tsquery(${regconfig}::regconfig, ${queryOrKeywords})`;
+    const rankExpr = sql<number>`ts_rank(${job.descriptionTsv}, ${tsquery}, 32)`;
+
+    const rows = await db
+      .select({
+        job,
+        rank: rankExpr,
+      })
+      .from(job)
+      .where(
+        and(
+          eq(job.language, resumeLanguage),
+          sql`${job.descriptionTsv} @@ ${tsquery}`,
+        )
       )
+      .orderBy(desc(rankExpr))
+      .limit(limit);
+
+    return ok(
+      rows.map((r) => ({
+        ...r.job,
+        bm25Rank: Number(r.rank),
+      }))
+    );
+  } catch (error) {
+    return err(
+      new AppError(
+        "DB_ERROR",
+        "Failed to find jobs ranked by keyword",
+        error,
+      ),
     );
   }
 }
@@ -466,12 +538,15 @@ export async function getJobResumeTsRank(
 export async function getJobHybridScores(
   jobId: string,
   resumeId: string,
-  queryOrKeywords: string
-): Promise<Result<{ cosineSimilarity: number | null; bm25Rank: number | null }, AppError>> {
+  queryOrKeywords: string,
+  language: "en" | "fr" = "en",
+): Promise<
+  Result<{ cosineSimilarity: number | null; bm25Rank: number | null }, AppError>
+> {
   try {
     const [cosineRes, bm25Res] = await Promise.all([
       getJobResumeSimilarity(jobId, resumeId),
-      getJobResumeTsRank(jobId, queryOrKeywords),
+      getJobResumeTsRank(jobId, queryOrKeywords, language),
     ]);
 
     if (!cosineRes.ok) return cosineRes;
@@ -483,18 +558,14 @@ export async function getJobHybridScores(
     });
   } catch (error) {
     return err(
-      new AppError(
-        "DB_ERROR",
-        "Failed to compute job hybrid scores",
-        error
-      )
+      new AppError("DB_ERROR", "Failed to compute job hybrid scores", error),
     );
   }
 }
 
 export async function getRawJobPayload(
   source: JobSource,
-  externalId: string
+  externalId: string,
 ): Promise<Result<RawJobPayloadSelect, AppError>> {
   try {
     const [row] = await db
@@ -503,8 +574,8 @@ export async function getRawJobPayload(
       .where(
         and(
           eq(rawJobPayload.source, source),
-          eq(rawJobPayload.externalId, externalId)
-        )
+          eq(rawJobPayload.externalId, externalId),
+        ),
       )
       .limit(1);
 
@@ -512,8 +583,8 @@ export async function getRawJobPayload(
       return err(
         new AppError(
           "NOT_FOUND",
-          `Raw job payload for ${source}:${externalId} not found`
-        )
+          `Raw job payload for ${source}:${externalId} not found`,
+        ),
       );
     }
 
@@ -523,14 +594,14 @@ export async function getRawJobPayload(
       new AppError(
         "DB_ERROR",
         `Failed to retrieve raw job payload for ${source}:${externalId}`,
-        error
-      )
+        error,
+      ),
     );
   }
 }
 
 export async function getRawJobPayloadById(
-  id: string
+  id: string,
 ): Promise<Result<RawJobPayloadSelect, AppError>> {
   try {
     const [row] = await db
@@ -541,7 +612,7 @@ export async function getRawJobPayloadById(
 
     if (!row) {
       return err(
-        new AppError("NOT_FOUND", `Raw job payload with ID ${id} not found`)
+        new AppError("NOT_FOUND", `Raw job payload with ID ${id} not found`),
       );
     }
 
@@ -551,19 +622,22 @@ export async function getRawJobPayloadById(
       new AppError(
         "DB_ERROR",
         `Failed to retrieve raw job payload with ID ${id}`,
-        error
-      )
+        error,
+      ),
     );
   }
 }
 
 /**
- * Queries for an existing canonical job with SimHash within the specified Hamming distance threshold.
+ * Queries for an existing canonical job with SimHash within the specified Hamming distance threshold
+ * within a lookback period (default 30 days).
  * Uses PostgreSQL bitwise XOR (#) and popcount (bit_count) on 64-bit bit strings.
  */
 export async function findJobBySimhash(
   targetSimhash: string | bigint,
-  maxDistance: number = 3
+  maxDistance: number = 4,
+  lookbackDays: number = 30,
+  excludeJobId?: string,
 ): Promise<Result<CanonicalJobSelect | null, AppError>> {
   try {
     const targetBigIntStr =
@@ -571,40 +645,117 @@ export async function findJobBySimhash(
         ? targetSimhash.toString()
         : BigInt(targetSimhash).toString();
 
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - lookbackDays);
+
+    const conditions = [
+      sql`${job.simhash} IS NOT NULL`,
+      sql`bit_count((${job.simhash}::bigint # ${sql.raw(targetBigIntStr)}::bigint)::bit(64)) <= ${maxDistance}`,
+      or(
+        gte(job.postedAt, cutoff),
+        and(sql`${job.postedAt} IS NULL`, gte(job.createdAt, cutoff)),
+      )!,
+    ];
+
+    if (excludeJobId) {
+      conditions.push(sql`${job.id} != ${excludeJobId}`);
+    }
+
     const [matched] = await db
       .select()
       .from(job)
-      .where(
-        and(
-          sql`${job.simhash} IS NOT NULL`,
-          sql`bit_count((${job.simhash}::bigint # ${sql.raw(targetBigIntStr)}::bigint)::bit(64)) <= ${maxDistance}`
-        )
-      )
+      .where(and(...conditions))
       .orderBy(
-        sql`bit_count((${job.simhash}::bigint # ${sql.raw(targetBigIntStr)}::bigint)::bit(64)) ASC`
+        sql`bit_count((${job.simhash}::bigint # ${sql.raw(targetBigIntStr)}::bigint)::bit(64)) ASC`,
       )
       .limit(1);
 
     return ok(matched || null);
   } catch (error) {
     return err(
-      new AppError("DB_ERROR", "Failed to query job by simhash", error)
+      new AppError("DB_ERROR", "Failed to query job by simhash", error),
     );
   }
 }
 
-export async function getCanonicalJobRowById(
-  id: string
+export async function getCanonicalJobBySourceAndExternalId(
+  source: JobSource,
+  externalId: string,
 ): Promise<Result<CanonicalJobSelect | null, AppError>> {
   try {
     const [found] = await db
       .select()
       .from(job)
-      .where(eq(job.id, id))
+      .where(and(eq(job.source, source), eq(job.externalId, externalId)))
       .limit(1);
     return ok(found || null);
   } catch (error) {
-    return err(new AppError("DB_ERROR", `Failed to get canonical job ${id}`, error));
+    return err(
+      new AppError(
+        "DB_ERROR",
+        `Failed to get job by source ${source} and externalId ${externalId}`,
+        error,
+      ),
+    );
   }
 }
 
+export async function getJobSourceRefBySourceAndExternalId(
+  source: JobSource,
+  externalId: string,
+): Promise<Result<typeof jobSourceRef.$inferSelect | null, AppError>> {
+  try {
+    const [found] = await db
+      .select()
+      .from(jobSourceRef)
+      .where(
+        and(
+          eq(jobSourceRef.source, source),
+          eq(jobSourceRef.externalId, externalId),
+        ),
+      )
+      .limit(1);
+    return ok(found || null);
+  } catch (error) {
+    return err(
+      new AppError(
+        "DB_ERROR",
+        `Failed to get job source ref for ${source}:${externalId}`,
+        error,
+      ),
+    );
+  }
+}
+
+export async function getJobSourceRefsForJob(
+  jobId: string,
+): Promise<Result<Array<typeof jobSourceRef.$inferSelect>, AppError>> {
+  try {
+    const refs = await db
+      .select()
+      .from(jobSourceRef)
+      .where(eq(jobSourceRef.jobId, jobId));
+    return ok(refs);
+  } catch (error) {
+    return err(
+      new AppError(
+        "DB_ERROR",
+        `Failed to get job source refs for job ${jobId}`,
+        error,
+      ),
+    );
+  }
+}
+
+export async function getCanonicalJobRowById(
+  id: string,
+): Promise<Result<CanonicalJobSelect | null, AppError>> {
+  try {
+    const [found] = await db.select().from(job).where(eq(job.id, id)).limit(1);
+    return ok(found || null);
+  } catch (error) {
+    return err(
+      new AppError("DB_ERROR", `Failed to get canonical job ${id}`, error),
+    );
+  }
+}

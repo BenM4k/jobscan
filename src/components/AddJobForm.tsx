@@ -43,6 +43,7 @@ export function AddJobForm() {
   const [url, setUrl] = useState("");
   const [salary, setSalary] = useState("");
   const [description, setDescription] = useState("");
+  const [language, setLanguage] = useState<"en" | "fr">("en");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -59,6 +60,7 @@ export function AddJobForm() {
     formData.append("workplaceType", workplaceType);
     formData.append("url", url);
     formData.append("salary", salary);
+    formData.append("language", language);
     formData.append("description", description);
 
     const res = await addManualJobAction(formData);
@@ -208,7 +210,42 @@ export function AddJobForm() {
             </div>
           </div>
 
-          {/* Row 4: Description */}
+          {/* Row 4: Language Selection */}
+          <div>
+            <label className="block text-xs font-medium text-slate-500 dark:text-zinc-400 mb-2 font-sans">
+              Job Language / Langue de l&apos;offre
+            </label>
+            <div className="inline-flex rounded-lg border border-slate-300 dark:border-zinc-800 p-0.5 bg-slate-100 dark:bg-zinc-900 text-xs">
+              <button
+                type="button"
+                onClick={() => setLanguage("en")}
+                className={cn(
+                  "px-3.5 py-1.5 rounded-md font-medium transition cursor-pointer flex items-center gap-1.5",
+                  language === "en"
+                    ? "bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-400 shadow-xs font-semibold"
+                    : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
+                )}
+              >
+                <span>🇺🇸</span>
+                <span>English</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setLanguage("fr")}
+                className={cn(
+                  "px-3.5 py-1.5 rounded-md font-medium transition cursor-pointer flex items-center gap-1.5",
+                  language === "fr"
+                    ? "bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-400 shadow-xs font-semibold"
+                    : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
+                )}
+              >
+                <span>🇫🇷</span>
+                <span>Français</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Row 5: Description */}
           <div>
             <label
               htmlFor="job-description-input"

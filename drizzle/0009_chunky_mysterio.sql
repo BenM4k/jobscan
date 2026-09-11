@@ -1,3 +1,4 @@
+CREATE EXTENSION IF NOT EXISTS vector;--> statement-breakpoint
 CREATE TYPE "public"."job_source" AS ENUM('ashby', 'greenhouse', 'remoteok', 'lever', 'congojob', 'emploi_cd', 'fecrdc', 'unjobs', 'reliefweb', 'manual');--> statement-breakpoint
 CREATE TYPE "public"."job_status" AS ENUM('active', 'likely_stale', 'closed');--> statement-breakpoint
 CREATE TYPE "public"."skill_relation_type" AS ENUM('implies', 'broader_than');--> statement-breakpoint

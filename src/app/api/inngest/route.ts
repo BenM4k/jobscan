@@ -1,7 +1,7 @@
 import { serve } from "inngest/next";
 import { inngest } from "@/inngest/client";
 import {
-  scheduledJobFetch,
+  ingestAllSources,
   jobFetchRequested,
   scheduledDigestCron,
   sendDigestEmail,
@@ -11,7 +11,7 @@ import {
 export const { GET, POST, PUT } = serve({
   client: inngest,
   functions: [
-    scheduledJobFetch,
+    ingestAllSources,
     jobFetchRequested,
     scheduledDigestCron,
     sendDigestEmail,
