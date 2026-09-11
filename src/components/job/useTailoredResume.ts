@@ -102,7 +102,7 @@ export function useTailoredResume({ job, onJobUpdated }: UseTailoredResumeOption
 
   const handleDownloadPdf = async (content: string) => {
     try {
-      await downloadTextAsPdf(content, `${job.company || "Company"}-Tailored-Resume.pdf`);
+      await downloadTextAsPdf(`${job.company || "Company"}-Tailored-Resume.pdf`, content);
       toast.success("Downloaded tailored resume PDF");
     } catch (err) {
       console.error(err);

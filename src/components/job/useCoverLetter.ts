@@ -162,7 +162,7 @@ export function useCoverLetter({ job, onJobUpdated }: UseCoverLetterProps) {
     try {
       const content = coverLetter || job.coverLetterDraft;
       if (!content) return;
-      await downloadTextAsPdf(content, `${job.company || "Company"}-Cover-Letter.pdf`);
+      await downloadTextAsPdf(`${job.company || "Company"}-Cover-Letter.pdf`, content);
       toast.success("Downloaded cover letter PDF");
     } catch (err) {
       console.error(err);
