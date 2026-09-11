@@ -4,11 +4,14 @@ import {
   masterResume,
   resumeSkill,
   skill,
+  tailoredResume,
+  pipelineEntry,
 } from "@/services/db/schema";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { generateEmbedding } from "@/services/ai/embed";
+import { normalizeSkillName } from "@/services/skills/normalize";
 
 export type MasterResumeSelect = typeof masterResume.$inferSelect;
 export type MasterResumeInsert = typeof masterResume.$inferInsert;
@@ -68,6 +71,9 @@ export async function getMasterResumeById(
     return err(new AppError("DB_ERROR", `Failed to fetch resume ${id}`, error));
   }
 }
+
+export const getActiveResume = getActiveMasterResume;
+export const getResumeById = getMasterResumeById;
 
 export async function createMasterResume(
   data: MasterResumeInsert,
@@ -236,7 +242,13 @@ export async function syncResumeSkills(
   try {
     return await db.transaction(async (tx) => {
       await tx.delete(resumeSkill).where(eq(resumeSkill.resumeId, resumeId));
-      const cleanNames = skillNames.map((n) => n.trim()).filter(Boolean);
+      const cleanNames = Array.from(
+        new Set(
+          skillNames
+            .map((n) => normalizeSkillName(n))
+            .filter((n) => n.length > 0)
+        )
+      );
       if (cleanNames.length === 0) return ok(undefined);
 
       for (const name of cleanNames) {
@@ -288,5 +300,188 @@ export async function setResumeEmbedding(
     return err(
       new AppError("DB_ERROR", `Failed to set embedding for resume ${resumeId}`, error)
     );
+  }
+}
+
+export interface PromoteTailoredResumeResult {
+  newMasterResume: MasterResumeSelect;
+  previousActiveId: string | null;
+}
+
+/**
+ * Promotes a tailored resume to an active master persona.
+ * Demotes the user's currently active persona, inserts the new persona with
+ * source: "promoted_tailored", language inherited from tailoredResume, version: 1,
+ * and auto-activates it.
+ */
+export async function promoteTailoredResumeToMaster(
+  tailoredResumeId: string,
+  userId: string,
+  label: string
+): Promise<Result<PromoteTailoredResumeResult, AppError>> {
+  try {
+    // 1. Verify tailored resume existence and ownership via pipelineEntry
+    const [tailored] = await db
+      .select({
+        id: tailoredResume.id,
+        content: tailoredResume.content,
+        language: tailoredResume.language,
+        userId: pipelineEntry.userId,
+      })
+      .from(tailoredResume)
+      .innerJoin(pipelineEntry, eq(tailoredResume.pipelineEntryId, pipelineEntry.id))
+      .where(and(eq(tailoredResume.id, tailoredResumeId), eq(pipelineEntry.userId, userId)))
+      .limit(1);
+
+    if (!tailored) {
+      return err(new AppError("NOT_FOUND", "Tailored resume not found or unauthorized"));
+    }
+
+    // 2. Perform promotion in a transaction: capture previous active ID, demote, insert new active
+    const result = await db.transaction(async (tx) => {
+      const [currentActive] = await tx
+        .select({ id: masterResume.id })
+        .from(masterResume)
+        .where(and(eq(masterResume.userId, userId), eq(masterResume.isActive, true)))
+        .limit(1);
+
+      const previousActiveId = currentActive?.id || null;
+
+      // Demote all personas
+      await tx
+        .update(masterResume)
+        .set({ isActive: false })
+        .where(eq(masterResume.userId, userId));
+
+      // Insert new persona
+      const [created] = await tx
+        .insert(masterResume)
+        .values({
+          userId,
+          label: label.trim() || "Promoted Persona",
+          content: tailored.content,
+          isActive: true,
+          version: 1,
+          language: tailored.language,
+          source: "promoted_tailored",
+          promotedFromTailoredResumeId: tailored.id,
+        })
+        .returning();
+
+      return {
+        newMasterResume: created,
+        previousActiveId,
+      };
+    });
+
+    if (!result.newMasterResume) {
+      return err(new AppError("DB_ERROR", "Failed to create promoted master resume"));
+    }
+
+    // 3. Generate embedding asynchronously (fire-and-forget)
+    generateEmbedding(result.newMasterResume.content)
+      .then((embRes) => {
+        if (!embRes.ok) {
+          console.warn("Resume embedding generation failed (promote):", embRes.error.message);
+          return;
+        }
+        return setResumeEmbedding(
+          result.newMasterResume.id,
+          result.newMasterResume.userId,
+          embRes.value
+        );
+      })
+      .catch((e) => console.warn("Resume embedding write failed (promote):", e));
+
+    return ok(result);
+  } catch (error) {
+    return err(
+      new AppError("DB_ERROR", "Failed to promote tailored resume to master", error)
+    );
+  }
+}
+
+/**
+ * Reverts the active persona back to previousActiveId (used by undo toast).
+ */
+export async function revertActiveResume(
+  userId: string,
+  previousActiveId: string
+): Promise<Result<boolean, AppError>> {
+  try {
+    return await db.transaction(async (tx) => {
+      const [target] = await tx
+        .select({ id: masterResume.id })
+        .from(masterResume)
+        .where(and(eq(masterResume.id, previousActiveId), eq(masterResume.userId, userId)))
+        .limit(1);
+
+      if (!target) {
+        return err(new AppError("NOT_FOUND", "Previous active resume not found"));
+      }
+
+      await tx
+        .update(masterResume)
+        .set({ isActive: false })
+        .where(eq(masterResume.userId, userId));
+
+      await tx
+        .update(masterResume)
+        .set({ isActive: true })
+        .where(and(eq(masterResume.id, previousActiveId), eq(masterResume.userId, userId)));
+
+      return ok(true);
+    });
+  } catch (error) {
+    return err(new AppError("DB_ERROR", "Failed to revert active resume", error));
+  }
+}
+
+/**
+ * Deletes a master resume persona.
+ */
+export async function deleteMasterResume(
+  id: string,
+  userId: string
+): Promise<Result<{ deletedId: string; fallbackActiveId: string | null }, AppError>> {
+  try {
+    return await db.transaction(async (tx) => {
+      const [target] = await tx
+        .select()
+        .from(masterResume)
+        .where(and(eq(masterResume.id, id), eq(masterResume.userId, userId)))
+        .limit(1);
+
+      if (!target) {
+        return err(new AppError("NOT_FOUND", `Resume ${id} not found`));
+      }
+
+      await tx
+        .delete(masterResume)
+        .where(and(eq(masterResume.id, id), eq(masterResume.userId, userId)));
+
+      // If the deleted resume was active, set the most recent remaining one active
+      let fallbackActiveId: string | null = null;
+      if (target.isActive) {
+        const [nextActive] = await tx
+          .select({ id: masterResume.id })
+          .from(masterResume)
+          .where(eq(masterResume.userId, userId))
+          .orderBy(desc(masterResume.updatedAt))
+          .limit(1);
+
+        if (nextActive) {
+          fallbackActiveId = nextActive.id;
+          await tx
+            .update(masterResume)
+            .set({ isActive: true })
+            .where(eq(masterResume.id, nextActive.id));
+        }
+      }
+
+      return ok({ deletedId: id, fallbackActiveId });
+    });
+  } catch (error) {
+    return err(new AppError("DB_ERROR", "Failed to delete master resume", error));
   }
 }

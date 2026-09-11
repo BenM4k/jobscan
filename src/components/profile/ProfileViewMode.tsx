@@ -17,6 +17,10 @@ interface ProfileViewModeProps {
   aiProvider: string;
   aiUsage?: UserAiUsage | null;
   aiUsageError?: boolean;
+  resumeLabel?: string;
+  resumeVersion?: number;
+  resumeLanguage?: string;
+  resumeSource?: string;
   onEditClick: () => void;
   onDeleteClick: () => void;
 }
@@ -32,6 +36,10 @@ export function ProfileViewMode({
   aiProvider,
   aiUsage,
   aiUsageError = false,
+  resumeLabel,
+  resumeVersion,
+  resumeLanguage,
+  resumeSource,
   onEditClick,
   onDeleteClick,
 }: ProfileViewModeProps) {
@@ -43,19 +51,22 @@ export function ProfileViewMode({
       ? `${experience[0].title}${experience[0].company ? ` at ${experience[0].company}` : ""}`
       : parsedSkillsList.length > 0
       ? parsedSkillsList.slice(0, 3).join(" • ")
-      : "Candidate Profile";
+      : `${resumeLabel || "Master"} Resume Profile`;
 
   return (
     <div className="flex flex-col lg:flex-row items-start gap-12 lg:gap-16 pt-2">
       <ProfileOverview
         name={displayName}
         headline={headline}
-        location="Democratic Republic of Congo"
         summary={summary}
         education={education}
         experience={experience}
         about={resumeText}
         skills={parsedSkillsList}
+        resumeLabel={resumeLabel}
+        resumeVersion={resumeVersion}
+        resumeLanguage={resumeLanguage}
+        resumeSource={resumeSource}
         onEditClick={onEditClick}
         onReformatClick={onEditClick}
         onDeleteClick={onDeleteClick}
@@ -70,6 +81,10 @@ export function ProfileViewMode({
         educationCount={education.length}
         aiUsage={aiUsage}
         aiUsageError={aiUsageError}
+        resumeLabel={resumeLabel}
+        resumeVersion={resumeVersion}
+        resumeLanguage={resumeLanguage}
+        resumeSource={resumeSource}
       />
     </div>
   );

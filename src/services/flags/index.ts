@@ -1,8 +1,25 @@
 import "server-only";
 import * as flagsDal from "@/dal/flags.dal";
-import type { UserFeatureFlagView } from "@/dal/flags.dal";
+import type {
+  UserFeatureFlagView,
+  FeatureFlagAssignmentWithUser,
+} from "@/dal/flags.dal";
+import {
+  isFeatureEnabled,
+  invalidateFeatureFlagCache,
+  getFeatureFlagCacheKey,
+  FEATURE_FLAG_CACHE_TTL_SECONDS,
+} from "./is-enabled";
+
+export {
+  isFeatureEnabled,
+  invalidateFeatureFlagCache,
+  getFeatureFlagCacheKey,
+  FEATURE_FLAG_CACHE_TTL_SECONDS,
+};
 
 export const FEATURE_FLAGS = {
+  HYBRID_SCORING_V1: "hybrid-scoring-v1",
   HYBRID_SCORING: "hybrid_scoring",
   NEW_ADAPTERS: "new_adapters",
 } as const;
@@ -11,41 +28,12 @@ export type FeatureFlagKey =
   | (typeof FEATURE_FLAGS)[keyof typeof FEATURE_FLAGS]
   | string;
 
-export type { UserFeatureFlagView };
+export type { UserFeatureFlagView, FeatureFlagAssignmentWithUser };
 
 /**
- * Checks whether a feature flag is enabled for a given user.
- * Evaluates the per-user override in featureFlagAssignment first via flagsDal.
- * If no per-user assignment exists, falls back to the global flag (enabledGlobally).
+ * Backward-compatible alias for isFeatureEnabled.
  */
-export async function isEnabled(
-  userId: string | undefined | null,
-  flagKey: FeatureFlagKey
-): Promise<boolean> {
-  try {
-    const flag = await flagsDal.getFeatureFlagByKey(flagKey);
-    if (!flag) {
-      return false;
-    }
-
-    // 1. Check per-user override first
-    if (userId) {
-      const assignment = await flagsDal.getFeatureFlagAssignment(
-        flag.id,
-        userId
-      );
-      if (assignment) {
-        return assignment.enabled;
-      }
-    }
-
-    // 2. Fallback to global flag
-    return flag.enabledGlobally;
-  } catch (err) {
-    console.error(`[Flags] Error evaluating feature flag "${flagKey}":`, err);
-    return false;
-  }
-}
+export const isEnabled = isFeatureEnabled;
 
 /**
  * Get all available feature flags with the user's specific state for the settings UI.
@@ -59,6 +47,7 @@ export async function getUserFeatureFlags(
 /**
  * Sets or clears a user's feature flag override.
  * Passing enabled = null removes the override (reverts to global state).
+ * Immediately invalidates the 60-second Redis cache entry for this user and flag.
  */
 export async function setUserFeatureFlagOverride(
   userId: string,
@@ -77,6 +66,9 @@ export async function setUserFeatureFlagOverride(
       await flagsDal.upsertUserFeatureFlagAssignment(flag.id, userId, enabled);
     }
 
+    // Step 18: Invalidate Redis cache immediately rather than waiting out TTL
+    await invalidateFeatureFlagCache(flagKey, userId);
+
     return { success: true };
   } catch (err) {
     console.error(`[Flags] Failed to set override for flag "${flagKey}":`, err);
@@ -85,4 +77,48 @@ export async function setUserFeatureFlagOverride(
       error: "Failed to update feature flag",
     };
   }
+}
+
+/**
+ * Update the global state of a feature flag and invalidate default/anonymous cache.
+ */
+export async function setGlobalFlagState(
+  flagKey: string,
+  enabledGlobally: boolean
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const success = await flagsDal.setGlobalFeatureFlag(flagKey, enabledGlobally);
+    if (!success) {
+      return { success: false, error: `Feature flag "${flagKey}" not found` };
+    }
+
+    // Invalidate anonymous/default cache entry
+    await invalidateFeatureFlagCache(flagKey, null);
+
+    return { success: true };
+  } catch (err) {
+    console.error(`[Flags] Failed to set global state for flag "${flagKey}":`, err);
+    return {
+      success: false,
+      error: "Failed to update global flag state",
+    };
+  }
+}
+
+/**
+ * Admin: Get all per-user overrides with user email and flag details.
+ */
+export async function getAdminFeatureFlagAssignments(
+  flagKey?: string
+): Promise<FeatureFlagAssignmentWithUser[]> {
+  return await flagsDal.getFeatureFlagAssignmentsWithUsers(flagKey);
+}
+
+/**
+ * Admin: Search users by email for override assignment.
+ */
+export async function searchUsersForFlagAssignment(
+  query: string
+): Promise<{ id: string; email: string; name: string | null }[]> {
+  return await flagsDal.searchUsersByEmail(query);
 }

@@ -1,9 +1,10 @@
 import { Suspense } from "react";
-import * as profileService from "@/services/profile.service";
 import { getUserAiUsage } from "@/services/ai/usage.service";
 import { requireSession } from "@/lib/auth-guard";
 import { redirect } from "next/navigation";
 import { ProfileForm } from "@/components/ProfileForm";
+import * as resumeDal from "@/dal/resume.dal";
+import { parseResumeContent } from "@/dal/profile.dal";
 
 export const instant = false;
 
@@ -14,27 +15,48 @@ async function ProfileFormContent() {
     redirect("/sign-in");
   }
 
-  const [profileResult, aiUsageResult] = await Promise.all([
-    profileService.getUserProfile(sessionResult.value.user.id),
-    getUserAiUsage(sessionResult.value.user.id),
+  const userId = sessionResult.value.user.id;
+
+  const [activeResumeResult, aiUsageResult] = await Promise.all([
+    resumeDal.getActiveMasterResume(userId),
+    getUserAiUsage(userId),
   ]);
-  const userProfile = profileResult.ok ? profileResult.value : null;
+
+  const activeResume = activeResumeResult.ok ? activeResumeResult.value : null;
   const aiUsage = aiUsageResult.ok ? aiUsageResult.value : null;
   const aiUsageError = !aiUsageResult.ok;
 
+  let skills: string[] = [];
+  if (activeResume) {
+    const skillsRes = await resumeDal.getResumeSkills(activeResume.id);
+    if (skillsRes.ok) {
+      skills = skillsRes.value;
+    }
+  }
+
+  const resumeText = activeResume?.content || "";
+  const parsed = parseResumeContent(resumeText);
+  if (skills.length === 0 && parsed.skills.length > 0) {
+    skills = parsed.skills;
+  }
+
   return (
     <ProfileForm
-      key={userProfile?.id || "empty"}
+      key={activeResume?.id || "empty"}
       userEmail={sessionResult.value.user.email}
       userName={sessionResult.value.user.name || sessionResult.value.user.email.split("@")[0]}
-      initialResumeText={userProfile?.resumeText || ""}
-      initialSkills={userProfile?.skills || []}
-      initialAiProvider={userProfile?.aiProvider || "gemini"}
-      initialSummary={userProfile?.summary || ""}
-      initialEducation={userProfile?.education ?? []}
-      initialExperience={userProfile?.experience ?? []}
+      initialResumeText={resumeText}
+      initialSkills={skills}
+      initialAiProvider="gemini"
+      initialSummary={parsed.summary}
+      initialEducation={parsed.education}
+      initialExperience={parsed.experience}
       initialAiUsage={aiUsage}
       aiUsageError={aiUsageError}
+      resumeLabel={activeResume?.label || "Primary Persona"}
+      resumeVersion={activeResume?.version || 1}
+      resumeLanguage={activeResume?.language || "en"}
+      resumeSource={activeResume?.source || "uploaded"}
     />
   );
 }

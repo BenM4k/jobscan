@@ -89,13 +89,16 @@ export async function scoreJobWithAI(
   jobId: string,
   userId: string,
   preferredProvider?: "claude" | "gemini" | "openai" | "gateway",
+  resumeId?: string,
 ): Promise<Result<jobsDal.JobSelect, AppError>> {
   const jobResult = await jobsDal.getJobById(jobId, userId);
   if (!jobResult.ok) return jobResult;
   const job = jobResult.value;
 
-  // Gate on master_resume — AI scoring requires an active resume (per AGENTS.md §5)
-  const resumeRes = await resumeDal.getActiveMasterResume(userId);
+  // Gate on master_resume — resolve specific persona or active resume (per AGENTS.md §5)
+  const resumeRes = resumeId
+    ? await resumeDal.getMasterResumeById(resumeId, userId)
+    : await resumeDal.getActiveMasterResume(userId);
   if (!resumeRes.ok) return err(resumeRes.error);
   const activeResume = resumeRes.value;
   const resumeText = activeResume?.content || "";
@@ -215,6 +218,9 @@ export async function scoreJobWithAI(
     modelVersion,
     activeResume?.version,
     userId,
+    undefined,
+    undefined,
+    activeResume.id
   );
 }
 

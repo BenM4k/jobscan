@@ -249,3 +249,40 @@ export async function getIdempotencyRecord(
     );
   }
 }
+
+export async function reopenIdempotentAction(
+  id: string,
+  targetId?: string | null
+): Promise<Result<{ record: IdempotencyKeySelect; attemptId: string }, AppError>> {
+  try {
+    const nextAttemptId = crypto.randomUUID();
+    const [updated] = await db
+      .update(idempotencyKey)
+      .set({
+        status: "in_progress",
+        attemptId: nextAttemptId,
+        targetId: targetId || undefined,
+        resultRef: null,
+        createdAt: new Date(),
+      })
+      .where(eq(idempotencyKey.id, id))
+      .returning();
+
+    if (!updated) {
+      return err(
+        new AppError("NOT_FOUND", `Idempotency record ${id} not found`)
+      );
+    }
+
+    return ok({ record: updated, attemptId: nextAttemptId });
+  } catch (error) {
+    return err(
+      new AppError(
+        "DB_ERROR",
+        `Failed to reopen idempotent action ${id}`,
+        error
+      )
+    );
+  }
+}
+

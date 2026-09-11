@@ -8,7 +8,9 @@ import { AccountSettingsCard } from "@/components/settings/AccountSettingsCard";
 import { FeatureFlagsCard } from "@/components/settings/FeatureFlagsCard";
 import { NotificationPreferencesCard } from "@/components/settings/NotificationPreferencesCard";
 import { AiUsageProgress } from "@/components/shared/AiUsageProgress";
-import { Sliders } from "lucide-react";
+import { Sliders, Shield } from "lucide-react";
+import Link from "next/link";
+import { isAdmin } from "@/services/auth/admin";
 
 export const instant = false;
 
@@ -108,6 +110,28 @@ async function SettingsContent() {
 
   return (
     <div className="space-y-6">
+      {isAdmin(user) && (
+        <div className="rounded-2xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/20 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0">
+              <Shield className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                Admin Console Access
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-zinc-400">
+                You have administrator privileges. Manage global rollouts and per-user feature flag overrides.
+              </p>
+            </div>
+          </div>
+          <Link href="/dashboard/admin">
+            <span className="inline-flex items-center px-3.5 py-1.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 text-xs font-semibold cursor-pointer transition">
+              Manage Overrides
+            </span>
+          </Link>
+        </div>
+      )}
       <AccountSettingsCard user={user} />
       {aiUsageResult.ok ? (
         <AiUsageProgress

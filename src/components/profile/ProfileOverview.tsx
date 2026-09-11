@@ -10,7 +10,11 @@ import { formatProfileDateRange } from "@/lib/date-format";
 interface ProfileOverviewProps {
   name: string;
   headline: string;
-  location: string;
+  location?: string;
+  resumeLabel?: string;
+  resumeVersion?: number;
+  resumeLanguage?: string;
+  resumeSource?: string;
   summary?: string;
   skills: string[];
   education?: EducationItem[];
@@ -26,6 +30,10 @@ export function ProfileOverview({
   name,
   headline,
   location,
+  resumeLabel,
+  resumeVersion,
+  resumeLanguage,
+  resumeSource,
   summary,
   skills,
   education = [],
@@ -50,6 +58,10 @@ export function ProfileOverview({
           name={name}
           headline={headline}
           location={location}
+          resumeLabel={resumeLabel}
+          resumeVersion={resumeVersion}
+          resumeLanguage={resumeLanguage}
+          resumeSource={resumeSource}
           onEditClick={onEditClick}
           onReformatClick={onReformatClick}
           onDeleteClick={onDeleteClick}

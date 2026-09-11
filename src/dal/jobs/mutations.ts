@@ -15,7 +15,6 @@ import { eq, and, sql, or, desc, gte } from "drizzle-orm";
 import { isOlderThanOneMonth } from "@/lib/date-utils";
 import * as pipelineDal from "@/dal/pipeline.dal";
 import * as tailoringDal from "@/dal/tailoring.dal";
-import { getAgeInDays, applyExponentialDecay } from "@/lib/decay";
 import type { TailoredResumeData } from "@/lib/ai";
 import {
   CanonicalJobSelect,
@@ -487,7 +486,8 @@ export async function updateJobScoreAndCoverLetter(
   resumeVersion?: number,
   userId?: string,
   cosineSimilarity?: number | null,
-  bm25Rank?: number | null
+  bm25Rank?: number | null,
+  resumeIdUsed?: string
 ): Promise<Result<JobSelect, AppError>> {
   try {
     const entryConditions = [
@@ -511,17 +511,8 @@ export async function updateJobScoreAndCoverLetter(
 
     const pipelineEntryId = entry.id;
 
-    // Apply exponential decay based on posting age before writing to score table
-    const [jobRow] = await db
-      .select({ postedAt: job.postedAt, createdAt: job.createdAt })
-      .from(job)
-      .where(eq(job.id, entry.jobId))
-      .limit(1);
-
-    const ageInDays = getAgeInDays(jobRow?.postedAt || jobRow?.createdAt || entry.createdAt);
-    const finalScoreWithDecay = applyExponentialDecay(fitScore, ageInDays);
-
-    // Atomic append into score to preserve scoring history
+    // Atomic append into score to preserve scoring history (undecayed raw score)
+    const rawFitScore = Math.min(100, Math.max(0, Math.round(fitScore)));
     await db.insert(score).values({
       pipelineEntryId,
       resumeVersion: resumeVersion ?? 1,
@@ -534,7 +525,7 @@ export async function updateJobScoreAndCoverLetter(
         bm25Rank !== undefined && bm25Rank !== null
           ? bm25Rank.toString()
           : null,
-      finalScore: finalScoreWithDecay.toString(),
+      finalScore: rawFitScore.toString(),
       matchedSkills: matchedSkills ?? [],
       missingSkills: missingSkills ?? [],
       explanation: scoreReasoning,
@@ -562,7 +553,10 @@ export async function updateJobScoreAndCoverLetter(
 
     await db
       .update(pipelineEntry)
-      .set({ updatedAt: new Date() })
+      .set({
+        updatedAt: new Date(),
+        ...(resumeIdUsed ? { resumeIdUsed } : {}),
+      })
       .where(eq(pipelineEntry.id, pipelineEntryId));
 
     return await getJobById(pipelineEntryId, entry.userId);
@@ -639,20 +633,12 @@ export async function saveHybridScore(
       );
     }
 
-    const [jobRow] = await db
-      .select({ postedAt: job.postedAt, createdAt: job.createdAt })
-      .from(job)
-      .where(eq(job.id, entry.jobId))
-      .limit(1);
-
-    const ageInDays = getAgeInDays(jobRow?.postedAt || jobRow?.createdAt || entry.createdAt);
-    const finalScoreWithDecay = applyExponentialDecay(data.finalScore, ageInDays);
-
+    // Atomic append into score to preserve scoring history (undecayed hybrid score)
     await db.insert(score).values({
       pipelineEntryId: entry.id,
       resumeVersion: data.resumeVersion ?? 1,
       modelUsed: "hybrid-pgvector-bm25",
-      finalScore: finalScoreWithDecay.toString(),
+      finalScore: data.finalScore.toString(),
       cosineSimilarity: data.cosineSimilarity != null ? data.cosineSimilarity.toString() : null,
       bm25Rank: data.bm25Rank != null ? data.bm25Rank.toString() : null,
       explanation:
@@ -733,20 +719,11 @@ export async function recalculateScoreWithWeights(
       newScore = Math.min(100, Math.max(0, Math.round(bm25! * 100)));
     }
 
-    // Query job postedAt or createdAt for age-based exponential decay
-    const [jobRow] = await db
-      .select({ postedAt: job.postedAt, createdAt: job.createdAt })
-      .from(job)
-      .where(eq(job.id, entry.jobId))
-      .limit(1);
-
-    const ageInDays = getAgeInDays(jobRow?.postedAt || jobRow?.createdAt || entry.createdAt);
-    const finalScoreWithDecay = applyExponentialDecay(newScore, ageInDays);
-
+    // Persist undecayed re-blended score to score table; decay is computed at read/display time
     await db
       .update(score)
       .set({
-        finalScore: finalScoreWithDecay.toString(),
+        finalScore: newScore.toString(),
         updatedAt: new Date(),
       })
       .where(eq(score.id, latestScore.id));
@@ -757,7 +734,7 @@ export async function recalculateScoreWithWeights(
       .where(eq(pipelineEntry.id, entry.id));
 
     return ok({
-      finalScore: finalScoreWithDecay,
+      finalScore: newScore,
       cosineSimilarity: cosine,
       bm25Rank: bm25,
     });
@@ -772,7 +749,8 @@ export async function updateJobTailoredResume(
   id: string,
   tailoredResumeText: string,
   _tailoredResumeData?: TailoredResumeData | null,
-  userId?: string
+  userId?: string,
+  resumeIdUsed?: string
 ): Promise<Result<JobSelect, AppError>> {
   try {
     const entryConditions = [
@@ -804,7 +782,10 @@ export async function updateJobTailoredResume(
 
     await db
       .update(pipelineEntry)
-      .set({ updatedAt: new Date() })
+      .set({
+        updatedAt: new Date(),
+        ...(resumeIdUsed ? { resumeIdUsed } : {}),
+      })
       .where(eq(pipelineEntry.id, entry.id));
 
     return await getJobById(entry.id, entry.userId);
@@ -822,7 +803,9 @@ export async function updateJobTailoredResume(
 export async function updateJobCoverLetter(
   id: string,
   userId: string,
-  coverLetterDraft: string
+  coverLetterDraft: string,
+  resumeIdUsed?: string,
+  diffFromPrevious?: unknown
 ): Promise<Result<JobSelect, AppError>> {
   try {
     const [entry] = await db
@@ -844,7 +827,8 @@ export async function updateJobCoverLetter(
 
     const saveRes = await tailoringDal.saveTailoredCoverLetter(
       entry.id,
-      coverLetterDraft
+      coverLetterDraft,
+      diffFromPrevious
     );
     if (!saveRes.ok) {
       return err(saveRes.error);
@@ -852,7 +836,10 @@ export async function updateJobCoverLetter(
 
     await db
       .update(pipelineEntry)
-      .set({ updatedAt: new Date() })
+      .set({
+        updatedAt: new Date(),
+        ...(resumeIdUsed ? { resumeIdUsed } : {}),
+      })
       .where(eq(pipelineEntry.id, entry.id));
 
     return await getJobById(entry.id, userId);

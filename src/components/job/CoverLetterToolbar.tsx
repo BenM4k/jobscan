@@ -13,6 +13,7 @@ interface CoverLetterToolbarProps {
   onDownloadPdf: () => void;
   onSave: () => void;
   onGenerateStream: () => void;
+  onRegenerate?: () => void;
 }
 
 export function CoverLetterToolbar({
@@ -24,6 +25,7 @@ export function CoverLetterToolbar({
   onDownloadPdf,
   onSave,
   onGenerateStream,
+  onRegenerate,
 }: CoverLetterToolbarProps) {
   const t = useTranslations("jobDetail");
   const tCommon = useTranslations("common");
@@ -77,7 +79,7 @@ export function CoverLetterToolbar({
 
       <button
         type="button"
-        onClick={onGenerateStream}
+        onClick={onRegenerate || onGenerateStream}
         disabled={isStreaming}
         className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer disabled:opacity-50 font-sans"
       >

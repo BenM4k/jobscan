@@ -1,6 +1,6 @@
 {
-  "id": "b9e4cecb-b6f0-4840-ae9e-5c97cddc178e",
-  "prevId": "7eddbdf3-79f9-4f45-a8ea-5191408c80b0",
+  "id": "d0eef181-b659-4d2b-ab0a-35aac4013e3a",
+  "prevId": "b9e4cecb-b6f0-4840-ae9e-5c97cddc178e",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -439,6 +439,14 @@
           "notNull": true,
           "default": "'active'"
         },
+        "language": {
+          "name": "language",
+          "type": "job_language",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'en'"
+        },
         "salary_min": {
           "name": "salary_min",
           "type": "numeric",
@@ -516,14 +524,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "language": {
-          "name": "language",
-          "type": "job_language",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'en'"
         }
       },
       "indexes": {
@@ -1126,6 +1126,14 @@
           "notNull": true,
           "default": 1
         },
+        "language": {
+          "name": "language",
+          "type": "job_language",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'en'"
+        },
         "embedding": {
           "name": "embedding",
           "type": "vector(1536)",
@@ -1145,14 +1153,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "language": {
-          "name": "language",
-          "type": "job_language",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'en'"
         }
       },
       "indexes": {
@@ -2073,6 +2073,67 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.adapter_circuit_breaker": {
+      "name": "adapter_circuit_breaker",
+      "schema": "",
+      "columns": {
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "state": {
+          "name": "state",
+          "type": "circuit_breaker_state",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'closed'"
+        },
+        "consecutive_failures": {
+          "name": "consecutive_failures",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "consecutive_opens": {
+          "name": "consecutive_opens",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "opened_at": {
+          "name": "opened_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.ai_call_log": {
       "name": "ai_call_log",
       "schema": "",
@@ -2088,7 +2149,7 @@
           "name": "user_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "feature": {
           "name": "feature",
@@ -2612,68 +2673,17 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
-    },
-    "public.adapter_circuit_breaker": {
-      "name": "adapter_circuit_breaker",
-      "schema": "",
-      "columns": {
-        "source": {
-          "name": "source",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "state": {
-          "name": "state",
-          "type": "circuit_breaker_state",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'closed'"
-        },
-        "consecutive_failures": {
-          "name": "consecutive_failures",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "consecutive_opens": {
-          "name": "consecutive_opens",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "opened_at": {
-          "name": "opened_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
     }
   },
   "enums": {
+    "public.job_language": {
+      "name": "job_language",
+      "schema": "public",
+      "values": [
+        "en",
+        "fr"
+      ]
+    },
     "public.job_source": {
       "name": "job_source",
       "schema": "public",
@@ -2737,14 +2747,6 @@
         "closed",
         "open",
         "half_open"
-      ]
-    },
-    "public.job_language": {
-      "name": "job_language",
-      "schema": "public",
-      "values": [
-        "en",
-        "fr"
       ]
     }
   },

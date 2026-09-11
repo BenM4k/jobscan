@@ -10,13 +10,13 @@ import { eq, and, gte } from "drizzle-orm";
 export type AiFeature = (typeof aiFeatureEnum.enumValues)[number];
 
 export interface LogAiCallParams {
-  userId: string;
+  userId?: string | null;
   feature: AiFeature;
   provider: string;
   model: string;
-  inputTokens?: number;
-  outputTokens?: number;
-  costEstimateUsd?: string;
+  inputTokens?: number | null;
+  outputTokens?: number | null;
+  costEstimateUsd?: string | null;
   cacheHit?: boolean;
 }
 

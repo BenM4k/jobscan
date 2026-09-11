@@ -18,6 +18,7 @@
   },
   "nav": {
     "pipeline": "Pipeline",
+    "resumes": "CVs",
     "addJob": "Ajouter une offre",
     "profile": "Profil & CV",
     "settings": "Paramètres",
@@ -152,7 +153,10 @@
     "deleteJobConfirm": "Supprimer l'offre",
     "missingResumeTitle": "CV Principal Requis",
     "missingResumeDescription": "Vous devez configurer votre CV principal et vos compétences dans votre profil avant d'évaluer les offres avec l'IA Gemini.",
-    "goToProfile": "Configurer le CV dans le Profil →"
+    "goToProfile": "Configurer le CV dans le Profil →",
+    "matchedSkills": "Compétences correspondantes",
+    "missingSkills": "Compétences manquantes",
+    "noneIdentified": "Aucun identifié"
   },
   "addJob": {
     "sourceManual": "Source : Saisie manuelle",
@@ -229,6 +233,7 @@
     "deleteResumeConfirm": "Effacer le CV"
   },
   "jobDetail": {
+    "via": "via",
     "backToPipeline": "← Retour au pipeline",
     "statusLabel": "Statut",
     "scoreHeading": "Analyse d'adéquation & Score",

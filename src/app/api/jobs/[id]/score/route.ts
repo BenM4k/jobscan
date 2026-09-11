@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as jobsDal from "@/dal/jobs.dal";
 import { requireSession } from "@/lib/auth-guard";
 import { runWithIdempotency } from "@/services/idempotency.service";
+import { checkAiRateLimit } from "@/services/rate-limit";
 import { ok } from "@/lib/result";
 
 export async function POST(
@@ -20,6 +21,19 @@ export async function POST(
     }
 
     const userId = sessionResult.value.user.id;
+
+    // Rate limiting check before paid operation
+    const rateLimitRes = await checkAiRateLimit(userId, "scoring");
+    if (!rateLimitRes.allowed) {
+      return NextResponse.json(
+        {
+          error: `Rate limit exceeded for AI scoring. Please wait ${rateLimitRes.retryAfterSeconds}s before retrying.`,
+          code: "rate_limited",
+          retryAfterSeconds: rateLimitRes.retryAfterSeconds,
+        },
+        { status: 429 }
+      );
+    }
 
     // Extract idempotency key from header or body
     let reqBody: Record<string, unknown> | null = null;
@@ -47,6 +61,11 @@ export async function POST(
       );
     }
 
+    const resumeId =
+      typeof reqBody?.resumeId === "string"
+        ? reqBody.resumeId
+        : _req.nextUrl.searchParams.get("resumeId") || undefined;
+
     const result = await runWithIdempotency({
       userId,
       action: "run_scoring",
@@ -54,7 +73,7 @@ export async function POST(
       targetId: id,
       execute: async () => {
         const { scoreJobWithAI } = await import("@/services/job.service");
-        const scoreRes = await scoreJobWithAI(id, userId);
+        const scoreRes = await scoreJobWithAI(id, userId, undefined, resumeId);
         if (!scoreRes.ok) {
           return scoreRes;
         }

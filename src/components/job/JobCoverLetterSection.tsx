@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCoverLetter } from "./useCoverLetter";
+import { RetryProgressBadge } from "@/components/ui/RetryProgressBadge";
 
 interface JobCoverLetterSectionProps {
   job: JobSelect;
@@ -28,19 +29,28 @@ export function JobCoverLetterSection({
 
   const {
     isStreaming,
+    retryStatus,
+    retryAttempt,
+    totalAttempts,
+    retryCountdown,
+    retryMessage,
+    cancelRetry,
+    retryNow,
     coverLetter,
     setCoverLetter,
     isSaving,
     isEditing,
     setIsEditing,
     isCopied,
-    hasContent,
+    hasCoverLetter,
     handleGenerateStream,
+    handleRegenerate,
     handleSave,
     handleDownloadPdf,
     handleCopy,
   } = useCoverLetter({ job, onJobUpdated });
 
+  const hasContent = hasCoverLetter || Boolean(coverLetter);
   const isIdle = !hasContent && !isStreaming;
   const isLoading = isStreaming && !coverLetter;
   const isGeneratedOrStreaming =
@@ -70,7 +80,7 @@ export function JobCoverLetterSection({
           <div className="shrink-0 pt-0.5">
             <button
               type="button"
-              onClick={handleGenerateStream}
+              onClick={() => handleGenerateStream()}
               className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors p-0 bg-transparent border-0 cursor-pointer font-sans"
             >
               {t("generateCoverLetter")}
@@ -79,8 +89,19 @@ export function JobCoverLetterSection({
         )}
       </div>
 
+      {/* Retry Feedback Badge */}
+      <RetryProgressBadge
+        status={retryStatus}
+        attempt={retryAttempt}
+        totalAttempts={totalAttempts}
+        countdown={retryCountdown}
+        message={retryMessage}
+        onRetryNow={retryNow}
+        onCancel={cancelRetry}
+      />
+
       {/* Loading State: 3 lines low-contrast pulsing block, indented under title, no spinner icon */}
-      {isLoading && (
+      {isLoading && retryStatus !== "retrying" && (
         <div className="ml-7.5 border-l-2 border-border dark:border-zinc-800 pl-3.5 py-1 space-y-2">
           <div className="h-3.5 w-full bg-muted dark:bg-zinc-800 animate-pulse rounded-sm" />
           <div className="h-3.5 w-5/6 bg-muted dark:bg-zinc-800 animate-pulse rounded-sm" />
@@ -158,7 +179,7 @@ export function JobCoverLetterSection({
 
             <button
               type="button"
-              onClick={handleGenerateStream}
+              onClick={() => handleRegenerate()}
               disabled={isStreaming}
               className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer disabled:opacity-50 font-sans"
             >

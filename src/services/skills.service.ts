@@ -10,6 +10,9 @@ import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 import * as skillsDal from "@/dal/skills.dal";
 import * as resumeDal from "@/dal/resume.dal";
+import { withCostTracking } from "@/services/ai/with-cost-tracking";
+
+export { normalizeSkillName } from "./skills/normalize";
 
 export const extractSkillsSchema = z.object({
   skills: z
@@ -32,8 +35,27 @@ export const extractCombinedSkillsSchema = z.object({
     ),
 });
 
+export const matchAnalysisSchema = z.object({
+  jobSkills: z
+    .array(z.string())
+    .describe(
+      "Comprehensive list of technical and domain skills, qualifications, and competencies required or preferred by the job description"
+    ),
+  resumeSkills: z
+    .array(z.string())
+    .describe(
+      "Comprehensive list of technical and domain skills, qualifications, and competencies demonstrated in the candidate's resume"
+    ),
+  explanation: z
+    .string()
+    .describe(
+      "A 1-2 sentence, specific and concrete rationale explaining why this candidate matches or does not match this job posting, citing specific technologies and experience. Avoid generic filler."
+    ),
+});
+
 export type ExtractSkillsResult = z.infer<typeof extractSkillsSchema>;
 export type ExtractCombinedSkillsResult = z.infer<typeof extractCombinedSkillsSchema>;
+export type MatchAnalysisResult = z.infer<typeof matchAnalysisSchema>;
 
 /**
  * Normalizes a skill string for naive comparison (casing, trimming, and separator normalization).
@@ -323,3 +345,146 @@ export async function performSkillGapAnalysis(params: {
     missingSkills,
   });
 }
+
+/**
+ * Step 13: Builds the bilingual prompt for combined match analysis.
+ * Branches on French vs English based on job.language.
+ */
+export function buildMatchAnalysisPrompt(
+  jobDescription: string,
+  resumeContent: string,
+  language: "en" | "fr" = "en"
+): { system: string; prompt: string } {
+  const isFrench = language === "fr";
+
+  const system = isFrench
+    ? "Vous êtes un recruteur technique expert et un spécialiste de l'évaluation des talents. Analysez l'offre d'emploi et le CV du candidat. Extrayez : 1) toutes les compétences techniques et de domaine requises/souhaitées ('jobSkills'), 2) toutes les compétences démontrées dans le CV ('resumeSkills'), et 3) une justification spécifique et concrète de 1 à 2 phrases expliquant l'adéquation ('explanation'), sans formules génériques."
+    : "You are an expert technical recruiter and talent assessment evaluator. Analyze the job posting and candidate resume. Extract: 1) all required/preferred technical and domain skills in the job description ('jobSkills'), 2) all demonstrated technical and domain skills in the candidate resume ('resumeSkills'), and 3) a 1-2 sentence, specific and concrete rationale ('explanation') citing exact technologies and experience, with no generic filler.";
+
+  const prompt = isFrench
+    ? `OFFRE D'EMPLOI CIBLE:
+${jobDescription}
+
+CV DU CANDIDAT:
+${resumeContent}
+
+Directives de sortie:
+1. 'jobSkills': Liste exhaustive des compétences requises/souhaitées.
+2. 'resumeSkills': Liste exhaustive des compétences démontrées dans le CV.
+3. 'explanation': Rédigez 1 à 2 phrases spécifiques et concrètes en français expliquant pourquoi le profil correspond ou non à cette offre, en citant les compétences clés et les éventuelles lacunes.`
+    : `TARGET JOB POSTING:
+${jobDescription}
+
+CANDIDATE RESUME:
+${resumeContent}
+
+Output Directives:
+1. 'jobSkills': Exhaustive list of required/preferred skills from the job posting.
+2. 'resumeSkills': Exhaustive list of demonstrated skills from the candidate resume.
+3. 'explanation': Provide a 1-2 sentence concrete, specific rationale in English explaining match alignment and core gaps, without generic filler.`;
+
+  return { system, prompt };
+}
+
+/**
+ * Step 13: Option B — Single combined function for job-resume match analysis.
+ * Extracts jobSkills, resumeSkills, and 'Why this matched' explanation in one LLM call.
+ */
+export async function analyzeJobResumeMatch(
+  jobDescription: string,
+  resumeContent: string,
+  language: "en" | "fr" = "en",
+  userId?: string | null,
+  preferredProvider?: string
+): Promise<Result<MatchAnalysisResult, AppError>> {
+  try {
+    const model = resolveLanguageModel(preferredProvider);
+    const { system, prompt } = buildMatchAnalysisPrompt(
+      jobDescription,
+      resumeContent,
+      language
+    );
+
+    const result = await withCostTracking(
+      {
+        userId: userId ?? null,
+        feature: "scoring",
+        provider: preferredProvider || "gemini",
+        model: AI_MODEL,
+      },
+      async () => {
+        return await generateText({
+          model,
+          output: Output.object({ schema: matchAnalysisSchema }),
+          system,
+          prompt,
+        });
+      }
+    );
+
+    return ok({
+      jobSkills: result.output.jobSkills || [],
+      resumeSkills: result.output.resumeSkills || [],
+      explanation: result.output.explanation || "",
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return err(
+      new AppError("AI_EXECUTION_ERROR", `Match analysis failed: ${message}`, error)
+    );
+  }
+}
+
+/**
+ * Step 12/13: Skill-gap analysis using the combined match analysis function.
+ * Calls analyzeJobResumeMatch in a single LLM call, computes matched/missing skills,
+ * and persists to job_skill and resume_skill relational tables.
+ */
+export async function analyzeSkillGap(
+  jobId: string,
+  resumeId: string,
+  jobDescription: string,
+  resumeContent: string,
+  language: "en" | "fr" = "en",
+  userId?: string,
+  preferredProvider?: string
+): Promise<
+  Result<
+    {
+      jobSkills: string[];
+      resumeSkills: string[];
+      matchedSkills: string[];
+      missingSkills: string[];
+      explanation: string;
+    },
+    AppError
+  >
+> {
+  const matchRes = await analyzeJobResumeMatch(
+    jobDescription,
+    resumeContent,
+    language,
+    userId,
+    preferredProvider
+  );
+
+  if (!matchRes.ok) return err(matchRes.error);
+
+  const { jobSkills, resumeSkills, explanation } = matchRes.value;
+  const { matchedSkills, missingSkills } = diffSkills(jobSkills, resumeSkills);
+
+  // Persist extracted skills to relational tables (deduped by normalized name)
+  await Promise.all([
+    skillsDal.syncJobSkills(jobId, jobSkills),
+    resumeDal.syncResumeSkills(resumeId, resumeSkills),
+  ]);
+
+  return ok({
+    jobSkills,
+    resumeSkills,
+    matchedSkills,
+    missingSkills,
+    explanation,
+  });
+}
+

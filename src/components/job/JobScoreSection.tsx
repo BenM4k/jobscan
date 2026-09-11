@@ -2,15 +2,31 @@
 
 import React from "react";
 import { JobSelect } from "@/dal/jobs.dal";
-import { Sparkles, Check, AlertCircle, RotateCcw } from "lucide-react";
+import { Sparkles, AlertCircle, RotateCcw } from "lucide-react";
 import { getScoreBadgeStyle } from "@/lib/score-style";
 import { useTranslations } from "next-intl";
+import { MatchExplanation } from "./MatchExplanation";
+import { SkillGapBreakdown } from "./SkillGapBreakdown";
+import { MasterResumeSelect } from "@/services/db/schema";
+import { PersonaSelectDropdown } from "./PersonaSelectDropdown";
+import { RetryProgressBadge } from "@/components/ui/RetryProgressBadge";
+import type { AsyncJobStatus } from "@/hooks/useAsyncJobWithRetry";
 
 interface JobScoreSectionProps {
   job: JobSelect;
   isScoring: boolean;
   scoringError: string | null;
   onScoreJob: () => void;
+  resumes?: MasterResumeSelect[];
+  selectedResumeId?: string;
+  onSelectResume?: (id: string) => void;
+  retryStatus?: AsyncJobStatus;
+  retryAttempt?: number;
+  totalAttempts?: number;
+  retryCountdown?: number;
+  retryMessage?: string;
+  onRetryNow?: () => void;
+  onCancelRetry?: () => void;
 }
 
 export function JobScoreSection({
@@ -18,6 +34,16 @@ export function JobScoreSection({
   isScoring,
   scoringError,
   onScoreJob,
+  resumes,
+  selectedResumeId,
+  onSelectResume,
+  retryStatus = "idle",
+  retryAttempt = 1,
+  totalAttempts = 3,
+  retryCountdown = 0,
+  retryMessage = "",
+  onRetryNow,
+  onCancelRetry,
 }: JobScoreSectionProps) {
   const t = useTranslations("jobDetail");
   const isScored = job.fitScore !== null && job.fitScore !== undefined;
@@ -40,7 +66,16 @@ export function JobScoreSection({
           </div>
         </div>
 
-        <div className="shrink-0 pt-0.5">
+        <div className="shrink-0 pt-0.5 flex items-center gap-2">
+          {resumes && resumes.length > 1 && (
+            <PersonaSelectDropdown
+              resumes={resumes}
+              selectedResumeId={selectedResumeId}
+              onSelectResume={onSelectResume}
+              size="sm"
+            />
+          )}
+
           {isScoring ? (
             <span className="text-sm font-normal text-muted-foreground inline-flex items-center gap-1.5 font-sans">
               <Sparkles className="size-4.5 animate-spin text-blue-600 dark:text-blue-400 shrink-0" />
@@ -64,8 +99,19 @@ export function JobScoreSection({
         </div>
       </div>
 
+      {/* Retry Progress Feedback */}
+      <RetryProgressBadge
+        status={retryStatus}
+        attempt={retryAttempt}
+        totalAttempts={totalAttempts}
+        countdown={retryCountdown}
+        message={retryMessage}
+        onRetryNow={onRetryNow}
+        onCancel={onCancelRetry}
+      />
+
       {/* Warning/Error Notice */}
-      {scoringError && (
+      {scoringError && retryStatus !== "retrying" && (
         <div className="flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400 font-normal pt-1">
           <AlertCircle className="size-4.5 shrink-0" />
           <span>{scoringError}</span>
@@ -88,42 +134,13 @@ export function JobScoreSection({
       {/* Inline Generated Content */}
       {isScored && !isScoring && (
         <div className="pt-2 space-y-3 font-sans">
-          {job.scoreReasoning && (
-            <p className="text-sm text-gray-600 dark:text-zinc-300 font-normal leading-relaxed">
-              {job.scoreReasoning}
-            </p>
-          )}
+          <MatchExplanation explanation={job.scoreReasoning} />
 
           {/* Matched & Missing Skills Breakdown */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1 text-sm font-normal">
-            <div className="space-y-1">
-              <div className="flex items-center gap-1.5 text-foreground dark:text-zinc-100 font-medium">
-                <Check className="size-4.5 text-muted-foreground dark:text-zinc-400 shrink-0" />
-                <span>
-                  {t("matchedSkills")} ({job.matchedSkills?.length || 0})
-                </span>
-              </div>
-              <p className="text-gray-600 dark:text-zinc-300 leading-relaxed pl-6">
-                {job.matchedSkills?.length
-                  ? job.matchedSkills.join(", ")
-                  : t("noneIdentified")}
-              </p>
-            </div>
-
-            <div className="space-y-1">
-              <div className="flex items-center gap-1.5 text-foreground dark:text-zinc-100 font-medium">
-                <AlertCircle className="size-4.5 text-muted-foreground dark:text-zinc-400 shrink-0" />
-                <span>
-                  {t("missingSkills")} ({job.missingSkills?.length || 0})
-                </span>
-              </div>
-              <p className="text-gray-600 dark:text-zinc-300 leading-relaxed pl-6">
-                {job.missingSkills?.length
-                  ? job.missingSkills.join(", ")
-                  : t("noneIdentified")}
-              </p>
-            </div>
-          </div>
+          <SkillGapBreakdown
+            matchedSkills={job.matchedSkills}
+            missingSkills={job.missingSkills}
+          />
 
           {/* Gaps Analysis */}
           {Array.isArray(job.gaps) && job.gaps.length > 0 && (
@@ -142,7 +159,7 @@ export function JobScoreSection({
           )}
 
           {/* Actions Directly Below Content, Separated by Divider */}
-          <div className="pt-3 border-t border-border/40 flex items-center gap-4">
+          <div className="pt-3 border-t border-border/40 flex items-center justify-between">
             <button
               type="button"
               onClick={onScoreJob}
@@ -152,6 +169,21 @@ export function JobScoreSection({
               <RotateCcw className="size-4.5 shrink-0" />
               <span>{t("reScore")}</span>
             </button>
+
+            {resumes && resumes.length > 1 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground font-sans">
+                  Persona:
+                </span>
+                <PersonaSelectDropdown
+                  resumes={resumes}
+                  selectedResumeId={selectedResumeId}
+                  onSelectResume={onSelectResume}
+                  size="xs"
+                  showIcon={false}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}

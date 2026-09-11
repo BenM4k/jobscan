@@ -6,6 +6,7 @@ import {
   jobLanguageEnum,
 } from "@/services/db/schema";
 import * as pipelineDal from "@/dal/pipeline.dal";
+import { decayFactor } from "@/services/ranking/decay";
 import type { TailoredResumeData } from "@/lib/ai";
 export type { TailoredResumeData };
 
@@ -40,6 +41,7 @@ export interface JobSelect {
   workplaceType?: string | null;
   remoteRegions?: string[] | null;
   fitScore: number | null;
+  displayRank?: number | null;
   scoreReasoning: string | null;
   matchedSkills: string[] | null;
   missingSkills: string[] | null;
@@ -47,6 +49,8 @@ export interface JobSelect {
   coverLetterDraft: string | null;
   tailoredResume: string | null;
   tailoredResumeData: TailoredResumeData | null;
+  tailoredResumeRecordId?: string;
+  resumeIdUsed?: string | null;
   status: JobStatus;
   createdAt: Date;
   updatedAt?: Date;
@@ -66,6 +70,15 @@ export type JobInsert = Partial<JobSelect> & {
 export function pipelineEntryToJobSelect(
   entry: pipelineDal.PipelineEntryWithDetails
 ): JobSelect {
+  const rawFitScore = entry.score?.finalScore
+    ? Math.round(Number(entry.score.finalScore))
+    : null;
+  const postedAt = entry.job.postedAt || entry.createdAt;
+  const rank =
+    rawFitScore !== null
+      ? Math.min(100, Math.max(0, Math.round(rawFitScore * decayFactor(postedAt))))
+      : null;
+
   return {
     id: entry.id,
     userId: entry.userId,
@@ -82,9 +95,8 @@ export function pipelineEntryToJobSelect(
     city: entry.job.location,
     workplaceType: null,
     remoteRegions: null,
-    fitScore: entry.score?.finalScore
-      ? Math.round(Number(entry.score.finalScore))
-      : null,
+    fitScore: rawFitScore,
+    displayRank: rank,
     scoreReasoning: entry.score?.explanation || null,
     matchedSkills: (entry.score?.matchedSkills as string[]) || [],
     missingSkills: (entry.score?.missingSkills as string[]) || [],
@@ -92,6 +104,8 @@ export function pipelineEntryToJobSelect(
     coverLetterDraft: entry.tailoredCoverLetter?.content || null,
     tailoredResume: entry.tailoredResume?.content || null,
     tailoredResumeData: null,
+    tailoredResumeRecordId: entry.tailoredResume?.id,
+    resumeIdUsed: entry.resumeIdUsed,
     status: entry.status,
     createdAt: entry.createdAt,
     updatedAt: entry.updatedAt,

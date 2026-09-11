@@ -24,7 +24,11 @@ import { toast } from "sonner";
 interface ProfileHeaderProps {
   name: string;
   headline: string;
-  location: string;
+  location?: string;
+  resumeLabel?: string;
+  resumeVersion?: number;
+  resumeLanguage?: string;
+  resumeSource?: string;
   onEditClick: () => void;
   onReformatClick?: () => void;
   onDeleteClick?: () => void;
@@ -35,6 +39,10 @@ export function ProfileHeader({
   name,
   headline,
   location,
+  resumeLabel = "Default",
+  resumeVersion = 1,
+  resumeLanguage = "en",
+  resumeSource = "uploaded",
   onEditClick,
   onReformatClick,
   onDeleteClick,
@@ -78,7 +86,7 @@ export function ProfileHeader({
               <span>{initials}</span>
             </div>
             <span
-              title="Profile Active"
+              title="Active Master Resume"
               className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white dark:border-[#0A0A0C] flex items-center justify-center shadow-2xs"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-white" />
@@ -96,12 +104,30 @@ export function ProfileHeader({
               {headline}
             </p>
 
-            {/* Standardized Pills: Location & Open to Opportunities */}
+            {/* Master Resume Badges & Pills */}
             <div className="flex flex-wrap items-center gap-2 pt-1">
-              <span className="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-zinc-800/80 text-slate-700 dark:text-zinc-300 px-2.5 py-1 rounded-md border border-slate-200 dark:border-zinc-700/70 text-xs font-medium font-sans">
-                <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                <span>{location}</span>
+              <span className="inline-flex items-center gap-1.5 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 px-2.5 py-1 rounded-md border border-blue-200 dark:border-blue-900/60 text-xs font-semibold font-sans">
+                <FileText className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                <span>Master: {resumeLabel} (v{resumeVersion})</span>
               </span>
+
+              <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-zinc-800/80 text-slate-700 dark:text-zinc-300 px-2.5 py-1 rounded-md border border-slate-200 dark:border-zinc-700/70 text-xs font-medium font-sans uppercase">
+                <span>{resumeLanguage}</span>
+              </span>
+
+              {resumeSource === "promoted_tailored" && (
+                <span className="inline-flex items-center gap-1 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 px-2.5 py-1 rounded-md border border-purple-200 dark:border-purple-800/60 text-xs font-medium font-sans">
+                  <Sparkles className="w-3 h-3 text-purple-500 shrink-0" />
+                  <span>Promoted</span>
+                </span>
+              )}
+
+              {location && (
+                <span className="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-zinc-800/80 text-slate-700 dark:text-zinc-300 px-2.5 py-1 rounded-md border border-slate-200 dark:border-zinc-700/70 text-xs font-medium font-sans">
+                  <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  <span>{location}</span>
+                </span>
+              )}
 
               <span className="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-zinc-800/80 text-slate-700 dark:text-zinc-300 px-2.5 py-1 rounded-md border border-slate-200 dark:border-zinc-700/70 text-xs font-medium font-sans">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />

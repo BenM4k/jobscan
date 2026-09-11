@@ -1,42 +1,55 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { JobSelect } from "@/dal/jobs.dal";
 import { toast } from "sonner";
 import posthog from "posthog-js";
 import { downloadTextAsPdf } from "@/lib/pdf-export";
+import { useAsyncJobWithRetry } from "@/hooks/useAsyncJobWithRetry";
 
-interface UseCoverLetterOptions {
+interface UseCoverLetterProps {
   job: JobSelect;
   onJobUpdated: (updated: JobSelect) => void;
 }
 
-export function useCoverLetter({ job, onJobUpdated }: UseCoverLetterOptions) {
-  const [isStreaming, setIsStreaming] = useState(false);
+export interface GenerateCoverLetterOptions {
+  regenerate?: boolean;
+  instructions?: string;
+  tone?: string;
+  resumeId?: string;
+}
+
+export function useCoverLetter({ job, onJobUpdated }: UseCoverLetterProps) {
   const [coverLetter, setCoverLetter] = useState(job.coverLetterDraft || "");
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  const pendingIdempotencyKeyRef = useRef<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const pendingIdempotencyKeyRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
+  const retryRunner = useAsyncJobWithRetry<string>({
+    jobName: "Cover Letter Generation",
+    maxRetries: 2,
+    defaultDelaySeconds: 3,
+    enableToasts: true,
+  });
 
-  const handleGenerateStream = async () => {
-    try {
-      setIsStreaming(true);
+  const handleGenerateStream = async (options?: GenerateCoverLetterOptions) => {
+    const isRegeneration =
+      options?.regenerate ||
+      Boolean(job.coverLetterDraft) ||
+      Boolean(coverLetter);
+
+    if (isRegeneration) {
+      // Always mint a fresh idempotency key when regenerating
+      pendingIdempotencyKeyRef.current = crypto.randomUUID();
+    } else if (!pendingIdempotencyKeyRef.current) {
+      pendingIdempotencyKeyRef.current = crypto.randomUUID();
+    }
+    const idempotencyKey = pendingIdempotencyKeyRef.current;
+
+    const result = await retryRunner.execute(async () => {
       setCoverLetter("");
-      if (!pendingIdempotencyKeyRef.current) {
-        pendingIdempotencyKeyRef.current = crypto.randomUUID();
-      }
-      const idempotencyKey = pendingIdempotencyKeyRef.current;
-
       abortControllerRef.current?.abort();
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
@@ -48,12 +61,27 @@ export function useCoverLetter({ job, onJobUpdated }: UseCoverLetterOptions) {
           "Content-Type": "application/json",
           "Idempotency-Key": idempotencyKey,
         },
-        body: JSON.stringify({ idempotencyKey }),
+        body: JSON.stringify({
+          idempotencyKey,
+          regenerate: isRegeneration,
+          instructions: options?.instructions,
+          tone: options?.tone,
+          resumeId: options?.resumeId,
+        }),
       });
 
       if (!res.ok) {
-        const errJson = await res.json();
-        throw new Error(errJson.error || "Failed to generate cover letter stream");
+        const errJson = await res.json().catch(() => ({}));
+        const msg = errJson.error || `Failed to generate cover letter (${res.status})`;
+        const errorObj = new Error(msg) as Error & {
+          status?: number;
+          code?: string;
+          retryAfterSeconds?: number;
+        };
+        errorObj.status = res.status;
+        errorObj.code = errJson.code;
+        errorObj.retryAfterSeconds = errJson.retryAfterSeconds;
+        throw errorObj;
       }
 
       if (!res.body) throw new Error("No readable stream response received");
@@ -70,19 +98,20 @@ export function useCoverLetter({ job, onJobUpdated }: UseCoverLetterOptions) {
         setCoverLetter(accumulated);
       }
 
+      return accumulated;
+    });
+
+    if (result) {
       pendingIdempotencyKeyRef.current = null;
       posthog.capture("cover_letter_generated");
-      toast.success("Cover letter generated");
-      onJobUpdated({ ...job, coverLetterDraft: accumulated });
-    } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") {
-        return;
-      }
-      console.error(err);
-      toast.error(err instanceof Error ? err.message : "Cover letter streaming failed");
-    } finally {
-      setIsStreaming(false);
+      onJobUpdated({ ...job, coverLetterDraft: result });
     }
+  };
+
+  const handleRegenerate = async (
+    options?: Omit<GenerateCoverLetterOptions, "regenerate">
+  ) => {
+    return handleGenerateStream({ ...options, regenerate: true });
   };
 
   const handleSave = async () => {
@@ -113,18 +142,20 @@ export function useCoverLetter({ job, onJobUpdated }: UseCoverLetterOptions) {
 
   const handleDownloadPdf = async () => {
     try {
-      const filename = `Cover_Letter_${job.company.replace(/\s+/g, "_")}.pdf`;
-      await downloadTextAsPdf(filename, coverLetter, 11, 6);
-      toast.success("PDF downloaded");
+      const content = coverLetter || job.coverLetterDraft;
+      if (!content) return;
+      await downloadTextAsPdf(content, `${job.company || "Company"}-Cover-Letter.pdf`);
+      toast.success("Downloaded cover letter PDF");
     } catch (err) {
       console.error(err);
-      toast.error("Failed to generate PDF");
+      toast.error("Failed to download PDF");
     }
   };
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(coverLetter);
+      const textToCopy = coverLetter || job.coverLetterDraft || "";
+      await navigator.clipboard.writeText(textToCopy);
       setIsCopied(true);
       toast.success("Copied to clipboard");
       setTimeout(() => setIsCopied(false), 2000);
@@ -135,15 +166,23 @@ export function useCoverLetter({ job, onJobUpdated }: UseCoverLetterOptions) {
   };
 
   return {
-    isStreaming,
+    isStreaming: retryRunner.isLoading,
+    retryStatus: retryRunner.status,
+    retryAttempt: retryRunner.attempt,
+    totalAttempts: retryRunner.totalAttempts,
+    retryCountdown: retryRunner.countdown,
+    retryMessage: retryRunner.message,
+    cancelRetry: retryRunner.cancelRetry,
+    retryNow: retryRunner.retryNow,
     coverLetter,
     setCoverLetter,
     isSaving,
     isEditing,
     setIsEditing,
     isCopied,
-    hasContent: Boolean(coverLetter),
+    hasCoverLetter: Boolean(job.coverLetterDraft),
     handleGenerateStream,
+    handleRegenerate,
     handleSave,
     handleDownloadPdf,
     handleCopy,

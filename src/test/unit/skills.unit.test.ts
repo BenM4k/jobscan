@@ -1,5 +1,6 @@
-import { diffSkills, normalizeSkill } from "@/services/skills.service";
+import { diffSkills, normalizeSkill, normalizeSkillName } from "@/services/skills.service";
 import * as skillsService from "@/services/skills.service";
+import { normalizeSkillName as normalizeSkillNameDirect } from "@/services/skills/normalize";
 import * as skillsDal from "@/dal/skills.dal";
 import { scoreResultSchema } from "@/services/scoring/types";
 
@@ -20,6 +21,26 @@ async function runSkillsUnitTests() {
   assert(
     typeof skillsService.normalizeSkill === "function",
     "normalizeSkill should be exported from skills.service"
+  );
+  assert(
+    typeof skillsService.normalizeSkillName === "function",
+    "normalizeSkillName should be exported from skills.service"
+  );
+  assert(
+    typeof normalizeSkillNameDirect === "function",
+    "normalizeSkillName should be exported from @/services/skills/normalize"
+  );
+  assert(
+    typeof skillsService.analyzeJobResumeMatch === "function",
+    "analyzeJobResumeMatch should be exported from skills.service"
+  );
+  assert(
+    typeof skillsService.analyzeSkillGap === "function",
+    "analyzeSkillGap should be exported from skills.service"
+  );
+  assert(
+    typeof skillsService.buildMatchAnalysisPrompt === "function",
+    "buildMatchAnalysisPrompt should be exported from skills.service"
   );
   assert(
     typeof skillsService.extractSkillsFromJob === "function",
@@ -61,6 +82,26 @@ async function runSkillsUnitTests() {
   assert(normalizeSkill("Node-JS") === "node js", "normalizeSkill replaces dashes with space");
   assert(normalizeSkill("CI/CD") === "ci cd", "normalizeSkill replaces slashes with space");
   console.log("✓ normalizeSkill correctly handles punctuation and whitespace");
+
+  // Step 12: normalizeSkillName does lowercase/trim/whitespace-collapse only (no synonym resolution)
+  assert(normalizeSkillName("  JavaScript   Core  ") === "javascript core", "normalizeSkillName collapses whitespace and trims");
+  assert(normalizeSkillName("JS") === "js", "normalizeSkillName does not resolve synonyms like JS->JavaScript");
+  assert(normalizeSkillName("PostgreSQL") === "postgresql", "normalizeSkillName lowercases");
+  assert(normalizeSkillName("") === "", "normalizeSkillName handles empty string");
+  console.log("✓ normalizeSkillName does lowercase/trim/whitespace-collapse only (no synonym resolution)");
+
+  // Step 13: Prompt branching for French vs English
+  {
+    const enPrompt = skillsService.buildMatchAnalysisPrompt("Software Engineer", "Resume...", "en");
+    assert(enPrompt.system.includes("expert technical recruiter"), "English prompt should use English system instruction");
+    assert(enPrompt.prompt.includes("TARGET JOB POSTING"), "English prompt should use TARGET JOB POSTING");
+
+    const frPrompt = skillsService.buildMatchAnalysisPrompt("Ingénieur Logiciel", "CV...", "fr");
+    assert(frPrompt.system.includes("recruteur technique expert"), "French prompt should use French system instruction");
+    assert(frPrompt.prompt.includes("OFFRE D'EMPLOI CIBLE"), "French prompt should use OFFRE D'EMPLOI CIBLE");
+    assert(frPrompt.prompt.includes("français"), "French prompt should request explanation in French");
+  }
+  console.log("✓ buildMatchAnalysisPrompt correctly branches between French and English");
 
   // 3. diffSkills test: Exact matches
   {
@@ -157,6 +198,25 @@ async function runSkillsUnitTests() {
     assert(!parsedInvalid.success, "scoreResultSchema should require explanation");
   }
   console.log("✓ scoreResultSchema enforces 'Why this matched' explanation and skill arrays");
+
+  // 7. matchAnalysisSchema validation (Step 13 Option B)
+  {
+    const validMatch = {
+      jobSkills: ["TypeScript", "Next.js"],
+      resumeSkills: ["TypeScript", "React"],
+      explanation: "Matches TypeScript experience but lacks production Next.js background.",
+    };
+    const parsedMatch = skillsService.matchAnalysisSchema.safeParse(validMatch);
+    assert(parsedMatch.success, "matchAnalysisSchema should parse valid payload");
+
+    const invalidMatch = {
+      jobSkills: ["TypeScript"],
+      resumeSkills: ["TypeScript"],
+    };
+    const parsedInvalidMatch = skillsService.matchAnalysisSchema.safeParse(invalidMatch);
+    assert(!parsedInvalidMatch.success, "matchAnalysisSchema requires explanation");
+  }
+  console.log("✓ matchAnalysisSchema validates combined output structure");
 
   console.log("\n==========================================");
   console.log("✓ All Skills & Explanation unit tests passed successfully!");

@@ -5,6 +5,10 @@ import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 import { setJobEmbedding } from "@/dal/jobs/mutations";
 import { setResumeEmbedding } from "@/dal/resume.dal";
+import {
+  logAiCall,
+  calculateEstimatedCost,
+} from "@/services/ai/with-cost-tracking";
 
 /**
  * Primary embedding model: gemini-embedding-2 (multimodal preview model with 8,192-token context).
@@ -26,6 +30,7 @@ export const MAX_INPUT_CHARS = 24_000;
  */
 export async function embedText(
   text: string,
+  userId?: string | null,
 ): Promise<Result<number[], AppError>> {
   try {
     const trimmed = text.trim();
@@ -59,12 +64,33 @@ export async function embedText(
     const google = createGoogleGenerativeAI({ apiKey: geminiKey });
     const model = google.textEmbeddingModel(GEMINI_EMBEDDING_MODEL_ID);
 
-    const { embedding } = await embed({
+    const { embedding, usage } = await embed({
       model,
       value: truncated,
       providerOptions: {
         google: { outputDimensionality: EMBEDDING_DIMENSIONS },
       },
+    });
+
+    // Extract usage tokens or fallback to estimation if undefined/NaN
+    const tokens =
+      typeof usage?.tokens === "number" && !Number.isNaN(usage.tokens)
+        ? usage.tokens
+        : Math.ceil(truncated.length / 4);
+
+    await logAiCall({
+      userId: userId ?? null,
+      feature: "scoring",
+      provider: "google",
+      model: GEMINI_EMBEDDING_MODEL_ID,
+      inputTokens: tokens,
+      outputTokens: 0,
+      costEstimateUsd: calculateEstimatedCost(
+        GEMINI_EMBEDDING_MODEL_ID,
+        tokens,
+        0,
+      ),
+      cacheHit: false,
     });
 
     return ok(embedding);
@@ -87,7 +113,7 @@ export async function embedResume(
   userId: string,
   content: string,
 ): Promise<Result<void, AppError>> {
-  const embRes = await embedText(content);
+  const embRes = await embedText(content, userId);
   if (!embRes.ok) {
     console.warn(
       `Resume embedding generation failed for resume ${resumeId}:`,
@@ -120,9 +146,10 @@ export async function embedJob(
     company?: string | null;
     description: string;
   },
+  userId?: string | null,
 ): Promise<Result<void, AppError>> {
   const jobText = `${jobData.title}\n\n${jobData.description}`;
-  const embRes = await embedText(jobText);
+  const embRes = await embedText(jobText, userId);
   if (!embRes.ok) {
     console.warn(
       `Job embedding generation failed for job ${jobId}:`,

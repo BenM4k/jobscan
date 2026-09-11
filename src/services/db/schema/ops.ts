@@ -31,7 +31,6 @@ export const aiCallLog = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     userId: uuid("user_id")
-      .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     feature: aiFeatureEnum("feature").notNull(),
     provider: text("provider").notNull(),
