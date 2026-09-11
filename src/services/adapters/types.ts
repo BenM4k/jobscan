@@ -11,8 +11,7 @@ export type SupportedJobSource =
   | "congojob"
   | "emploi_cd"
   | "fecrdc"
-  | "unjobs"
-  | "reliefweb";
+  | "unjobs";
 
 export interface NormalizedJobInput {
   externalId: string;

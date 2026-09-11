@@ -8,16 +8,12 @@ import { runWithIdempotency } from "@/services/idempotency.service";
 import { checkAiRateLimit } from "@/services/rate-limit";
 import { ok } from "@/lib/result";
 
-const ALL_SUPPORTED_SOURCES = [
-  "greenhouse",
-  "remoteok",
-  "lever",
-  "ashby",
-  "congojob",
-  "emploi_cd",
-  "fecrdc",
-  "unjobs",
-] as const;
+import {
+  ALL_JOB_SOURCES,
+  type SupportedSourceId,
+} from "@/inngest/functions/job-fetch";
+
+export type { SupportedSourceId };
 
 const triggerFetchSchema = z.object({
   sourceId: z.string().min(1),
@@ -85,7 +81,7 @@ export async function triggerJobFetchAction(formData: FormData) {
   if (rawSources.length > 0) {
     requestedSources = rawSources;
   } else if (parsed.data.sourceId === "all") {
-    requestedSources = [...ALL_SUPPORTED_SOURCES];
+    requestedSources = [...ALL_JOB_SOURCES];
   } else if (parsed.data.sourceId.includes(",")) {
     requestedSources = parsed.data.sourceId
       .split(",")
@@ -95,8 +91,17 @@ export async function triggerJobFetchAction(formData: FormData) {
     requestedSources = [parsed.data.sourceId];
   }
 
+  const validSourceSet = new Set<string>(ALL_JOB_SOURCES);
+  const sanitizedSources = Array.from(
+    new Set(requestedSources.filter((s) => validSourceSet.has(s)))
+  ).slice(0, ALL_JOB_SOURCES.length);
+
+  if (sanitizedSources.length === 0) {
+    return { success: false, error: "No valid job sources selected" };
+  }
+
   const result = await jobService.fetchAndUpsertJobsAcrossSources(
-    requestedSources,
+    sanitizedSources,
     parsed.data.target,
     sessionResult.value.user.id,
   );

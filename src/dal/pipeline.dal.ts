@@ -67,6 +67,22 @@ function selectScoreFields(sub: ReturnType<typeof latestScoreSubquery>) {
   };
 }
 
+export async function getAlsoPostedOnForJob(
+  jobId: string,
+  ownSource?: string
+): Promise<string[]> {
+  const refs = await db
+    .select({ source: jobSourceRef.source })
+    .from(jobSourceRef)
+    .where(eq(jobSourceRef.jobId, jobId));
+
+  const filtered = refs
+    .map((r) => r.source)
+    .filter((s) => !ownSource || s !== ownSource);
+
+  return Array.from(new Set(filtered));
+}
+
 export async function getPipelineEntryById(
   id: string,
   userId: string
@@ -94,13 +110,7 @@ export async function getPipelineEntryById(
     }
 
     const row = rows[0];
-    const refs = await db
-      .select({ source: jobSourceRef.source })
-      .from(jobSourceRef)
-      .where(eq(jobSourceRef.jobId, row.job.id));
-    const alsoPostedOn = refs
-      .map((r) => r.source)
-      .filter((s) => s !== row.job.source);
+    const alsoPostedOn = await getAlsoPostedOnForJob(row.job.id, row.job.source);
 
     return ok({
       ...row.entry,
@@ -144,13 +154,7 @@ export async function getPipelineEntryByUserAndJob(
     }
 
     const row = rows[0];
-    const refs = await db
-      .select({ source: jobSourceRef.source })
-      .from(jobSourceRef)
-      .where(eq(jobSourceRef.jobId, row.job.id));
-    const alsoPostedOn = refs
-      .map((r) => r.source)
-      .filter((s) => s !== row.job.source);
+    const alsoPostedOn = await getAlsoPostedOnForJob(row.job.id, row.job.source);
 
     return ok({
       ...row.entry,

@@ -64,13 +64,22 @@ export function FetchJobsPopover({
           );
           const total = res.data?.totalUpserted || 0;
 
-          if (successfulSources.length === 0 && circuitOpenSources.length > 0) {
-            const names = circuitOpenSources
-              .map((s) => s.source.toUpperCase())
-              .join(", ");
-            onError(
-              `DRC crawl skipped: circuit breaker is OPEN for ${names} due to consecutive failures. Cooling down.`,
-            );
+          if (successfulSources.length === 0 && (circuitOpenSources.length > 0 || fetchFailedSources.length > 0)) {
+            if (circuitOpenSources.length > 0) {
+              const names = circuitOpenSources
+                .map((s) => s.source.toUpperCase())
+                .join(", ");
+              onError(
+                `DRC crawl skipped: circuit breaker is OPEN for ${names} due to consecutive failures. Cooling down.`,
+              );
+            } else {
+              const names = fetchFailedSources
+                .map((s) => s.source.toUpperCase())
+                .join(", ");
+              onError(
+                `DRC crawl failed for ${names}. The external source may be temporarily unreachable.`,
+              );
+            }
           } else {
             posthog.capture("jobs_fetched", {
               source: selectedSource,

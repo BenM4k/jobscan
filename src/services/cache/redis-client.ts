@@ -65,14 +65,7 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
   try {
     const raw = await client.get<T>(key);
     if (raw === null || raw === undefined) return null;
-    if (typeof raw === "string") {
-      try {
-        return JSON.parse(raw) as T;
-      } catch {
-        return raw as unknown as T;
-      }
-    }
-    return raw as T;
+    return raw;
   } catch (err) {
     console.warn(
       `[Redis] Failed to get cache key "${key}":`,

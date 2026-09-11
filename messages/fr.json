@@ -135,6 +135,7 @@
     "onSite": "Sur site",
     "status": "Statut",
     "via": "via",
+    "alsoPostedOn": "Également publié sur :",
     "dateRangeAll": "Période : Toutes",
     "filterByDate": "Filtrer par date",
     "clearFilter": "Effacer le filtre",

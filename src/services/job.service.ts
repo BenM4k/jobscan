@@ -1,6 +1,7 @@
 import "server-only";
 import { JobStatus } from "@/services/db/schema";
 import * as jobsDal from "@/dal/jobs.dal";
+import * as pipelineDal from "@/dal/pipeline.dal";
 import * as resumeDal from "@/dal/resume.dal";
 import * as opsDal from "@/dal/ops.dal";
 import * as skillsDal from "@/dal/skills.dal";
@@ -48,8 +49,13 @@ export async function fetchAndUpsertJobsAcrossSources(
   let totalFailed = 0;
   const sources: IngestResult[] = [];
 
-  for (const sourceId of sourceIds) {
-    const res = await ingestFromSource(sourceId, { target, userId });
+  const results = await Promise.all(
+    sourceIds.map((sourceId) => ingestFromSource(sourceId, { target, userId }))
+  );
+
+  for (let i = 0; i < sourceIds.length; i++) {
+    const sourceId = sourceIds[i];
+    const res = results[i];
     if (res.ok) {
       sources.push(res.value);
       totalFetched += res.value.fetched;
@@ -292,6 +298,18 @@ export async function scoreJobHybrid(
   if (!jobResult.ok) return jobResult;
   const job = jobResult.value;
 
+  // Resolve canonical job ID: if jobId was a pipeline entry, resolve entry.jobId
+  let canonicalJobId = job.id;
+  const entryRes = await pipelineDal.getPipelineEntryById(jobId, userId);
+  if (entryRes.ok && entryRes.value) {
+    canonicalJobId = entryRes.value.jobId;
+  } else {
+    const entryByJob = await pipelineDal.getPipelineEntryByUserAndJob(userId, jobId);
+    if (entryByJob.ok && entryByJob.value) {
+      canonicalJobId = entryByJob.value.jobId;
+    }
+  }
+
   const resumeRes = await resumeDal.getActiveMasterResume(userId);
   if (!resumeRes.ok) return err(resumeRes.error);
   const activeResume = resumeRes.value;
@@ -322,9 +340,9 @@ export async function scoreJobHybrid(
         : "developer";
 
   const [cosineRes, bm25Res] = await Promise.all([
-    jobsDal.getJobResumeSimilarity(job.id, activeResume.id),
+    jobsDal.getJobResumeSimilarity(canonicalJobId, activeResume.id),
     isLanguageMatch
-      ? jobsDal.getJobResumeTsRank(job.id, queryTerms, jobLanguage)
+      ? jobsDal.getJobResumeTsRank(canonicalJobId, queryTerms, jobLanguage)
       : Promise.resolve(ok(null)),
   ]);
 

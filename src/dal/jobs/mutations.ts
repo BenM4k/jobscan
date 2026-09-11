@@ -161,6 +161,36 @@ export async function upsertCanonicalJobWithSimhashDedup(
               postedAt: data.postedAt || null,
               location,
               status: "active",
+              language:
+                data.language !== undefined
+                  ? (data.language as "en" | "fr")
+                  : sql`${job.language}`,
+              salaryMin:
+                data.salaryMin !== undefined
+                  ? (data.salaryMin ? String(data.salaryMin) : null)
+                  : sql`${job.salaryMin}`,
+              salaryMax:
+                data.salaryMax !== undefined
+                  ? (data.salaryMax ? String(data.salaryMax) : null)
+                  : sql`${job.salaryMax}`,
+              salaryCurrency:
+                data.salaryCurrency !== undefined
+                  ? (data.salaryCurrency || null)
+                  : sql`${job.salaryCurrency}`,
+              salaryPeriod:
+                data.salaryPeriod !== undefined
+                  ? (data.salaryPeriod || null)
+                  : sql`${job.salaryPeriod}`,
+              salaryNormalizedYearlyUsd:
+                data.salaryNormalizedYearlyUsd !== undefined
+                  ? (data.salaryNormalizedYearlyUsd
+                      ? String(data.salaryNormalizedYearlyUsd)
+                      : null)
+                  : sql`${job.salaryNormalizedYearlyUsd}`,
+              rawSalaryText:
+                data.rawSalaryText !== undefined
+                  ? (data.rawSalaryText || null)
+                  : sql`${job.rawSalaryText}`,
               simhash:
                 data.simhash != null
                   ? typeof data.simhash === "bigint"
@@ -1020,15 +1050,4 @@ export async function deleteCanonicalJobAndRefs(
   }
 }
 
-export const upsertRawJobPayload = insertRawJobPayload;
-export const upsertFromSource = upsertJob;
-
-export const rawJobPayloadDal = {
-  upsert: insertRawJobPayload,
-};
-
-export const jobDal = {
-  upsertFromSource: upsertJob,
-  upsert: upsertJob,
-};
 

@@ -1,41 +1,58 @@
 import assert from "node:assert/strict";
-import { rawJobPayloadDal, jobDal, upsertFromSource, insertRawJobPayload } from "@/dal/jobs.dal";
-import { rawJobPayload, job } from "@/services/db/schema/job";
+import { upsertJob, insertRawJobPayload } from "@/dal/jobs.dal";
+import { rawJobPayload, job, jobSourceRef } from "@/services/db/schema/job";
 import { NormalizedJobInput } from "@/services/adapters/types";
+import { getTableConfig } from "drizzle-orm/pg-core";
 
 console.log("Running Ingestion Step 2 Verification Test Suite...\n");
 
 // 1. Verify DAL functions exist and are exported
-console.log("1. Checking rawJobPayloadDal and jobDal exports...");
+console.log("1. Checking upsertJob and insertRawJobPayload exports...");
 assert.equal(
-  typeof rawJobPayloadDal.upsert,
+  typeof upsertJob,
   "function",
-  "rawJobPayloadDal.upsert must be a function"
-);
-assert.equal(
-  typeof jobDal.upsertFromSource,
-  "function",
-  "jobDal.upsertFromSource must be a function"
-);
-assert.equal(
-  typeof upsertFromSource,
-  "function",
-  "upsertFromSource function must be exported"
+  "upsertJob must be a function"
 );
 assert.equal(
   typeof insertRawJobPayload,
   "function",
   "insertRawJobPayload function must be exported"
 );
-console.log(" DAL upsert functions successfully exported.");
+console.log("✓ DAL canonical upsert functions successfully exported.");
 
 // 2. Verify table schema unique indexes targeted by onConflictDoUpdate
 console.log("\n2. Verifying unique constraints on (source, external_id)...");
-assert(job.source, "job table must have source column");
-assert(job.externalId, "job table must have external_id column");
-assert(rawJobPayload.source, "raw_job_payload table must have source column");
-assert(rawJobPayload.externalId, "raw_job_payload table must have external_id column");
-console.log(" Schema columns for (source, external_id) conflict targets verified.");
+const jobConfig = getTableConfig(job);
+const rawPayloadConfig = getTableConfig(rawJobPayload);
+const jobSourceRefConfig = getTableConfig(jobSourceRef);
+
+const hasUniqueIndexOn = (
+  tableConfig: ReturnType<typeof getTableConfig>,
+  col1: string,
+  col2: string
+) => {
+  return tableConfig.indexes.some((idx) => {
+    const isUnique = idx.config?.unique === true;
+    const colNames = idx.config?.columns?.map((c) =>
+      c && "name" in c && typeof c.name === "string" ? c.name : undefined
+    );
+    return isUnique && colNames?.includes(col1) && colNames?.includes(col2);
+  });
+};
+
+assert(
+  hasUniqueIndexOn(jobConfig, "source", "external_id"),
+  "job table must have unique index on (source, external_id)"
+);
+assert(
+  hasUniqueIndexOn(rawPayloadConfig, "source", "external_id"),
+  "raw_job_payload table must have unique index on (source, external_id)"
+);
+assert(
+  hasUniqueIndexOn(jobSourceRefConfig, "source", "external_id"),
+  "job_source_ref table must have unique index on (source, external_id)"
+);
+console.log("✓ Schema unique indexes for (source, external_id) conflict targets verified.");
 
 // 3. Verify NormalizedJobInput shared contract fields
 console.log("\n3. Verifying NormalizedJobInput shared contract shape...");
@@ -63,6 +80,6 @@ const testJobInput: NormalizedJobInput = {
 assert.equal(testJobInput.source, "remoteok");
 assert.equal(testJobInput.title, "Senior Fullstack Engineer");
 assert.equal(testJobInput.salaryCurrency, "USD");
-console.log(" NormalizedJobInput shared contract verified.");
+console.log("✓ NormalizedJobInput shared contract verified.");
 
-console.log("\n All Step 2 checks passed successfully!");
+console.log("\n✨ All Step 2 checks passed successfully!");

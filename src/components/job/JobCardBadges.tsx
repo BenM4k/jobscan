@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
+import { formatSourceName } from "@/lib/format-source";
 
 interface JobCardBadgesProps {
   locationText?: string;
@@ -9,23 +10,6 @@ interface JobCardBadgesProps {
   source?: string | null;
   postedDate?: string | null;
   alsoPostedOn?: string[] | null;
-}
-
-function formatSourceName(source: string): string {
-  const map: Record<string, string> = {
-    remoteok: "RemoteOK",
-    greenhouse: "Greenhouse",
-    reliefweb: "ReliefWeb",
-    emploicd: "Emploi.cd",
-    emploi_cd: "Emploi.cd",
-    congojob: "CongoJob",
-    unjobs: "UNJobs",
-    ashby: "Ashby",
-    lever: "Lever",
-    manual: "Manual",
-  };
-  const clean = source.toLowerCase();
-  return map[clean] || (source.charAt(0).toUpperCase() + source.slice(1));
 }
 
 function formatSource(source?: string | null, viaPrefix: string = "via"): string | null {
@@ -91,7 +75,7 @@ export function JobCardBadges({
             <span className="text-muted-foreground/40 select-none">·</span>
           )}
           <span>
-            Also posted on:{" "}
+            {t("alsoPostedOn") || "Also posted on:"}{" "}
             <span className="font-medium text-slate-700 dark:text-zinc-200">
               {alsoPostedOn!.map(formatSourceName).join(", ")}
             </span>

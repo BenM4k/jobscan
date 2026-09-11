@@ -11,6 +11,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
+import { formatSourceName } from "@/lib/format-source";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -46,22 +47,6 @@ export function JobDetailHeader({ job, onStatusChange }: JobDetailHeaderProps) {
       ? job.remoteRegions.join(", ")
       : [job.city, job.countryCode || job.country].filter(Boolean).join(", ");
 
-  const formatSourceName = (src: string): string => {
-    const map: Record<string, string> = {
-      remoteok: "RemoteOK",
-      greenhouse: "Greenhouse",
-      reliefweb: "ReliefWeb",
-      emploicd: "Emploi.cd",
-      emploi_cd: "Emploi.cd",
-      congojob: "CongoJob",
-      unjobs: "UNJobs",
-      ashby: "Ashby",
-      lever: "Lever",
-      manual: "Manual",
-    };
-    const clean = src.toLowerCase();
-    return map[clean] || (src.charAt(0).toUpperCase() + src.slice(1));
-  };
 
   const alsoPostedSources =
     job.alsoPostedOn && job.alsoPostedOn.length > 0
@@ -86,7 +71,7 @@ export function JobDetailHeader({ job, onStatusChange }: JobDetailHeaderProps) {
               )}
               {alsoPostedSources && (
                 <span className="text-muted-foreground/80 dark:text-zinc-400 ml-2 text-xs font-normal">
-                  · Also posted on:{" "}
+                  · {tDash("alsoPostedOn") || "Also posted on:"}{" "}
                   <span className="font-medium text-slate-800 dark:text-zinc-200">
                     {alsoPostedSources}
                   </span>

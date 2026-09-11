@@ -63,14 +63,21 @@ export async function fetchRaw(options?: {
 export function normalize(raw: unknown): NormalizedJobInput {
   const item = raw as RemoteOKJobRaw;
   const region = item.location || item.region;
+  let postedAt = new Date();
+  if (item.date) {
+    const parsed = new Date(item.date);
+    if (!isNaN(parsed.getTime())) {
+      postedAt = parsed;
+    }
+  }
   return {
     externalId: String(item.id),
     source: "remoteok",
-    title: item.position,
-    company: item.company,
+    title: item.position || "Untitled Position",
+    company: item.company || "Unknown Company",
     url: item.url,
     description: item.description || "",
-    postedAt: item.date ? new Date(item.date) : new Date(),
+    postedAt,
     workplaceType: "remote",
     remoteRegions: region ? [region] : ["Worldwide"],
   };

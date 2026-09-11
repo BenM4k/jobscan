@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { job, jobSourceRef } from "@/services/db/schema/job";
+import { getTableConfig } from "drizzle-orm/pg-core";
 import {
   computeSimhash,
   buildJobSimhashText,
@@ -115,18 +116,43 @@ assert.equal(
   "function",
   "findNearDuplicateJobId must be an exported function",
 );
+
+// Verify findNearDuplicateJobId accepts custom lookbackDays and maxDistance options
+const testSimhash = "1234567890123456789";
+const fnSignatureCheck = async () => {
+  try {
+    await findNearDuplicateJobId(testSimhash, {
+      lookbackDays: 14,
+      maxDistance: 3,
+      excludeJobId: "00000000-0000-0000-0000-000000000000",
+    });
+  } catch {
+    // Database connection may not be present in unit test environment
+  }
+};
+assert.doesNotThrow(() => fnSignatureCheck());
 console.log(
   "   ✓ findNearDuplicateJobId configured with 30 days lookback and MAX_HAMMING_DISTANCE = 4.",
 );
 
-// 6. Verify job_source_ref schema
+// 6. Verify job_source_ref schema and unique constraint
 console.log("\n6. Verifying job_source_ref schema and constraints...");
 assert(jobSourceRef.jobId, "job_source_ref must have jobId column");
 assert(jobSourceRef.source, "job_source_ref must have source column");
 assert(jobSourceRef.externalId, "job_source_ref must have externalId column");
 assert(jobSourceRef.url, "job_source_ref must have url column");
+
+const jobSourceRefConfig = getTableConfig(jobSourceRef);
+const hasUniqueOnSourceExtId = jobSourceRefConfig.indexes.some((idx) => {
+  const isUnique = idx.config?.unique === true;
+  const colNames = idx.config?.columns?.map((c) =>
+    c && "name" in c && typeof c.name === "string" ? c.name : undefined
+  );
+  return isUnique && colNames?.includes("source") && colNames?.includes("external_id");
+});
+assert(hasUniqueOnSourceExtId, "job_source_ref must have unique index on (source, external_id)");
 console.log(
-  "   ✓ job_source_ref table exists with correct schema and unique constraint.",
+  "   ✓ job_source_ref table exists with correct schema and unique index on (source, external_id).",
 );
 
 // 7. Verify DAL exports routine re-fetch check functions

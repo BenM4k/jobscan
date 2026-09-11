@@ -22,7 +22,7 @@ function sleep(ms: number): Promise<void> {
  * 6. Run EXPLAIN ANALYZE on a test similarity query to verify the HNSW index is active.
  */
 export async function backfillJobEmbeddings(options: { batchSize?: number; dropIndexFirst?: boolean } = {}) {
-  const { dropIndexFirst = true } = options;
+  const { batchSize = 50, dropIndexFirst = true } = options;
   console.log("=================================================");
   console.log("🚀 Starting Step 9: HNSW Embeddings Backfill...");
   console.log("=================================================\n");
@@ -34,60 +34,68 @@ export async function backfillJobEmbeddings(options: { batchSize?: number; dropI
     console.log("   ✓ Index dropped successfully (or did not exist).\n");
   }
 
-  // Step 2: Query jobs lacking embeddings
-  console.log("2. Fetching jobs with missing embeddings (embedding IS NULL)...");
-  const jobsToEmbed = await db
-    .select({
-      id: job.id,
-      title: job.title,
-      description: job.description,
-    })
-    .from(job)
-    .where(isNull(job.embedding));
-
-  console.log(`   Found ${jobsToEmbed.length} job(s) requiring embeddings.\n`);
-
-  if (jobsToEmbed.length > 0) {
-    console.log("3. Backfilling embeddings with rate-limit pacing...");
+  try {
+    // Step 2 & 3: Query jobs lacking embeddings in batches with rate-limit pacing
+    console.log(`2. Fetching and embedding jobs in batches of ${batchSize}...`);
+    let totalProcessed = 0;
     let succeeded = 0;
     let failed = 0;
 
-    for (let i = 0; i < jobsToEmbed.length; i++) {
-      const currentJob = jobsToEmbed[i];
-      const jobText = `${currentJob.title}\n\n${currentJob.description || ""}`;
+    while (true) {
+      const jobsBatch = await db
+        .select({
+          id: job.id,
+          title: job.title,
+          description: job.description,
+        })
+        .from(job)
+        .where(isNull(job.embedding))
+        .limit(batchSize);
 
-      console.log(`   [${i + 1}/${jobsToEmbed.length}] Embedding job "${currentJob.title.slice(0, 40)}"...`);
-
-      const embedRes = await embedText(jobText);
-      if (!embedRes.ok) {
-        console.warn(`   ⚠️ Failed to generate embedding for job ${currentJob.id}: ${embedRes.error.message}`);
-        failed++;
-      } else {
-        const vectorLiteral = `[${embedRes.value.join(",")}]`;
-        await db.execute(
-          sql`UPDATE "job" SET "embedding" = ${vectorLiteral}::vector, "updated_at" = NOW() WHERE "id" = ${currentJob.id}`
-        );
-        succeeded++;
+      if (jobsBatch.length === 0) {
+        break;
       }
 
-      // Delay between API calls to prevent 429 rate limit errors
-      if (i < jobsToEmbed.length - 1) {
+      console.log(`   Processing batch of ${jobsBatch.length} job(s)...`);
+      for (let i = 0; i < jobsBatch.length; i++) {
+        const currentJob = jobsBatch[i];
+        totalProcessed++;
+        const jobText = `${currentJob.title}\n\n${currentJob.description || ""}`;
+
+        console.log(`   [${totalProcessed}] Embedding job "${currentJob.title.slice(0, 40)}"...`);
+
+        const embedRes = await embedText(jobText);
+        if (!embedRes.ok) {
+          console.warn(`   ⚠️ Failed to generate embedding for job ${currentJob.id}: ${embedRes.error.message}`);
+          failed++;
+        } else {
+          const vectorLiteral = `[${embedRes.value.join(",")}]`;
+          await db.execute(
+            sql`UPDATE "job" SET "embedding" = ${vectorLiteral}::vector, "updated_at" = NOW() WHERE "id" = ${currentJob.id}`
+          );
+          succeeded++;
+        }
+
         await sleep(RATE_LIMIT_DELAY_MS);
       }
     }
 
-    console.log(`\n   ✓ Backfill complete: ${succeeded} succeeded, ${failed} failed.\n`);
-  } else {
-    console.log("   ✓ All jobs already have embeddings. No backfill updates needed.\n");
+    if (totalProcessed > 0) {
+      console.log(`\n   ✓ Backfill complete: ${succeeded} succeeded, ${failed} failed.\n`);
+    } else {
+      console.log("   ✓ All jobs already have embeddings. No backfill updates needed.\n");
+    }
+  } finally {
+    // Step 4: (Re)create HNSW Index with vector_cosine_ops
+    if (dropIndexFirst) {
+      console.log("4. Building HNSW index 'job_embedding_hnsw_idx' on job(embedding)...");
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS "job_embedding_hnsw_idx"
+        ON "job" USING hnsw ("embedding" vector_cosine_ops);
+      `);
+      console.log("   ✓ HNSW index created successfully using vector_cosine_ops.\n");
+    }
   }
-
-  // Step 4: (Re)create HNSW Index with vector_cosine_ops
-  console.log("4. Building HNSW index 'job_embedding_hnsw_idx' on job(embedding)...");
-  await db.execute(sql`
-    CREATE INDEX IF NOT EXISTS "job_embedding_hnsw_idx"
-    ON "job" USING hnsw ("embedding" vector_cosine_ops);
-  `);
-  console.log("   ✓ HNSW index created successfully using vector_cosine_ops.\n");
 
   // Step 5: Verify with EXPLAIN ANALYZE
   console.log("5. Running EXPLAIN ANALYZE on cosine distance query...");

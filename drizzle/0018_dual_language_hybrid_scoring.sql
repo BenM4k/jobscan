@@ -5,6 +5,8 @@ EXCEPTION
 END $$;--> statement-breakpoint
 ALTER TABLE "job" ADD COLUMN IF NOT EXISTS "language" "job_language" DEFAULT 'en' NOT NULL;--> statement-breakpoint
 ALTER TABLE "master_resume" ADD COLUMN IF NOT EXISTS "language" "job_language" DEFAULT 'en' NOT NULL;--> statement-breakpoint
+-- NOTE: Adding a STORED generated column and GIN index requires a full table rewrite and exclusive lock.
+-- In large production deployments (>100k jobs), schedule during a maintenance window or backfill additively.
 ALTER TABLE "job" DROP COLUMN IF EXISTS "description_tsv";--> statement-breakpoint
 ALTER TABLE "job" ADD COLUMN "description_tsv" tsvector
   GENERATED ALWAYS AS (
@@ -14,3 +16,4 @@ ALTER TABLE "job" ADD COLUMN "description_tsv" tsvector
     END
   ) STORED;--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "job_description_tsv_idx" ON "job" USING gin ("description_tsv");
+

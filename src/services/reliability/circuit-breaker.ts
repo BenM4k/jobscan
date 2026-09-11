@@ -70,28 +70,14 @@ async function getOrCreateBreaker(
 export async function canAttempt(source: string): Promise<boolean> {
   const row = await getOrCreateBreaker(source);
 
-  if (row.state === "closed" || row.state === "half_open") {
+  if (row.state === "closed") {
     return true;
   }
 
-  if (row.state === "open") {
-    if (!row.openedAt) {
-      return true;
-    }
-
-    const backoffMs = calculateBackoffMs(row.consecutiveOpens);
-    const now = Date.now();
-    const elapsed = now - row.openedAt.getTime();
-
-    if (elapsed >= backoffMs) {
-      // Transition open -> half_open once backoff window elapses
-      await circuitBreakerDal.updateCircuitBreaker(source, {
-        state: "half_open",
-      });
-      return true;
-    }
-
-    return false;
+  const backoffMs = calculateBackoffMs(row.consecutiveOpens);
+  const claimRes = await circuitBreakerDal.claimHalfOpenProbe(source, backoffMs);
+  if (claimRes.ok) {
+    return claimRes.value.allowed;
   }
 
   return true;
@@ -112,28 +98,11 @@ export async function recordSuccess(source: string): Promise<void> {
 }
 
 /**
- * Records a failed fetch from an adapter:
- * Increments consecutiveFailures.
- * If in 'half_open' OR consecutiveFailures >= 5: trips breaker OPEN,
- * increments consecutiveOpens, and sets openedAt = now.
+ * Records a failed fetch from an adapter atomically in Postgres:
+ * Increments consecutiveFailures, checks half_open or FAILURE_THRESHOLD,
+ * and trips the breaker OPEN with updated openedAt and consecutiveOpens.
  */
 export async function recordFailure(source: string): Promise<void> {
-  const row = await getOrCreateBreaker(source);
-  const nextFailures = row.consecutiveFailures + 1;
-  const isHalfOpen = row.state === "half_open";
-  const shouldTrip = isHalfOpen || nextFailures >= FAILURE_THRESHOLD;
-
-  if (shouldTrip) {
-    const nextOpens = isHalfOpen ? row.consecutiveOpens + 1 : 0;
-    await circuitBreakerDal.updateCircuitBreaker(source, {
-      state: "open",
-      consecutiveFailures: nextFailures,
-      consecutiveOpens: nextOpens,
-      openedAt: new Date(),
-    });
-  } else {
-    await circuitBreakerDal.updateCircuitBreaker(source, {
-      consecutiveFailures: nextFailures,
-    });
-  }
+  await circuitBreakerDal.recordFailureAtomic(source, FAILURE_THRESHOLD);
 }
+

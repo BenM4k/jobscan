@@ -91,14 +91,10 @@ export async function getJobById(
       return err(new AppError("NOT_FOUND", `Job with ID ${id} not found`));
     }
 
-    const refs = await db
-      .select({ source: jobSourceRef.source })
-      .from(jobSourceRef)
-      .where(eq(jobSourceRef.jobId, found.id));
-
-    const alsoPostedOn = refs
-      .map((r) => r.source)
-      .filter((s) => s !== found.source);
+    const alsoPostedOn = await pipelineDal.getAlsoPostedOnForJob(
+      found.id,
+      found.source
+    );
 
     return ok({
       id: found.id,

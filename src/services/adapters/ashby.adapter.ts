@@ -29,7 +29,8 @@ export async function fetchRaw(options?: {
 }): Promise<RawJobItem[]> {
   const organization = options?.target || "notion";
   const category = options?.category || "software";
-  const url = `https://api.ashbyhq.com/posting-api/job-board/${organization}`;
+  const encodedOrg = encodeURIComponent(organization);
+  const url = `https://api.ashbyhq.com/posting-api/job-board/${encodedOrg}`;
   const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
   if (!res.ok) {
     throw new Error(`Ashby API request failed with status ${res.status}`);

@@ -29,7 +29,7 @@ export interface UserAiUsageSummary {
   periodStart: Date;
 }
 
-let logAiCallImpl = async (
+const defaultLogAiCallImpl = async (
   params: LogAiCallParams
 ): Promise<Result<void, AppError>> => {
   try {
@@ -50,6 +50,8 @@ let logAiCallImpl = async (
   }
 };
 
+let logAiCallImpl = defaultLogAiCallImpl;
+
 export async function logAiCall(
   params: LogAiCallParams
 ): Promise<Result<void, AppError>> {
@@ -59,28 +61,7 @@ export async function logAiCall(
 export function setLogAiCallImplementation(
   impl?: (params: LogAiCallParams) => Promise<Result<void, AppError>>
 ) {
-  if (impl) {
-    logAiCallImpl = impl;
-  } else {
-    logAiCallImpl = async (params: LogAiCallParams) => {
-      try {
-        await db.insert(aiCallLog).values({
-          userId: params.userId,
-          feature: params.feature,
-          provider: params.provider,
-          model: params.model,
-          inputTokens: params.inputTokens ?? null,
-          outputTokens: params.outputTokens ?? null,
-          costEstimateUsd: params.costEstimateUsd ?? null,
-          cacheHit: params.cacheHit ?? false,
-        });
-        return ok(undefined);
-      } catch (error) {
-        console.error("Failed to log AI call:", error);
-        return err(new AppError("DB_ERROR", "Failed to log AI call", error));
-      }
-    };
-  }
+  logAiCallImpl = impl || defaultLogAiCallImpl;
 }
 
 /**

@@ -240,8 +240,8 @@ export async function ingestFromSource(
       let canonicalJobId: string;
 
       if (isKnownCanonical) {
-        // Routine re-fetch of existing canonical job: update directly without near-duplicate dedup logic
-        const upsertRes = await jobsDal.jobDal.upsertFromSource({
+        const existingJob = existingCanonicalRes.value;
+        const upsertRes = await jobsDal.upsertJob({
           userId: options?.userId,
           source: normalized.source as jobsDal.JobSource,
           externalId: normalized.externalId,
@@ -284,6 +284,20 @@ export async function ingestFromSource(
           normalized.externalId,
           normalized.url,
         );
+
+        // Refresh vector embedding when description changes on re-fetch
+        if (existingJob && existingJob.description !== normalized.description) {
+          embedJob(canonicalJobId, {
+            title: normalized.title,
+            company: normalized.company,
+            description: normalized.description,
+          }).catch((err) => {
+            console.warn(
+              `[Ingest ${adapter.id}] Background embedding refresh failed for job ${canonicalJobId}:`,
+              err,
+            );
+          });
+        }
       } else if (isKnownSourceRef && existingSourceRefRes.value) {
         // Routine re-fetch of existing secondary source ref: update ref directly
         canonicalJobId = existingSourceRefRes.value.jobId;
@@ -310,7 +324,7 @@ export async function ingestFromSource(
           );
         } else {
           // Genuinely unique new job: upsert new canonical job row
-          const upsertRes = await jobsDal.jobDal.upsertFromSource({
+          const upsertRes = await jobsDal.upsertJob({
             userId: options?.userId,
             source: normalized.source as jobsDal.JobSource,
             externalId: normalized.externalId,

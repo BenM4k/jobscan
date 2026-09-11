@@ -84,24 +84,52 @@ export const jobFetchRequested = inngest.createFunction(
     }
 
     if (source === "all") {
+      const results: Array<{
+        source: string;
+        success: boolean;
+        fetched?: number;
+        upserted?: number;
+        failed?: number;
+        skipped?: boolean;
+        reason?: string;
+        error?: string;
+      }> = [];
+      let totalUpserted = 0;
+      let totalFetched = 0;
+      let totalFailed = 0;
+
       for (const s of ALL_JOB_SOURCES) {
-        await step.run(`fetch-${s}`, async () => {
+        const stepRes = await step.run(`fetch-${s}`, async () => {
           const res = await fetchAndUpsertJobs(s, target, userId);
           if (!res.ok) {
             console.warn(`[Inngest On-Demand] Fetch failed for ${s}:`, res.error);
-            return { source: s, success: false, error: res.error.message };
+            return {
+              source: s,
+              success: false,
+              fetched: 0,
+              upserted: 0,
+              failed: 0,
+              skipped: true,
+              reason: "fetch_failed",
+              error: res.error.message,
+            };
           }
           return { success: true, ...res.value };
         });
+        results.push(stepRes);
+        totalUpserted += stepRes.upserted || 0;
+        totalFetched += stepRes.fetched || 0;
+        totalFailed += stepRes.failed || 0;
       }
 
-      return await step.run("fetch-drc-crawler", async () => {
-        const crawlResult = await runDrcCrawler(target, userId, { drcOnly: true });
-        return {
-          success: crawlResult.success,
-          totalUpserted: crawlResult.totalUpserted,
-        };
-      });
+      return {
+        success: results.some((r) => r.success),
+        totalUpserted,
+        totalFetched,
+        totalFailed,
+        totalSources: ALL_JOB_SOURCES.length,
+        results,
+      };
     }
 
     // Single source
