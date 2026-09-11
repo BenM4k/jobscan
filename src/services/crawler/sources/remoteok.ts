@@ -1,5 +1,6 @@
 import { CrawledJob, CrawlSourceResult } from "../types";
 import { isDrcJob } from "../drc-filter";
+export { fetchRaw, normalize } from "@/services/adapters/remoteok.adapter";
 
 // Known RemoteOK tag slugs that map exactly to RemoteOK's tag taxonomy.
 // Free-text keywords not in this set are not sent as tag queries — they would

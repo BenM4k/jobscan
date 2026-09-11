@@ -1,6 +1,7 @@
 import { CrawledJob, CrawlSourceResult } from "../types";
 import { LEVER_COMPANIES } from "../config";
 import { isEligibleCandidate, parseLocationFromText } from "../crawler-utils";
+export { fetchRaw, normalize } from "@/services/adapters/lever.adapter";
 
 function parseLeverJob(raw: Record<string, unknown>, companyName: string): CrawledJob {
   const categories = raw.categories as Record<string, string> | undefined;

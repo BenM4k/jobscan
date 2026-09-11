@@ -19,8 +19,8 @@ async function runSimhashUnitTests() {
   const rawHtml = "  Senior   Software Engineer \n at <p>Acme Corp</p>!  ";
   const normalized = normalizeTextForSimhash(rawHtml);
   assert(
-    normalized === "senior software engineer at acme corp !",
-    `normalization should strip html tags and collapse whitespace: got "${normalized}"`
+    normalized === "senior software engineer at acme corp",
+    `normalization should strip html tags, punctuation, and collapse whitespace: got "${normalized}"`
   );
 
   // 2. Canonical job simhash text building

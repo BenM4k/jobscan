@@ -188,6 +188,7 @@ export function JobCardItem({
             workplaceLabel={workplaceLabel}
             source={job.source}
             postedDate={postedDate}
+            alsoPostedOn={job.alsoPostedOn}
           />
         </div>
       </div>

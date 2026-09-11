@@ -30,14 +30,19 @@ async function runInngestUnitTests() {
   // 2. Inngest Function Definitions & Triggers
   {
     console.log("2. Verifying Inngest function triggers & metadata...");
+    const { ingestAllSources, ALL_JOB_SOURCES } = await import("@/inngest/functions/job-fetch");
 
+    assert(Boolean(ingestAllSources), "ingestAllSources function must exist");
     assert(Boolean(scheduledJobFetch), "scheduledJobFetch function must exist");
     assert(Boolean(jobFetchRequested), "jobFetchRequested function must exist");
     assert(Boolean(scheduledDigestCron), "scheduledDigestCron function must exist");
     assert(Boolean(sendDigestEmail), "sendDigestEmail function must exist");
     assert(Boolean(scoreJobOnCreation), "scoreJobOnCreation function must exist");
 
-    console.log("   ✅ All 5 Inngest background functions defined and exported.");
+    assert(ALL_JOB_SOURCES.length === 8, `Expected 8 sources in ALL_JOB_SOURCES, got ${ALL_JOB_SOURCES.length}`);
+    console.log("   ✅ All 8 sources configured for ingestAllSources:", ALL_JOB_SOURCES.join(", "));
+
+    console.log("   ✅ All Inngest background functions defined and exported.");
   }
 
   // 3. Typed Event Schemas

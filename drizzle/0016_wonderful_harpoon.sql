@@ -1,0 +1,1 @@
+ALTER TABLE "job" ALTER COLUMN "simhash" SET DATA TYPE bigint;

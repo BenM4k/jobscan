@@ -7,7 +7,8 @@ import * as skillsDal from "@/dal/skills.dal";
 import * as skillsService from "./skills.service";
 import { diffSkills } from "./skills.service";
 
-import { getJobSourceAdapter } from "./adapters";
+import { ingestFromSource } from "./adapters";
+import type { IngestResult, IngestionAggregatedResult } from "./adapters/types";
 import { getScoringProvider } from "./scoring/factory";
 import { getCachedScore, setCachedScore } from "./ai/score-cache";
 import { withAiTracking } from "./ai/tracker";
@@ -18,58 +19,70 @@ import { AppError } from "@/lib/errors";
 const VALID_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
   new: ["saved", "scored", "tailored", "applied", "rejected"],
   saved: ["scored", "tailored", "applied", "rejected"],
-  scored: ["tailored", "applied", "interviewing", "rejected"],
-  tailored: ["applied", "interviewing", "rejected"],
-  applied: ["interviewing", "rejected", "offer"],
+  scored: ["tailored", "applied", "rejected"],
+  tailored: ["applied", "rejected"],
+  applied: ["interviewing", "rejected"],
   interviewing: ["offer", "rejected"],
-  rejected: ["saved", "new", "applied"],
+  rejected: ["saved"],
   offer: [],
   withdrawn: ["saved"],
 };
 
+export { ingestFromSource };
+
 export async function fetchAndUpsertJobs(
-  sourceId: "greenhouse" | "remoteok" | "lever" | "ashby",
+  sourceId: string,
   target?: string,
-  userId?: string
-): Promise<Result<{ fetched: number; upserted: number }, AppError>> {
-  try {
-    const adapter = getJobSourceAdapter(sourceId);
-    const rawItems = await adapter.fetchRaw(target);
+  userId?: string,
+): Promise<Result<IngestResult, AppError>> {
+  return await ingestFromSource(sourceId, { target, userId });
+}
 
-    let upsertedCount = 0;
-    for (const raw of rawItems) {
-      // DB Call 1: Write untouched external response into raw_job_payload first
-      const rawRes = await adapter.saveRaw(raw);
-      if (!rawRes.ok) {
-        continue;
-      }
+export async function fetchAndUpsertJobsAcrossSources(
+  sourceIds: string[],
+  target?: string,
+  userId?: string,
+): Promise<Result<IngestionAggregatedResult, AppError>> {
+  let totalFetched = 0;
+  let totalUpserted = 0;
+  let totalFailed = 0;
+  const sources: IngestResult[] = [];
 
-      // DB Call 2: Read stored payload from raw_job_payload, normalize, and upsert canonical job
-      const normRes = await adapter.normalizeFromStored(rawRes.value, userId);
-      if (normRes.ok) {
-        upsertedCount++;
-      }
+  for (const sourceId of sourceIds) {
+    const res = await ingestFromSource(sourceId, { target, userId });
+    if (res.ok) {
+      sources.push(res.value);
+      totalFetched += res.value.fetched;
+      totalUpserted += res.value.upserted;
+      totalFailed += res.value.failed;
+    } else {
+      sources.push({
+        source: sourceId,
+        fetched: 0,
+        upserted: 0,
+        failed: 0,
+        skipped: true,
+        reason: "fetch_failed",
+        message: res.error.message,
+      });
     }
-
-    return ok({ fetched: rawItems.length, upserted: upsertedCount });
-  } catch (error) {
-    if (error instanceof AppError) {
-      return err(error);
-    }
-    return err(
-      new AppError(
-        "EXTERNAL_API_ERROR",
-        `Failed to fetch jobs from source ${sourceId}`,
-        error
-      )
-    );
   }
+
+  return ok({
+    totalFetched,
+    totalUpserted,
+    totalFailed,
+    sources,
+    fetched: totalFetched,
+    upserted: totalUpserted,
+    failed: totalFailed,
+  });
 }
 
 export async function scoreJobWithAI(
   jobId: string,
   userId: string,
-  preferredProvider?: "claude" | "gemini" | "openai" | "gateway"
+  preferredProvider?: "claude" | "gemini" | "openai" | "gateway",
 ): Promise<Result<jobsDal.JobSelect, AppError>> {
   const jobResult = await jobsDal.getJobById(jobId, userId);
   if (!jobResult.ok) return jobResult;
@@ -91,8 +104,8 @@ export async function scoreJobWithAI(
     return err(
       new AppError(
         "NO_MASTER_RESUME",
-        "User master resume is not configured. Please set up your master resume in Profile before scoring jobs."
-      )
+        "User master resume is not configured. Please set up your master resume in Profile before scoring jobs.",
+      ),
     );
   }
 
@@ -130,8 +143,8 @@ export async function scoreJobWithAI(
           job.title,
           job.description || "",
           resumeText,
-          resumeSkills
-        )
+          resumeSkills,
+        ),
     );
 
     if (!scoreResult.ok) return scoreResult;
@@ -143,7 +156,8 @@ export async function scoreJobWithAI(
   }
 
   // Extract skills: use the structured JSON output from the scoring LLM call (or fallback to combined extraction)
-  let extractedJobSkills = score.jobSkills && score.jobSkills.length > 0 ? score.jobSkills : [];
+  let extractedJobSkills =
+    score.jobSkills && score.jobSkills.length > 0 ? score.jobSkills : [];
   let extractedResumeSkills =
     score.resumeSkills && score.resumeSkills.length > 0
       ? score.resumeSkills
@@ -156,7 +170,7 @@ export async function scoreJobWithAI(
       job.title,
       job.description || "",
       resumeText,
-      preferredProvider
+      preferredProvider,
     );
     if (extRes.ok) {
       if (extractedJobSkills.length === 0) {
@@ -171,7 +185,7 @@ export async function scoreJobWithAI(
   // Naive skill-gap diffing
   const { matchedSkills, missingSkills } = diffSkills(
     extractedJobSkills,
-    extractedResumeSkills
+    extractedResumeSkills,
   );
 
   // Persist extracted skills to relational tables: job_skill and resume_skill
@@ -194,49 +208,85 @@ export async function scoreJobWithAI(
     undefined,
     modelVersion,
     activeResume?.version,
-    userId
+    userId,
   );
 }
 
-/**
- * Blends dense cosine similarity and sparse BM25/ts_rank into a normalized 0-100 score.
- * Formula: finalScore = w1 * cosine + w2 * ts_rank (normalized by w1 + w2 and mapped to 0-100).
- */
-export function blendHybridScores(
-  cosine: number | null,
-  bm25: number | null,
-  w1: number = 0.7,
-  w2: number = 0.3
-): number {
-  const totalWeight = (w1 || 0) + (w2 || 0);
+export const DEFAULT_HYBRID_WEIGHTS = {
+  wSemantic: 0.6,
+  wKeyword: 0.4,
+} as const;
 
-  if (cosine !== null && bm25 !== null) {
-    const blended = totalWeight > 0 ? (w1 * cosine + w2 * bm25) / totalWeight : cosine;
+/**
+ * Computes hybrid fit score with dual-language awareness:
+ * - If jobLanguage !== resumeLanguage: cross-lingual keyword matching is skipped.
+ *   Full weight is redistributed to the semantic embedding score (returns semantic alone,
+ *   avoiding penalizing the candidate with a 0 keyword score).
+ * - If jobLanguage === resumeLanguage: blends dense cosine similarity and sparse keyword rank
+ *   using starting weights W_SEMANTIC = 0.6, W_KEYWORD = 0.4 (normalized and clamped to 0-100).
+ */
+export function computeHybridScore(
+  semanticScore: number | null,
+  keywordScore: number | null,
+  jobLanguage: "en" | "fr" = "en",
+  resumeLanguage: "en" | "fr" = "en",
+  weights: { wSemantic?: number; wKeyword?: number } = DEFAULT_HYBRID_WEIGHTS,
+): number {
+  // If languages mismatch, redistribute 100% weight to semantic score (no zero-keyword penalty)
+  if (jobLanguage !== resumeLanguage) {
+    if (semanticScore === null || semanticScore === undefined) return 0;
+    return Math.min(100, Math.max(0, Math.round(semanticScore * 100)));
+  }
+
+  const wSemantic = weights.wSemantic ?? DEFAULT_HYBRID_WEIGHTS.wSemantic;
+  const wKeyword = weights.wKeyword ?? DEFAULT_HYBRID_WEIGHTS.wKeyword;
+  const totalWeight = (wSemantic || 0) + (wKeyword || 0);
+
+  if (semanticScore !== null && keywordScore !== null) {
+    const blended =
+      totalWeight > 0
+        ? (wSemantic * semanticScore + wKeyword * keywordScore) / totalWeight
+        : semanticScore;
     return Math.min(100, Math.max(0, Math.round(blended * 100)));
   }
 
-  if (cosine !== null) {
-    return Math.min(100, Math.max(0, Math.round(cosine * 100)));
+  if (semanticScore !== null) {
+    return Math.min(100, Math.max(0, Math.round(semanticScore * 100)));
   }
 
-  if (bm25 !== null) {
-    return Math.min(100, Math.max(0, Math.round(bm25 * 100)));
+  if (keywordScore !== null) {
+    return Math.min(100, Math.max(0, Math.round(keywordScore * 100)));
   }
 
   return 0;
 }
 
 /**
+ * Backward-compatible alias for computeHybridScore with matching languages.
+ */
+export function blendHybridScores(
+  cosine: number | null,
+  bm25: number | null,
+  w1: number = 0.6,
+  w2: number = 0.4,
+): number {
+  return computeHybridScore(cosine, bm25, "en", "en", {
+    wSemantic: w1,
+    wKeyword: w2,
+  });
+}
+
+/**
  * Score a job using pure hybrid scoring (dense cosine similarity + sparse full-text ts_rank)
- * without invoking external AI providers.
+ * with dual-language awareness without invoking external AI providers.
  */
 export async function scoreJobHybrid(
   jobId: string,
   userId: string,
-  weights: { w1?: number; w2?: number } = { w1: 0.7, w2: 0.3 }
+  weights: { w1?: number; w2?: number } = { w1: 0.6, w2: 0.4 },
 ): Promise<Result<jobsDal.JobSelect, AppError>> {
-  const w1 = weights.w1 ?? 0.7;
-  const w2 = weights.w2 ?? 0.3;
+  const w1 = weights.w1 ?? 0.6;
+  const w2 = weights.w2 ?? 0.4;
 
   const jobResult = await jobsDal.getJobById(jobId, userId);
   if (!jobResult.ok) return jobResult;
@@ -250,27 +300,54 @@ export async function scoreJobHybrid(
     return err(
       new AppError(
         "NO_MASTER_RESUME",
-        "User master resume is not configured. Please set up your master resume in Profile before scoring jobs."
-      )
+        "User master resume is not configured. Please set up your master resume in Profile before scoring jobs.",
+      ),
     );
   }
+
+  const jobLanguage = ((job as { language?: string }).language as "en" | "fr") || "en";
+  const resumeLanguage =
+    ((activeResume as { language?: string }).language as "en" | "fr") || "en";
+  const isLanguageMatch = jobLanguage === resumeLanguage;
 
   let resumeSkills: string[] = [];
   const skillsRes = await resumeDal.getResumeSkills(activeResume.id);
   if (skillsRes.ok) resumeSkills = skillsRes.value;
 
   const queryTerms =
-    resumeSkills.length > 0 ? resumeSkills.slice(0, 20).join(" or ") : "developer";
+    resumeSkills.length > 0
+      ? resumeSkills.slice(0, 20).join(" or ")
+      : jobLanguage === "fr"
+        ? "développeur"
+        : "developer";
 
   const [cosineRes, bm25Res] = await Promise.all([
     jobsDal.getJobResumeSimilarity(job.id, activeResume.id),
-    jobsDal.getJobResumeTsRank(job.id, queryTerms),
+    isLanguageMatch
+      ? jobsDal.getJobResumeTsRank(job.id, queryTerms, jobLanguage)
+      : Promise.resolve(ok(null)),
   ]);
 
   const cosine = cosineRes.ok ? cosineRes.value : null;
   const bm25 = bm25Res.ok ? bm25Res.value : null;
 
-  const rawFinalScore = blendHybridScores(cosine, bm25, w1, w2);
+  const rawFinalScore = computeHybridScore(
+    cosine,
+    bm25,
+    jobLanguage,
+    resumeLanguage,
+    { wSemantic: w1, wKeyword: w2 },
+  );
+
+  const explanation = !isLanguageMatch
+    ? `Cross-lingual match: job (${jobLanguage.toUpperCase()}) and resume (${resumeLanguage.toUpperCase()}) differ. 100% semantic embedding score applied (${
+        cosine != null ? (cosine * 100).toFixed(1) : "N/A"
+      }%) without keyword penalty.`
+    : `Hybrid fit score (${rawFinalScore}/100) calculated from dense vector similarity (${
+        cosine != null ? (cosine * 100).toFixed(1) : "N/A"
+      }%) and sparse ${jobLanguage.toUpperCase()} keyword match (${
+        bm25 != null ? (bm25 * 100).toFixed(1) : "N/A"
+      }%) with weights [wSemantic=${w1}, wKeyword=${w2}].`;
 
   return await jobsDal.saveHybridScore(
     job.id,
@@ -279,13 +356,9 @@ export async function scoreJobHybrid(
       cosineSimilarity: cosine,
       bm25Rank: bm25,
       resumeVersion: activeResume.version,
-      explanation: `Hybrid fit score (${rawFinalScore}/100) calculated from dense vector similarity (${
-        cosine != null ? (cosine * 100).toFixed(1) : "N/A"
-      }%) and sparse keyword match (${
-        bm25 != null ? (bm25 * 100).toFixed(1) : "N/A"
-      }%) with weights [w1=${w1}, w2=${w2}].`,
+      explanation,
     },
-    userId
+    userId,
   );
 }
 
@@ -296,9 +369,23 @@ export async function tuneScoreWeights(
   pipelineEntryOrJobId: string,
   userId: string,
   w1: number,
-  w2: number
-): Promise<Result<{ finalScore: number; cosineSimilarity: number | null; bm25Rank: number | null }, AppError>> {
-  return await jobsDal.recalculateScoreWithWeights(pipelineEntryOrJobId, w1, w2, userId);
+  w2: number,
+): Promise<
+  Result<
+    {
+      finalScore: number;
+      cosineSimilarity: number | null;
+      bm25Rank: number | null;
+    },
+    AppError
+  >
+> {
+  return await jobsDal.recalculateScoreWithWeights(
+    pipelineEntryOrJobId,
+    w1,
+    w2,
+    userId,
+  );
 }
 
 export async function transitionJobStatus(
@@ -316,9 +403,9 @@ export async function transitionJobStatus(
       new AppError(
         "VALIDATION_ERROR",
         `Invalid status transition from '${currentJob.status}' to '${targetStatus}'. Allowed target statuses: [${allowed.join(
-          ", "
-        )}]`
-      )
+          ", ",
+        )}]`,
+      ),
     );
   }
 
@@ -335,6 +422,6 @@ export async function updateTailoredResume(
     jobId,
     tailoredResume,
     structured ?? null,
-    userId
+    userId,
   );
 }

@@ -9,10 +9,11 @@ import {
   score,
   tailoredResume,
   tailoredCoverLetter,
+  jobSourceRef,
 } from "@/services/db/schema";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
-import { eq, and, desc, sql, or, ilike, count, gte, lte, ne } from "drizzle-orm";
+import { eq, and, desc, sql, or, ilike, count, gte, lte, ne, inArray } from "drizzle-orm";
 
 export type PipelineEntrySelect = typeof pipelineEntry.$inferSelect;
 export type PipelineEntryInsert = typeof pipelineEntry.$inferInsert;
@@ -25,6 +26,7 @@ export interface PipelineEntryWithDetails extends PipelineEntrySelect {
   score?: typeof score.$inferSelect | null;
   tailoredResume?: typeof tailoredResume.$inferSelect | null;
   tailoredCoverLetter?: typeof tailoredCoverLetter.$inferSelect | null;
+  alsoPostedOn?: string[];
 }
 
 function latestScoreSubquery() {
@@ -92,12 +94,21 @@ export async function getPipelineEntryById(
     }
 
     const row = rows[0];
+    const refs = await db
+      .select({ source: jobSourceRef.source })
+      .from(jobSourceRef)
+      .where(eq(jobSourceRef.jobId, row.job.id));
+    const alsoPostedOn = refs
+      .map((r) => r.source)
+      .filter((s) => s !== row.job.source);
+
     return ok({
       ...row.entry,
       job: row.job,
       score: row.score?.id ? (row.score as typeof score.$inferSelect) : null,
       tailoredResume: row.tailoredResume || null,
       tailoredCoverLetter: row.tailoredCoverLetter || null,
+      alsoPostedOn,
     });
   } catch (error) {
     return err(
@@ -133,12 +144,21 @@ export async function getPipelineEntryByUserAndJob(
     }
 
     const row = rows[0];
+    const refs = await db
+      .select({ source: jobSourceRef.source })
+      .from(jobSourceRef)
+      .where(eq(jobSourceRef.jobId, row.job.id));
+    const alsoPostedOn = refs
+      .map((r) => r.source)
+      .filter((s) => s !== row.job.source);
+
     return ok({
       ...row.entry,
       job: row.job,
       score: row.score?.id ? (row.score as typeof score.$inferSelect) : null,
       tailoredResume: row.tailoredResume || null,
       tailoredCoverLetter: row.tailoredCoverLetter || null,
+      alsoPostedOn,
     });
   } catch (error) {
     return err(
@@ -225,13 +245,37 @@ export async function listPipelineEntries(
       .limit(limit)
       .offset(offset);
 
-    const mapped: PipelineEntryWithDetails[] = rows.map((r) => ({
-      ...r.entry,
-      job: r.job,
-      score: r.score?.id ? (r.score as typeof score.$inferSelect) : null,
-      tailoredResume: r.tailoredResume || null,
-      tailoredCoverLetter: r.tailoredCoverLetter || null,
-    }));
+    const jobIds = rows.map((r) => r.job.id);
+    const allRefs =
+      jobIds.length > 0
+        ? await db
+            .select({
+              jobId: jobSourceRef.jobId,
+              source: jobSourceRef.source,
+            })
+            .from(jobSourceRef)
+            .where(inArray(jobSourceRef.jobId, jobIds))
+        : [];
+
+    const refsByJobId = new Map<string, string[]>();
+    for (const ref of allRefs) {
+      const list = refsByJobId.get(ref.jobId) || [];
+      list.push(ref.source);
+      refsByJobId.set(ref.jobId, list);
+    }
+
+    const mapped: PipelineEntryWithDetails[] = rows.map((r) => {
+      const rawSources = refsByJobId.get(r.job.id) || [];
+      const alsoPostedOn = rawSources.filter((s) => s !== r.job.source);
+      return {
+        ...r.entry,
+        job: r.job,
+        score: r.score?.id ? (r.score as typeof score.$inferSelect) : null,
+        tailoredResume: r.tailoredResume || null,
+        tailoredCoverLetter: r.tailoredCoverLetter || null,
+        alsoPostedOn,
+      };
+    });
 
     return ok(mapped);
   } catch (error) {

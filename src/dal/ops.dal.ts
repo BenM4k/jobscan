@@ -29,9 +29,9 @@ export interface UserAiUsageSummary {
   periodStart: Date;
 }
 
-export async function logAiCall(
+let logAiCallImpl = async (
   params: LogAiCallParams
-): Promise<Result<void, AppError>> {
+): Promise<Result<void, AppError>> => {
   try {
     await db.insert(aiCallLog).values({
       userId: params.userId,
@@ -47,6 +47,39 @@ export async function logAiCall(
   } catch (error) {
     console.error("Failed to log AI call:", error);
     return err(new AppError("DB_ERROR", "Failed to log AI call", error));
+  }
+};
+
+export async function logAiCall(
+  params: LogAiCallParams
+): Promise<Result<void, AppError>> {
+  return logAiCallImpl(params);
+}
+
+export function setLogAiCallImplementation(
+  impl?: (params: LogAiCallParams) => Promise<Result<void, AppError>>
+) {
+  if (impl) {
+    logAiCallImpl = impl;
+  } else {
+    logAiCallImpl = async (params: LogAiCallParams) => {
+      try {
+        await db.insert(aiCallLog).values({
+          userId: params.userId,
+          feature: params.feature,
+          provider: params.provider,
+          model: params.model,
+          inputTokens: params.inputTokens ?? null,
+          outputTokens: params.outputTokens ?? null,
+          costEstimateUsd: params.costEstimateUsd ?? null,
+          cacheHit: params.cacheHit ?? false,
+        });
+        return ok(undefined);
+      } catch (error) {
+        console.error("Failed to log AI call:", error);
+        return err(new AppError("DB_ERROR", "Failed to log AI call", error));
+      }
+    };
   }
 }
 

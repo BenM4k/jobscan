@@ -1,6 +1,6 @@
 import "server-only";
 import { BaseJobSourceAdapter } from "./base";
-import type { NormalizedJob } from "./types";
+import type { NormalizedJobInput, RawJobItem } from "./types";
 
 export interface RemoteOKJobRaw {
   id: string | number;
@@ -13,6 +13,69 @@ export interface RemoteOKJobRaw {
   region?: string;
 }
 
+/**
+ * Fetch raw job payloads from RemoteOK without field mapping (I/O only).
+ */
+export async function fetchRaw(options?: {
+  target?: string;
+  category?: string;
+}): Promise<RawJobItem[]> {
+  const category = options?.target || options?.category;
+  const queryTag = category?.trim().toLowerCase().replace(/\s+/g, "-");
+  const url = queryTag
+    ? `https://remoteok.com/api?tag=${encodeURIComponent(queryTag)}`
+    : "https://remoteok.com/api";
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": "JobPilot/1.0",
+      "Accept-Encoding": "identity",
+    },
+  });
+  if (!res.ok) {
+    throw new Error(`RemoteOK API request failed with status ${res.status}`);
+  }
+  const data = await res.json();
+
+  if (Array.isArray(data)) {
+    const valid = data.filter((item) => item && item.id) as RemoteOKJobRaw[];
+    const filtered =
+      category && category.trim()
+        ? valid.filter((j) => {
+            const term = category.trim().toLowerCase();
+            return (
+              j.position?.toLowerCase().includes(term) ||
+              j.description?.toLowerCase().includes(term)
+            );
+          })
+        : valid;
+
+    return filtered.map((item) => ({
+      externalId: String(item.id),
+      payload: item,
+    }));
+  }
+  return [];
+}
+
+/**
+ * Pure function: maps raw RemoteOK payload to the shared NormalizedJobInput shape (no I/O).
+ */
+export function normalize(raw: unknown): NormalizedJobInput {
+  const item = raw as RemoteOKJobRaw;
+  const region = item.location || item.region;
+  return {
+    externalId: String(item.id),
+    source: "remoteok",
+    title: item.position,
+    company: item.company,
+    url: item.url,
+    description: item.description || "",
+    postedAt: item.date ? new Date(item.date) : new Date(),
+    workplaceType: "remote",
+    remoteRegions: region ? [region] : ["Worldwide"],
+  };
+}
+
 export class RemoteOKAdapter extends BaseJobSourceAdapter<RemoteOKJobRaw> {
   readonly id = "remoteok" as const;
 
@@ -21,48 +84,11 @@ export class RemoteOKAdapter extends BaseJobSourceAdapter<RemoteOKJobRaw> {
   }
 
   protected async fetchRawInternal(category?: string): Promise<RemoteOKJobRaw[]> {
-    const queryTag = category?.trim().toLowerCase().replace(/\s+/g, "-");
-    const url = queryTag
-      ? `https://remoteok.com/api?tag=${encodeURIComponent(queryTag)}`
-      : "https://remoteok.com/api";
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent": "JobPilot/1.0",
-        "Accept-Encoding": "identity",
-      },
-    });
-    if (!res.ok) {
-      throw new Error(`RemoteOK API request failed with status ${res.status}`);
-    }
-    const data = await res.json();
-
-    if (Array.isArray(data)) {
-      const valid = data.filter((item) => item && item.id) as RemoteOKJobRaw[];
-      if (category && category.trim()) {
-        const term = category.trim().toLowerCase();
-        return valid.filter(
-          (j) =>
-            j.position?.toLowerCase().includes(term) ||
-            j.description?.toLowerCase().includes(term)
-        );
-      }
-      return valid;
-    }
-    return [];
+    const rawItems = await fetchRaw({ category });
+    return rawItems.map((r) => r.payload as RemoteOKJobRaw);
   }
 
-  normalize(raw: RemoteOKJobRaw): NormalizedJob {
-    const region = raw.location || raw.region;
-    return {
-      externalId: String(raw.id),
-      source: "remoteok",
-      title: raw.position,
-      company: raw.company,
-      url: raw.url,
-      description: raw.description || "",
-      postedAt: raw.date ? new Date(raw.date) : new Date(),
-      workplaceType: "remote",
-      remoteRegions: region ? [region] : ["Worldwide"],
-    };
+  normalize(raw: RemoteOKJobRaw): NormalizedJobInput {
+    return normalize(raw);
   }
 }

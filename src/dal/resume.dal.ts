@@ -145,6 +145,7 @@ export async function updateMasterResume(
         .update(masterResume)
         .set({
           ...data,
+          ...(data.content ? { version: sql`${masterResume.version} + 1` } : {}),
           updatedAt: new Date(),
         })
         .where(and(eq(masterResume.id, id), eq(masterResume.userId, userId)))

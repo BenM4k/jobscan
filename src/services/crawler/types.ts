@@ -18,6 +18,9 @@ export interface CrawlSourceResult {
   fetched: number;
   matched: number;
   upserted: number;
+  skipped?: boolean;
+  reason?: "circuit_open" | "fetch_failed";
+  message?: string;
   error?: string;
 }
 

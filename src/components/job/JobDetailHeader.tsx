@@ -46,6 +46,28 @@ export function JobDetailHeader({ job, onStatusChange }: JobDetailHeaderProps) {
       ? job.remoteRegions.join(", ")
       : [job.city, job.countryCode || job.country].filter(Boolean).join(", ");
 
+  const formatSourceName = (src: string): string => {
+    const map: Record<string, string> = {
+      remoteok: "RemoteOK",
+      greenhouse: "Greenhouse",
+      reliefweb: "ReliefWeb",
+      emploicd: "Emploi.cd",
+      emploi_cd: "Emploi.cd",
+      congojob: "CongoJob",
+      unjobs: "UNJobs",
+      ashby: "Ashby",
+      lever: "Lever",
+      manual: "Manual",
+    };
+    const clean = src.toLowerCase();
+    return map[clean] || (src.charAt(0).toUpperCase() + src.slice(1));
+  };
+
+  const alsoPostedSources =
+    job.alsoPostedOn && job.alsoPostedOn.length > 0
+      ? job.alsoPostedOn.map(formatSourceName).join(", ")
+      : null;
+
   return (
     <header className="pb-6">
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -60,6 +82,14 @@ export function JobDetailHeader({ job, onStatusChange }: JobDetailHeaderProps) {
               {job.source && (
                 <span className="text-muted-foreground/60 dark:text-zinc-500 ml-2 font-mono text-xs uppercase tracking-wider">
                   {t("via")} {job.source}
+                </span>
+              )}
+              {alsoPostedSources && (
+                <span className="text-muted-foreground/80 dark:text-zinc-400 ml-2 text-xs font-normal">
+                  · Also posted on:{" "}
+                  <span className="font-medium text-slate-800 dark:text-zinc-200">
+                    {alsoPostedSources}
+                  </span>
                 </span>
               )}
             </p>

@@ -11,6 +11,7 @@ import {
 import { timestamps } from "./common";
 import { user } from "./auth";
 import { skill } from "./skills";
+import { jobLanguageEnum } from "./job";
 
 // ─────────────────────────────────────────────────────────────
 // Resume — Multi-persona support
@@ -28,6 +29,7 @@ export const masterResume = pgTable(
     fileUrl: text("file_url"),
     isActive: boolean("is_active").default(true).notNull(),
     version: integer("version").default(1).notNull(),
+    language: jobLanguageEnum("language").default("en").notNull(),
     embedding: vector("embedding", { dimensions: 1536 }),
     ...timestamps,
   },

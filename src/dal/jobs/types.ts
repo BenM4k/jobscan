@@ -3,6 +3,7 @@ import {
   rawJobPayload,
   jobSourceEnum,
   jobStatusEnum,
+  jobLanguageEnum,
 } from "@/services/db/schema";
 import * as pipelineDal from "@/dal/pipeline.dal";
 import type { TailoredResumeData } from "@/lib/ai";
@@ -13,6 +14,7 @@ export type CanonicalJobSelect = typeof job.$inferSelect;
 export type RawJobPayloadSelect = typeof rawJobPayload.$inferSelect;
 export type JobSource = (typeof jobSourceEnum.enumValues)[number];
 export type JobStatus = (typeof jobStatusEnum.enumValues)[number] | string;
+export type JobLanguage = (typeof jobLanguageEnum.enumValues)[number];
 
 export interface JobSelect {
   id: string;
@@ -24,11 +26,17 @@ export interface JobSelect {
   url: string;
   description: string | null;
   postedAt: Date | null;
+  language?: JobLanguage;
   country?: string | null;
   countryCode?: string | null;
   city?: string | null;
   location?: string | null;
   rawSalaryText?: string | null;
+  salaryMin?: string | number | null;
+  salaryMax?: string | number | null;
+  salaryCurrency?: string | null;
+  salaryPeriod?: string | null;
+  salaryNormalizedYearlyUsd?: string | number | null;
   workplaceType?: string | null;
   remoteRegions?: string[] | null;
   fitScore: number | null;
@@ -43,7 +51,8 @@ export interface JobSelect {
   createdAt: Date;
   updatedAt?: Date;
   embedding?: number[] | null;
-  simhash?: string | null;
+  simhash?: bigint | string | null;
+  alsoPostedOn?: string[] | null;
 }
 
 export type JobInsert = Partial<JobSelect> & {
@@ -67,6 +76,7 @@ export function pipelineEntryToJobSelect(
     url: entry.job.url || "",
     description: entry.job.description,
     postedAt: entry.job.postedAt,
+    language: (entry.job.language as JobLanguage) || "en",
     country: null,
     countryCode: null,
     city: entry.job.location,
@@ -85,6 +95,7 @@ export function pipelineEntryToJobSelect(
     status: entry.status,
     createdAt: entry.createdAt,
     updatedAt: entry.updatedAt,
+    alsoPostedOn: entry.alsoPostedOn || [],
   };
 }
 

@@ -9,6 +9,7 @@ import {
   DEFAULT_SIMHASH_THRESHOLD,
 } from "@/lib/simhash";
 import { embedJob } from "@/services/ai/embed";
+import { SOURCE_LANGUAGE } from "@/services/adapters/ingest";
 
 export function matchesKeyword(candidate: CrawledJob, keyword?: string): boolean {
   if (!keyword || !keyword.trim()) return true;
@@ -145,6 +146,7 @@ export async function ingestCrawledJob(
         workplaceType: (rawPayload.workplaceType as "remote" | "on-site" | "hybrid" | null | undefined) || job.workplaceType,
         remoteRegions: (rawPayload.remoteRegions as string[]) || job.remoteRegions,
         status: "active",
+        language: SOURCE_LANGUAGE[sourceName || job.source] || "en",
         simhash: simhashRes.hashString,
       },
       simhashRes.signedBigInt,
