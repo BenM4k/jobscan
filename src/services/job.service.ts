@@ -301,13 +301,18 @@ export async function scoreJobHybrid(
   // Resolve canonical job ID: if jobId was a pipeline entry, resolve entry.jobId
   let canonicalJobId = job.id;
   const entryRes = await pipelineDal.getPipelineEntryById(jobId, userId);
-  if (entryRes.ok && entryRes.value) {
+  if (entryRes.ok) {
     canonicalJobId = entryRes.value.jobId;
-  } else {
+  } else if (entryRes.error.code === "NOT_FOUND") {
     const entryByJob = await pipelineDal.getPipelineEntryByUserAndJob(userId, jobId);
-    if (entryByJob.ok && entryByJob.value) {
+    if (!entryByJob.ok) {
+      return err(entryByJob.error);
+    }
+    if (entryByJob.value) {
       canonicalJobId = entryByJob.value.jobId;
     }
+  } else {
+    return err(entryRes.error);
   }
 
   const resumeRes = await resumeDal.getActiveMasterResume(userId);

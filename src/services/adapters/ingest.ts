@@ -242,7 +242,6 @@ export async function ingestFromSource(
       if (isKnownCanonical) {
         const existingJob = existingCanonicalRes.value;
         const upsertRes = await jobsDal.upsertJob({
-          userId: options?.userId,
           source: normalized.source as jobsDal.JobSource,
           externalId: normalized.externalId,
           title: normalized.title,
@@ -313,7 +312,16 @@ export async function ingestFromSource(
           simhashRes.signedBigInt,
         );
 
-        if (nearDupRes.ok && nearDupRes.value) {
+        if (!nearDupRes.ok) {
+          console.error(
+            `[Ingest ${adapter.id}] Failed to check near-duplicate for ${item.externalId}:`,
+            nearDupRes.error,
+          );
+          failedCount++;
+          continue;
+        }
+
+        if (nearDupRes.value) {
           // Near-duplicate found pointing to existing canonical job: link ref without creating duplicate job
           canonicalJobId = nearDupRes.value;
           await jobsDal.linkJobSourceRef(
@@ -325,7 +333,6 @@ export async function ingestFromSource(
         } else {
           // Genuinely unique new job: upsert new canonical job row
           const upsertRes = await jobsDal.upsertJob({
-            userId: options?.userId,
             source: normalized.source as jobsDal.JobSource,
             externalId: normalized.externalId,
             title: normalized.title,

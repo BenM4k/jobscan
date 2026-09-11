@@ -167,11 +167,11 @@ export async function upsertCanonicalJobWithSimhashDedup(
                   : sql`${job.language}`,
               salaryMin:
                 data.salaryMin !== undefined
-                  ? (data.salaryMin ? String(data.salaryMin) : null)
+                  ? (data.salaryMin != null ? String(data.salaryMin) : null)
                   : sql`${job.salaryMin}`,
               salaryMax:
                 data.salaryMax !== undefined
-                  ? (data.salaryMax ? String(data.salaryMax) : null)
+                  ? (data.salaryMax != null ? String(data.salaryMax) : null)
                   : sql`${job.salaryMax}`,
               salaryCurrency:
                 data.salaryCurrency !== undefined
@@ -183,7 +183,7 @@ export async function upsertCanonicalJobWithSimhashDedup(
                   : sql`${job.salaryPeriod}`,
               salaryNormalizedYearlyUsd:
                 data.salaryNormalizedYearlyUsd !== undefined
-                  ? (data.salaryNormalizedYearlyUsd
+                  ? (data.salaryNormalizedYearlyUsd != null
                       ? String(data.salaryNormalizedYearlyUsd)
                       : null)
                   : sql`${job.salaryNormalizedYearlyUsd}`,
@@ -243,13 +243,14 @@ export async function upsertCanonicalJobWithSimhashDedup(
           url: data.url || null,
           description: data.description || "",
           postedAt: data.postedAt || null,
-          salaryMin: data.salaryMin ? String(data.salaryMin) : null,
-          salaryMax: data.salaryMax ? String(data.salaryMax) : null,
+          salaryMin: data.salaryMin != null ? String(data.salaryMin) : null,
+          salaryMax: data.salaryMax != null ? String(data.salaryMax) : null,
           salaryCurrency: data.salaryCurrency || null,
           salaryPeriod: data.salaryPeriod || null,
-          salaryNormalizedYearlyUsd: data.salaryNormalizedYearlyUsd
-            ? String(data.salaryNormalizedYearlyUsd)
-            : null,
+          salaryNormalizedYearlyUsd:
+            data.salaryNormalizedYearlyUsd != null
+              ? String(data.salaryNormalizedYearlyUsd)
+              : null,
           rawSalaryText: data.rawSalaryText || null,
           status: "active",
           language: (data.language as "en" | "fr") || "en",
@@ -276,11 +277,11 @@ export async function upsertCanonicalJobWithSimhashDedup(
                 : sql`${job.language}`,
             salaryMin:
               data.salaryMin !== undefined
-                ? (data.salaryMin ? String(data.salaryMin) : null)
+                ? (data.salaryMin != null ? String(data.salaryMin) : null)
                 : sql`${job.salaryMin}`,
             salaryMax:
               data.salaryMax !== undefined
-                ? (data.salaryMax ? String(data.salaryMax) : null)
+                ? (data.salaryMax != null ? String(data.salaryMax) : null)
                 : sql`${job.salaryMax}`,
             salaryCurrency:
               data.salaryCurrency !== undefined
@@ -292,7 +293,7 @@ export async function upsertCanonicalJobWithSimhashDedup(
                 : sql`${job.salaryPeriod}`,
             salaryNormalizedYearlyUsd:
               data.salaryNormalizedYearlyUsd !== undefined
-                ? (data.salaryNormalizedYearlyUsd
+                ? (data.salaryNormalizedYearlyUsd != null
                     ? String(data.salaryNormalizedYearlyUsd)
                     : null)
                 : sql`${job.salaryNormalizedYearlyUsd}`,

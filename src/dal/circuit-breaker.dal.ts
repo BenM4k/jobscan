@@ -102,14 +102,18 @@ export async function getAllCircuitBreakers(): Promise<
   }
 }
 
+export const DEFAULT_PROBE_LEASE_MS = 60_000; // 1 minute probe lease
+
 /**
  * Atomically checks breaker state and claims a half-open probe if open backoff has elapsed.
  * Only the winning claimant transitions state to 'half_open' and receives allowed = true.
- * An existing 'half_open' state represents an in-progress probe and returns allowed = false.
+ * An unexpired 'half_open' state represents an in-progress probe and returns allowed = false;
+ * once the probe lease has expired, the stale probe is reclaimed and allowed = true.
  */
 export async function claimHalfOpenProbe(
   source: string,
-  backoffMs: number
+  backoffMs: number,
+  probeLeaseMs: number = DEFAULT_PROBE_LEASE_MS
 ): Promise<Result<{ allowed: boolean }, AppError>> {
   try {
     return await db.transaction(async (tx) => {
@@ -136,7 +140,19 @@ export async function claimHalfOpenProbe(
       }
 
       if (row.state === "half_open") {
-        return ok({ allowed: false });
+        const probeElapsed = row.updatedAt
+          ? Date.now() - row.updatedAt.getTime()
+          : Infinity;
+        if (probeElapsed < probeLeaseMs) {
+          return ok({ allowed: false });
+        }
+
+        // Stale probe lease expired: reclaim and permit a new probe
+        await tx
+          .update(adapterCircuitBreaker)
+          .set({ updatedAt: new Date() })
+          .where(eq(adapterCircuitBreaker.source, source));
+        return ok({ allowed: true });
       }
 
       if (row.state === "open") {

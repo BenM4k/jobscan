@@ -120,6 +120,7 @@ export async function getJobById(
       tailoredResume: null,
       tailoredResumeData: null,
       status: found.status,
+      language: found.language,
       createdAt: found.createdAt,
       updatedAt: found.updatedAt,
       alsoPostedOn,
