@@ -1,36 +1,41 @@
 "use client";
 
 import React, { useState, Suspense } from "react";
-import { useQueryState, parseAsString } from "nuqs";
-import { FilterBar } from "@/components/FilterBar";
+import { useSearchParams } from "next/navigation";
+import { FilterBar, FilterBarSkeleton } from "@/components/FilterBar";
 import { FetchJobsPopover } from "@/components/FetchJobsPopover";
+import { JobListSkeleton } from "@/components/job/JobListSkeleton";
+import {
+  FilterTransitionProvider,
+  useFilterTransition,
+} from "@/components/filters/FilterTransitionContext";
 import { useTranslations } from "next-intl";
 
 interface ClientShellProps {
   children: React.ReactNode;
 }
 
-export function ClientShell({ children }: ClientShellProps) {
-  const [searchQuery, setSearchQuery] = useQueryState(
-    "q",
-    parseAsString.withDefault("").withOptions({ shallow: false, throttleMs: 300 }),
-  );
+function ClientShellContent({ children }: ClientShellProps) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const t = useTranslations("dashboard");
   const tCommon = useTranslations("common");
 
+  const { isPending } = useFilterTransition();
+  const searchParams = useSearchParams();
+  const filterKey = searchParams?.toString() ?? "";
+
   return (
-    <div className="space-y-7 max-w-5xl w-full mx-auto">
+    <div className="space-y-7 max-w-7xl w-full mx-auto">
       {/* Hero Header Section */}
       <div className="space-y-3 pt-2">
-        <h1 className="text-3xl sm:text-4xl lg:text-[40px] font-bold text-gray-900 dark:text-slate-100 leading-[1.15] tracking-tight font-sans max-w-xl">
+        <h1 className="text-3xl sm:text-4xl lg:text-[40px] font-bold text-gray-900 dark:text-slate-100 leading-[1.15] tracking-tight font-sans max-w-2xl">
           {t("heroTitle")}
         </h1>
 
         {/* Subtitle row: text left, Fetch Jobs button right */}
         <div className="flex flex-wrap items-start justify-between gap-4 pt-1">
-          <p className="text-sm text-gray-500 dark:text-zinc-400 max-w-xl font-sans leading-relaxed">
+          <p className="text-sm text-gray-500 dark:text-zinc-400 max-w-2xl font-sans leading-relaxed">
             {t("heroSubtitle")}
           </p>
 
@@ -83,43 +88,31 @@ export function ClientShell({ children }: ClientShellProps) {
         </div>
       )}
 
-      {/* Search Bar & Filter Pills Section */}
-      <div className="space-y-5 pt-2">
-        {/* Clean Search Input with bottom border line */}
-        <div className="relative pb-3 border-b border-slate-200/90 dark:border-zinc-800 flex items-center">
-          <span
-            className="text-gray-400 dark:text-zinc-500 text-sm mr-3 select-none"
-            aria-hidden="true"
-          >
-            🔍
-          </span>
-          <input
-            id="job-search-input"
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t("searchPlaceholder")}
-            aria-label={t("searchPlaceholder")}
-            className="w-full bg-transparent text-gray-900 dark:text-slate-100 text-base sm:text-sm font-normal focus:outline-none placeholder-gray-400 dark:placeholder-zinc-500"
-          />
-        </div>
-
-        {/* Filter Pills Row */}
-        <Suspense
-          fallback={
-            <div className="flex flex-wrap items-center gap-2.5 text-xs font-medium">
-              <div className="w-28 h-8 rounded-xl bg-slate-200 dark:bg-zinc-800 animate-pulse" />
-              <div className="w-28 h-8 rounded-xl bg-slate-200 dark:bg-zinc-800 animate-pulse" />
-              <div className="w-28 h-8 rounded-xl bg-slate-200 dark:bg-zinc-800 animate-pulse" />
-            </div>
-          }
-        >
+      {/* Grouped Search & Filters Section */}
+      <div className="pt-2">
+        <Suspense fallback={<FilterBarSkeleton />}>
           <FilterBar />
         </Suspense>
       </div>
 
-      {/* Rendered Job List */}
-      <div className="pt-2">{children}</div>
+      {/* Rendered Job List with instant visual feedback and key */}
+      <div className="pt-2" key={filterKey}>
+        {isPending ? (
+          <JobListSkeleton />
+        ) : (
+          <div className="animate-in fade-in duration-150">
+            {children}
+          </div>
+        )}
+      </div>
     </div>
+  );
+}
+
+export function ClientShell({ children }: ClientShellProps) {
+  return (
+    <FilterTransitionProvider>
+      <ClientShellContent>{children}</ClientShellContent>
+    </FilterTransitionProvider>
   );
 }

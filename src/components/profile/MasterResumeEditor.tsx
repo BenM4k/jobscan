@@ -4,6 +4,7 @@ import React from "react";
 import { EducationItem, ExperienceItem } from "@/lib/ai";
 import { ExperienceEditor } from "./ExperienceEditor";
 import { EducationEditor } from "./EducationEditor";
+import { formatResumeToMarkdown, parseResumeContent } from "@/lib/resume-format";
 import { useTranslations } from "next-intl";
 
 interface MasterResumeEditorProps {
@@ -34,6 +35,32 @@ export function MasterResumeEditor({
   const [activeTab, setActiveTab] = React.useState<"structured" | "raw">("structured");
   const t = useTranslations("profile");
 
+  const handleTabChange = (tab: "structured" | "raw") => {
+    if (tab === "raw" && activeTab === "structured") {
+      const parsedSkillsList = skills
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const markdown = formatResumeToMarkdown({
+        summary,
+        skills: parsedSkillsList,
+        education,
+        experience,
+        rawResumeText: resumeText,
+      });
+      onResumeTextChange(markdown);
+    } else if (tab === "structured" && activeTab === "raw") {
+      if (resumeText.trim()) {
+        const parsed = parseResumeContent(resumeText);
+        if (parsed.summary) onSummaryChange(parsed.summary);
+        if (parsed.skills.length > 0) onSkillsChange(parsed.skills.join(", "));
+        if (parsed.education.length > 0) onEducationChange(parsed.education);
+        if (parsed.experience.length > 0) onExperienceChange(parsed.experience);
+      }
+    }
+    setActiveTab(tab);
+  };
+
   return (
     <div className="space-y-6 pt-2">
       {/* Header with Title & View Switch */}
@@ -50,7 +77,7 @@ export function MasterResumeEditor({
         <div className="flex items-center gap-1 bg-slate-100 dark:bg-zinc-800/80 p-1 rounded-xl border border-slate-200 dark:border-zinc-700/60 self-start sm:self-auto">
           <button
             type="button"
-            onClick={() => setActiveTab("structured")}
+            onClick={() => handleTabChange("structured")}
             className={`text-xs font-semibold px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
               activeTab === "structured"
                 ? "bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-2xs"
@@ -61,7 +88,7 @@ export function MasterResumeEditor({
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("raw")}
+            onClick={() => handleTabChange("raw")}
             className={`text-xs font-semibold px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
               activeTab === "raw"
                 ? "bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-2xs"

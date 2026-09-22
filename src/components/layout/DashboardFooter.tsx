@@ -26,7 +26,7 @@ export async function DashboardFooter() {
       aria-label="Site footer"
       className="border-t border-slate-200 dark:border-zinc-800 bg-white/60 dark:bg-[#0A0A0C]/60 backdrop-blur-sm mt-16"
     >
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 mb-8">
           {/* Brand column */}
           <div className="space-y-3">

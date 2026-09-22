@@ -20,6 +20,7 @@ export function useJobScoring({
   const router = useRouter();
   const [missingResumeOpen, setMissingResumeOpen] = useState(false);
   const pendingScoreIdempotencyKeyRef = useRef<string | null>(null);
+  const pendingScoreResumeIdRef = useRef<string | undefined>(undefined);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const retryRunner = useAsyncJobWithRetry<JobSelect>({
@@ -35,6 +36,7 @@ export function useJobScoring({
       abortControllerRef.current = null;
     }
     pendingScoreIdempotencyKeyRef.current = null;
+    pendingScoreResumeIdRef.current = undefined;
     retryRunner.cancelRetry();
   }, [retryRunner]);
 
@@ -47,9 +49,16 @@ export function useJobScoring({
     };
   }, []);
 
-  const handleScoreJob = async () => {
-    if (!pendingScoreIdempotencyKeyRef.current) {
+  const handleScoreJob = async (overrideResumeId?: string) => {
+    const targetResumeId =
+      typeof overrideResumeId === "string" ? overrideResumeId : selectedResumeId;
+
+    if (
+      !pendingScoreIdempotencyKeyRef.current ||
+      pendingScoreResumeIdRef.current !== targetResumeId
+    ) {
       pendingScoreIdempotencyKeyRef.current = crypto.randomUUID();
+      pendingScoreResumeIdRef.current = targetResumeId;
     }
     const idempotencyKey = pendingScoreIdempotencyKeyRef.current;
 
@@ -64,7 +73,10 @@ export function useJobScoring({
             "Content-Type": "application/json",
             "Idempotency-Key": idempotencyKey,
           },
-          body: JSON.stringify({ idempotencyKey, resumeId: selectedResumeId }),
+          body: JSON.stringify({
+            idempotencyKey,
+            resumeId: typeof targetResumeId === "string" ? targetResumeId : undefined,
+          }),
           signal: controller.signal,
         });
 
@@ -100,6 +112,7 @@ export function useJobScoring({
 
     if (result) {
       pendingScoreIdempotencyKeyRef.current = null;
+      pendingScoreResumeIdRef.current = undefined;
       posthog.capture("job_scored", { location: "detail" });
       onJobUpdated(result);
       router.refresh();

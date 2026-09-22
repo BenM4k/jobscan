@@ -26,7 +26,7 @@ export default async function AdminFlagsPage() {
   // Verify admin access via stopgap ADMIN_USER_IDS check
   if (!isAdmin(user)) {
     return (
-      <main className="max-w-4xl mx-auto px-4 py-16 text-center space-y-4">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-16 text-center space-y-4">
         <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 mx-auto flex items-center justify-center">
           <ShieldAlert className="w-6 h-6" />
         </div>
@@ -53,7 +53,7 @@ export default async function AdminFlagsPage() {
   ]);
 
   return (
-    <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 w-full space-y-8 z-10">
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 w-full space-y-8 z-10">
       {/* Header */}
       <div className="space-y-1.5 border-b border-slate-200 dark:border-zinc-800/80 pb-6">
         <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 text-xs font-medium font-sans">

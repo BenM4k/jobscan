@@ -5,7 +5,7 @@ import { JobDetailSkeleton } from "@/components/job/JobDetailSkeleton";
 
 export default function JobDetailLoading() {
   return (
-    <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 font-sans">
+    <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 font-sans">
       {/* Breadcrumb Navigation */}
       <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-muted-foreground font-normal font-sans">
         <Link

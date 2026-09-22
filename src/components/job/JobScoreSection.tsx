@@ -20,6 +20,7 @@ interface JobScoreSectionProps {
   resumes?: MasterResumeSelect[];
   selectedResumeId?: string;
   onSelectResume?: (id: string) => void;
+  onAddPersona?: () => void;
   retryStatus?: AsyncJobStatus;
   retryAttempt?: number;
   totalAttempts?: number;
@@ -37,6 +38,7 @@ export function JobScoreSection({
   resumes,
   selectedResumeId,
   onSelectResume,
+  onAddPersona,
   retryStatus = "idle",
   retryAttempt = 1,
   totalAttempts = 3,
@@ -67,11 +69,12 @@ export function JobScoreSection({
         </div>
 
         <div className="shrink-0 pt-0.5 flex items-center gap-2">
-          {resumes && resumes.length > 1 && (
+          {resumes && (
             <PersonaSelectDropdown
               resumes={resumes}
               selectedResumeId={selectedResumeId}
               onSelectResume={onSelectResume}
+              onAddPersona={onAddPersona}
               size="sm"
               disabled={isScoring}
             />
@@ -91,7 +94,7 @@ export function JobScoreSection({
           ) : (
             <button
               type="button"
-              onClick={onScoreJob}
+              onClick={() => onScoreJob()}
               className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer font-sans"
             >
               <span>{t("scoreMatch")}</span>
@@ -163,7 +166,7 @@ export function JobScoreSection({
           <div className="pt-3 border-t border-border/40 flex items-center justify-between">
             <button
               type="button"
-              onClick={onScoreJob}
+              onClick={() => onScoreJob()}
               disabled={isScoring}
               className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer disabled:opacity-50 font-sans"
             >
@@ -171,7 +174,7 @@ export function JobScoreSection({
               <span>{t("reScore")}</span>
             </button>
 
-            {resumes && resumes.length > 1 && (
+            {resumes && (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground font-sans">
                   {t("personaPrefix")}
@@ -180,6 +183,7 @@ export function JobScoreSection({
                   resumes={resumes}
                   selectedResumeId={selectedResumeId}
                   onSelectResume={onSelectResume}
+                  onAddPersona={onAddPersona}
                   size="xs"
                   showIcon={false}
                   disabled={isScoring}

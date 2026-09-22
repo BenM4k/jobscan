@@ -12,6 +12,7 @@ import { AppError } from "@/lib/errors";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { generateEmbedding } from "@/services/ai/embed";
 import { normalizeSkillName } from "@/services/skills/normalize";
+import { parseResumeContent } from "@/lib/resume-format";
 
 export type MasterResumeSelect = typeof masterResume.$inferSelect;
 export type MasterResumeInsert = typeof masterResume.$inferInsert;
@@ -104,8 +105,13 @@ export async function createMasterResume(
       return err(new AppError("DB_ERROR", "Failed to create master resume"));
     }
 
-    if (skills && skills.length > 0) {
-      await syncResumeSkills(created.id, skills);
+    const effectiveSkills =
+      skills && skills.length > 0
+        ? skills
+        : parseResumeContent(created.content).skills;
+
+    if (effectiveSkills && effectiveSkills.length > 0) {
+      await syncResumeSkills(created.id, effectiveSkills);
     }
 
     // Generate embedding asynchronously — never block the response on this
@@ -171,8 +177,15 @@ export async function updateMasterResume(
       return err(new AppError("NOT_FOUND", `Master resume ${id} not found`));
     }
 
-    if (skills) {
-      await syncResumeSkills(updated.id, skills);
+    const effectiveSkills =
+      skills !== undefined
+        ? skills
+        : data.content
+          ? parseResumeContent(data.content).skills
+          : undefined;
+
+    if (effectiveSkills) {
+      await syncResumeSkills(updated.id, effectiveSkills);
     }
 
     // Re-embed only if resume content changed

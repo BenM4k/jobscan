@@ -54,13 +54,14 @@ async function runRateLimitUnitTests() {
   console.log("✓ Step 16 Rate limit tiers verified: scoring (20 burst, 1/10s), tailored_resume & cover_letter (5 burst, 1/60s)");
 
   // 3. checkRateLimit shape check & bounded local fallback when Redis is rejected or unavailable
-  const origEval = (redis as any).eval;
+  const redisMock = redis as unknown as { eval?: unknown };
+  const origEval = redisMock.eval;
   const origUrl = process.env.UPSTASH_REDIS_REST_URL;
   const origToken = process.env.UPSTASH_REDIS_REST_TOKEN;
   try {
     process.env.UPSTASH_REDIS_REST_URL = "https://mock.upstash.io";
     process.env.UPSTASH_REDIS_REST_TOKEN = "mock-token";
-    (redis as any).eval = async () => {
+    redisMock.eval = async () => {
       throw new Error("Redis connection refused (ECONNREFUSED)");
     };
 
@@ -78,7 +79,7 @@ async function runRateLimitUnitTests() {
     );
     console.log("✓ checkRateLimit returns { allowed: true } with bounded fallback when Redis is forced into rejected state");
   } finally {
-    (redis as any).eval = origEval;
+    redisMock.eval = origEval;
     if (origUrl !== undefined) {
       process.env.UPSTASH_REDIS_REST_URL = origUrl;
     } else {

@@ -14,19 +14,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
+import { useSignOut } from "@/hooks/useSignOut";
 
 interface NavbarUserDropdownProps {
   userEmail?: string | null;
   userName?: string | null;
-  onSignOut: () => void;
 }
 
 export function NavbarUserDropdown({
   userEmail,
   userName,
-  onSignOut,
 }: NavbarUserDropdownProps) {
   const t = useTranslations("nav");
+  const handleSignOut = useSignOut();
 
   if (!userEmail) {
     return (
@@ -116,7 +116,7 @@ export function NavbarUserDropdown({
 
           <DropdownMenuItem
             variant="destructive"
-            onClick={onSignOut}
+            onClick={handleSignOut}
             className="cursor-pointer px-3 py-2.5"
           >
             <LogOut className="size-4" />
