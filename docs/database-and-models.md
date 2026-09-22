@@ -39,7 +39,8 @@ Jobpilot uses **Drizzle ORM** with PostgreSQL. Schema definitions are organized 
 ## 3. Legacy Schema Isolation
 
 - **Migration `0010_shocking_power_pack.sql`** permanently dropped the legacy `jobs`, `profile`, and `deleted_jobs` tables.
-- **Transitional File `src/services/db/schema/legacy.ts`:** Retained solely for `profile.dal.ts` during transitional legacy `/dashboard/profile` UI usage.
+- **Transitional Compatibility File `src/services/db/schema/legacy.ts`:** Retained solely as a compatibility file for `profile.dal.ts` during transitional `/dashboard/profile` UI usage.
+- **Canonical Store:** `master_resume` is the canonical store of record for candidate profiles and resumes. Any database access targeting the dropped legacy `profile` table is strictly best-effort and caught safely.
 - **Do Not Re-Export:** `schema/legacy.ts` is intentionally **NOT** exported from `schema/index.ts`. New features must never import or bind to legacy schema.
 
 ---

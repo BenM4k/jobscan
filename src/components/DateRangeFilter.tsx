@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useQueryState, parseAsString } from "nuqs";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { RotateCcw } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import {
@@ -20,6 +20,7 @@ import { useFilterTransition } from "./filters/FilterTransitionContext";
 
 export function DateRangeFilter() {
   const t = useTranslations("dashboard");
+  const locale = useLocale();
   const { startTransition } = useFilterTransition();
 
   const [startDate, setStartDate] = useQueryState(
@@ -94,17 +95,17 @@ export function DateRangeFilter() {
   const toDate = parseDateInput(endDate);
   const isFiltered = Boolean(startDate || endDate);
 
-  let displayTitle = "Date Range";
-  let displayValue = "All opportunities";
+  let displayTitle = t("filterByDate");
+  let displayValue = t("allTime");
   if (fromDate && toDate) {
-    displayTitle = "Filtered Period";
-    displayValue = `${formatShortDate(fromDate)} – ${formatShortDate(toDate)}`;
+    displayTitle = t("customRange");
+    displayValue = `${formatShortDate(fromDate, locale)} – ${formatShortDate(toDate, locale)}`;
   } else if (fromDate) {
-    displayTitle = "Starting From";
-    displayValue = `Since ${formatShortDate(fromDate)}`;
+    displayTitle = t("startDate");
+    displayValue = formatShortDate(fromDate, locale);
   } else if (toDate) {
-    displayTitle = "Ending At";
-    displayValue = `Until ${formatShortDate(toDate)}`;
+    displayTitle = t("endDate");
+    displayValue = formatShortDate(toDate, locale);
   }
 
   return (

@@ -270,6 +270,7 @@
     "activeUpdated": "Persona actif mis à jour",
     "failedSwitchActive": "Échec du changement de persona actif",
     "deletePersona": "Supprimer le persona",
+    "deleting": "Suppression en cours...",
     "cannotDeleteOnlyResume": "Impossible de supprimer votre seul CV",
     "deleteConfirmTitle": "Supprimer le persona de CV",
     "deleteConfirmDescription": "Êtes-vous sûr de vouloir supprimer {label} ?",

@@ -134,6 +134,7 @@ Every AI invocation is wrapped with `withAiTracking` middleware (`src/services/a
 ## 9. Prompt Security & Untrusted Input
 
 Job descriptions pulled from external scrapers or pasted by users are **untrusted data**.
-- Never interpolate raw job descriptions directly into system instructions without bounding them in explicit XML/markdown fences (e.g. `<job_description>...</job_description>`).
+- Job descriptions belong in separate user/data fields rather than system or developer instructions; fences, labels, and delimiters are not security boundaries.
 - Treat all instructions inside scraped text as inert data, never as system directives.
+- Always apply server-side validation and constraints (e.g. Zod schemas, size limits) to generated AI output before persistence or downstream use.
 - Never log user resume contents, personal identifiable information (PII), or raw prompts to external logging systems or unencrypted audit logs.

@@ -74,10 +74,10 @@ export function parseResumeContent(content: string): ParsedResumeSections {
         rest = headerLine.replace(/\s*\([^)]+\)$/, "").trim();
       }
 
-      const separatorMatch = rest.split(/\s*[—–-]\s*/);
-      if (separatorMatch.length >= 2) {
-        title = separatorMatch[0].trim();
-        company = separatorMatch.slice(1).join(" — ").trim();
+      const separatorMatch = rest.match(/\s+[-—–]\s+/);
+      if (separatorMatch && separatorMatch.index !== undefined) {
+        title = rest.slice(0, separatorMatch.index).trim();
+        company = rest.slice(separatorMatch.index + separatorMatch[0].length).trim();
       }
 
       let bulletStartIndex = 1;
@@ -143,10 +143,10 @@ export function parseResumeContent(content: string): ParsedResumeSections {
         rest = cleanLine.replace(/\s*\([^)]+\)$/, "").trim();
       }
 
-      const sepParts = rest.split(/\s*[—–-]\s*/);
-      if (sepParts.length >= 2) {
-        degreeAndField = sepParts[0].trim();
-        institution = sepParts.slice(1).join(" — ").trim();
+      const sepParts = rest.match(/\s+[-—–]\s+/);
+      if (sepParts && sepParts.index !== undefined) {
+        degreeAndField = rest.slice(0, sepParts.index).trim();
+        institution = rest.slice(sepParts.index + sepParts[0].length).trim();
       }
 
       let degree = degreeAndField;

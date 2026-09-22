@@ -11,7 +11,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { CheckCircle2, Trash2, Eye } from "lucide-react";
+import { Trash2, Eye, Loader2, Check } from "lucide-react";
 import { ResumeViewerModal } from "./ResumeViewerModal";
 import {
   setActiveResumeAction,
@@ -39,10 +39,10 @@ export function ResumeCardActions({
   const t = useTranslations("resumes");
   const tCommon = useTranslations("common");
 
-  const handleSetActive = async () => {
+  const handleSetActive = async (id?: string) => {
     try {
       setIsSettingActive(true);
-      const res = await setActiveResumeAction(resume.id);
+      const res = await setActiveResumeAction(id || resume.id);
       if (!res.success) {
         toast.error(res.error || t("failedSwitchActive"));
       } else {
@@ -89,11 +89,15 @@ export function ResumeCardActions({
             type="button"
             variant="outline"
             size="sm"
-            onClick={handleSetActive}
+            onClick={() => handleSetActive()}
             disabled={isSettingActive}
-            className="text-xs h-8 gap-1.5 cursor-pointer"
+            className="text-xs h-8 gap-1.5 hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer"
           >
-            <CheckCircle2 className="size-3.5 text-blue-600 dark:text-blue-400" />
+            {isSettingActive ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Check className="size-3.5" />
+            )}
             <span>{isSettingActive ? t("activating") : t("setAsActive")}</span>
           </Button>
         )}
@@ -101,17 +105,19 @@ export function ResumeCardActions({
         <Button
           type="button"
           variant="ghost"
-          size="icon-sm"
+          size="sm"
           onClick={() => setDeleteOpen(true)}
-          disabled={isOnlyResume}
-          title={isOnlyResume ? t("cannotDeleteOnlyResume") : t("deletePersona")}
-          className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-40 cursor-pointer"
+          disabled={isOnlyResume || isDeleting}
+          title={
+            isOnlyResume ? t("cannotDeleteOnlyResume") : t("deletePersona")
+          }
+          className="text-xs h-8 px-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          <Trash2 className="size-4" />
+          <Trash2 className="size-3.5" />
         </Button>
       </div>
 
-      {/* Viewer & Editor Modal */}
+      {/* Viewer / Editor Modal */}
       <ResumeViewerModal
         open={viewerModalOpen}
         onOpenChange={setViewerModalOpen}
@@ -119,13 +125,7 @@ export function ResumeCardActions({
         onUpdated={() => {
           router.refresh();
         }}
-        onSetActive={async (id) => {
-          const res = await setActiveResumeAction(id);
-          if (res.success) {
-            toast.success(t("activeUpdated"));
-            router.refresh();
-          }
-        }}
+        onSetActive={handleSetActive}
       />
 
       {/* Delete Confirmation Dialog */}
@@ -157,7 +157,7 @@ export function ResumeCardActions({
               onClick={handleDelete}
               disabled={isDeleting}
             >
-              {isDeleting ? t("activating") : t("deletePersona")}
+              {isDeleting ? t("deleting") : t("deletePersona")}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -61,6 +61,28 @@ function ResumeViewerModalInner({
     .map((s) => s.trim())
     .filter(Boolean);
 
+  const handleResumeTextChange = (newText: string) => {
+    setResumeText(newText);
+    if (newText.trim()) {
+      const freshParsed = parseResumeContent(newText);
+      setSummary(freshParsed.summary);
+      setSkills(freshParsed.skills.join(", "));
+      setEducation(freshParsed.education);
+      setExperience(freshParsed.experience);
+    }
+  };
+
+  const handleCancel = () => {
+    const freshParsed = parseResumeContent(resume.content);
+    setSummary(freshParsed.summary);
+    setSkills(freshParsed.skills.join(", "));
+    setEducation(freshParsed.education);
+    setExperience(freshParsed.experience);
+    setResumeText(resume.content);
+    setLabel(resume.label);
+    setIsEditing(false);
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     const formattedContent = formatResumeToMarkdown({
@@ -197,7 +219,7 @@ function ResumeViewerModalInner({
               onSkillsChange={setSkills}
               onEducationChange={setEducation}
               onExperienceChange={setExperience}
-              onResumeTextChange={setResumeText}
+              onResumeTextChange={handleResumeTextChange}
             />
           </div>
         ) : (
@@ -218,7 +240,7 @@ function ResumeViewerModalInner({
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => setIsEditing(false)}
+            onClick={handleCancel}
             disabled={isSaving}
           >
             {tCommon("cancel")}

@@ -13,9 +13,8 @@ import {
 import { createMasterResumeAction } from "@/actions/resume.actions";
 import { MasterResumeSelect } from "@/services/db/schema";
 import { MasterResumeUpload } from "@/components/profile/MasterResumeUpload";
-import { ProfileAiEngineSelect } from "@/components/profile/ProfileAiEngineSelect";
 import { MasterResumeEditor } from "@/components/profile/MasterResumeEditor";
-import { formatResumeToMarkdown } from "@/lib/resume-format";
+import { formatResumeToMarkdown, parseResumeContent } from "@/lib/resume-format";
 import { EducationItem, ExperienceItem, ResumeProfileData } from "@/lib/ai";
 import { toast } from "sonner";
 import { Sparkles, Plus } from "lucide-react";
@@ -34,7 +33,6 @@ export function CreateResumeModal({
 }: CreateResumeModalProps) {
   const [label, setLabel] = useState("");
   const [language, setLanguage] = useState<"en" | "fr">("en");
-  const [aiProvider, setAiProvider] = useState("gemini");
 
   const [summary, setSummary] = useState("");
   const [skills, setSkills] = useState("");
@@ -50,13 +48,23 @@ export function CreateResumeModal({
   const resetForm = () => {
     setLabel("");
     setLanguage("en");
-    setAiProvider("gemini");
     setSummary("");
     setSkills("");
     setEducation([]);
     setExperience([]);
     setRawText("");
     setResumeText("");
+  };
+
+  const handleResumeTextChange = (newText: string) => {
+    setResumeText(newText);
+    if (newText.trim()) {
+      const parsed = parseResumeContent(newText);
+      setSummary(parsed.summary);
+      setSkills(parsed.skills.join(", "));
+      setEducation(parsed.education);
+      setExperience(parsed.experience);
+    }
   };
 
   const handleExtracted = (data: ResumeProfileData, fileRawText: string) => {
@@ -177,12 +185,6 @@ export function CreateResumeModal({
             isReplacing={hasContent}
           />
 
-          {/* AI Engine Selector */}
-          <ProfileAiEngineSelect
-            aiProvider={aiProvider}
-            onAiProviderChange={setAiProvider}
-          />
-
           {/* Structured Output Review & Editor */}
           <div className="border-t border-border/60 pt-4">
             <div className="mb-2">
@@ -204,7 +206,7 @@ export function CreateResumeModal({
               onSkillsChange={setSkills}
               onEducationChange={setEducation}
               onExperienceChange={setExperience}
-              onResumeTextChange={setResumeText}
+              onResumeTextChange={handleResumeTextChange}
             />
           </div>
 

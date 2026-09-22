@@ -27,6 +27,7 @@ export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCover
   const [isCopied, setIsCopied] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const pendingIdempotencyKeyRef = useRef<string | null>(null);
+  const pendingResumeIdRef = useRef<string | undefined>(undefined);
 
   const retryRunner = useAsyncJobWithRetry<string>({
     jobName: "Cover Letter Generation",
@@ -41,6 +42,7 @@ export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCover
       abortControllerRef.current = null;
     }
     pendingIdempotencyKeyRef.current = null;
+    pendingResumeIdRef.current = undefined;
     retryRunner.cancelRetry();
   }, [retryRunner]);
 
@@ -63,11 +65,18 @@ export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCover
       Boolean(job.coverLetterDraft) ||
       Boolean(coverLetter);
 
+    const targetResumeId = safeOptions?.resumeId || selectedResumeId;
+
     if (isRegeneration) {
       // Always mint a fresh idempotency key when regenerating
       pendingIdempotencyKeyRef.current = crypto.randomUUID();
-    } else if (!pendingIdempotencyKeyRef.current) {
+      pendingResumeIdRef.current = targetResumeId;
+    } else if (
+      !pendingIdempotencyKeyRef.current ||
+      pendingResumeIdRef.current !== targetResumeId
+    ) {
       pendingIdempotencyKeyRef.current = crypto.randomUUID();
+      pendingResumeIdRef.current = targetResumeId;
     }
     const idempotencyKey = pendingIdempotencyKeyRef.current;
 
@@ -89,7 +98,7 @@ export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCover
           regenerate: isRegeneration,
           instructions: safeOptions?.instructions,
           tone: safeOptions?.tone,
-          resumeId: safeOptions?.resumeId || selectedResumeId,
+          resumeId: targetResumeId,
         }),
       });
 
@@ -107,7 +116,9 @@ export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCover
         throw errorObj;
       }
 
-      if (!res.body) throw new Error("No readable stream response received");
+      if (!res.body) {
+        throw new Error("No response body received from server");
+      }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -126,6 +137,7 @@ export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCover
 
     if (result) {
       pendingIdempotencyKeyRef.current = null;
+      pendingResumeIdRef.current = undefined;
       posthog.capture("cover_letter_generated");
       onJobUpdated({ ...job, coverLetterDraft: result });
     }

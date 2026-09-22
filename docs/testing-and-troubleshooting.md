@@ -33,12 +33,13 @@ Before considering any task or PR complete, run:
 - Testing with an already-seeded user can give a false sense of success. Always verify the fresh-user / no-resume path.
 
 ### 2. `profile.dal.ts` vs `resume.dal.ts`
-- The transitional `/dashboard/profile` UI currently mirrors into `profileDal`, but all pipeline, scoring, and AI features strictly use `resumeDal` and `master_resume`.
-- Never import or route new features through `profileDal`.
+- The transitional `/dashboard/profile` UI routes profile actions through `profileDal`, which writes canonically to `master_resume` and only attempts a best-effort legacy mirror to the dropped `profile` table.
+- All pipeline, scoring, and AI features strictly use `resumeDal` and `master_resume`. Never import or route new features through `profileDal`.
 
 ### 3. Drizzle pgvector String Literal Formatting
 - Drizzle does not currently have native typed array binding for pgvector columns.
-- Updating vector columns (`master_resume.embedding`, `job.embedding`) requires passing a formatted string literal `[${embedding.join(",")}]` cast via `sql` or `as any`.
+- Updating vector columns (`master_resume.embedding`, `job.embedding`) requires passing a formatted string literal `[${embedding.join(",")}]` cast via SQL template: `sql\`\${vectorString}::vector\``.
+- Avoid unqualified `as any` type assertions; if a type escape is unavoidable due to a compiler gap, use a narrowly scoped, documented type override consistent with AGENTS.md.
 
 ### 4. Google Gemini Embeddings Syntax
 - In `@ai-sdk/google`, `embedding()` does not accept dimension parameters in the constructor.

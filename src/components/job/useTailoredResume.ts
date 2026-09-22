@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { JobSelect } from "@/dal/jobs.dal";
 import { toast } from "sonner";
 import posthog from "posthog-js";
@@ -23,6 +23,7 @@ export function useTailoredResume({ job, onJobUpdated, selectedResumeId }: UseTa
   const [editedResume, setEditedResume] = useState(job.tailoredResume || "");
   const [isCopied, setIsCopied] = useState(false);
   const pendingIdempotencyKeyRef = useRef<string | null>(null);
+  const pendingResumeIdRef = useRef<string | undefined>(undefined);
 
   const retryRunner = useAsyncJobWithRetry<{
     data: JobSelect;
@@ -34,9 +35,19 @@ export function useTailoredResume({ job, onJobUpdated, selectedResumeId }: UseTa
     enableToasts: true,
   });
 
+  const cancelRetry = useCallback(() => {
+    pendingIdempotencyKeyRef.current = null;
+    pendingResumeIdRef.current = undefined;
+    retryRunner.cancelRetry();
+  }, [retryRunner]);
+
   const handleGenerate = async () => {
-    if (!pendingIdempotencyKeyRef.current) {
+    if (
+      !pendingIdempotencyKeyRef.current ||
+      pendingResumeIdRef.current !== selectedResumeId
+    ) {
       pendingIdempotencyKeyRef.current = crypto.randomUUID();
+      pendingResumeIdRef.current = selectedResumeId;
     }
     const idempotencyKey = pendingIdempotencyKeyRef.current;
 
@@ -69,6 +80,7 @@ export function useTailoredResume({ job, onJobUpdated, selectedResumeId }: UseTa
 
     if (result) {
       pendingIdempotencyKeyRef.current = null;
+      pendingResumeIdRef.current = undefined;
       posthog.capture("tailored_resume_generated");
       setEditedResume(result.tailoredResume);
       onJobUpdated(result.data);
@@ -135,7 +147,7 @@ export function useTailoredResume({ job, onJobUpdated, selectedResumeId }: UseTa
     totalAttempts: retryRunner.totalAttempts,
     retryCountdown: retryRunner.countdown,
     retryMessage: retryRunner.message,
-    cancelRetry: retryRunner.cancelRetry,
+    cancelRetry,
     retryNow: retryRunner.retryNow,
     isSaving,
     isEditing,

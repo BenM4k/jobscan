@@ -270,6 +270,7 @@
     "activeUpdated": "Active persona updated",
     "failedSwitchActive": "Failed to switch active persona",
     "deletePersona": "Delete persona",
+    "deleting": "Deleting...",
     "cannotDeleteOnlyResume": "Cannot delete your only resume",
     "deleteConfirmTitle": "Delete Resume Persona",
     "deleteConfirmDescription": "Are you sure you want to delete {label}?",

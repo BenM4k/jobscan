@@ -55,11 +55,12 @@ async function runCostTrackingUnitTests() {
     // 1. Fixed pre-boundary test (before 2027 boundary): 0.75 + 3.75 = 4.50
     const mockPreDate = new Date("2026-09-10T12:00:00Z");
     class PreDateMock extends OriginalDate {
-      constructor(...args: (string | number | Date)[]) {
+      constructor(...args: unknown[]) {
         if (args.length === 0) {
           super(mockPreDate.getTime());
         } else {
-          super(args[0] as string | number | Date);
+          // @ts-expect-error - forward full constructor arguments
+          super(...args);
         }
       }
       static override now() {
@@ -79,11 +80,12 @@ async function runCostTrackingUnitTests() {
     // 2. Fixed post-boundary test (post-2026 boundary): 1.50 + 7.50 = 9.00
     const mockPostDate = new Date("2027-01-02T00:00:00Z");
     class PostDateMock extends OriginalDate {
-      constructor(...args: (string | number | Date)[]) {
+      constructor(...args: unknown[]) {
         if (args.length === 0) {
           super(mockPostDate.getTime());
         } else {
-          super(args[0] as string | number | Date);
+          // @ts-expect-error - forward full constructor arguments
+          super(...args);
         }
       }
       static override now() {

@@ -145,7 +145,7 @@ The following core rules govern all feature implementation in Jobpilot:
 
 ## 7. In-Depth Documentation Index
 
-For detailed guides, schemas, algorithms, and workflows, consult the corresponding topic document in [`docs/`](file:///home/benny/Github/Projects/SaaS/jobscan/docs/):
+For detailed guides, schemas, algorithms, and workflows, consult the corresponding topic document in [`docs/`](./docs/):
 
 | Topic | Document | Contents |
 | :--- | :--- | :--- |

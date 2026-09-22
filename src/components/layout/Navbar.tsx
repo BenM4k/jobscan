@@ -27,7 +27,7 @@ export async function Navbar({ userId, userEmail, userName }: NavbarProps) {
   return (
     <nav
       aria-label="Main navigation"
-      className="relative border-b border-slate-300 dark:border-zinc-800 bg-white/80 dark:bg-[#0A0A0C]/90 backdrop-blur-xl top-0 z-50 transition-colors duration-300"
+      className="sticky border-b border-slate-300 dark:border-zinc-800 bg-white/80 dark:bg-[#0A0A0C]/90 backdrop-blur-xl top-0 z-50 transition-colors duration-300"
     >
       <NavbarTelemetry
         userId={userId}

@@ -126,7 +126,7 @@ export function FilterBar() {
               <button
                 type="button"
                 onClick={handleClearSearch}
-                aria-label="Clear search query"
+                aria-label={t("clearFilter")}
                 className="text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer p-1 rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800 transition"
               >
                 <X className="size-3.5" />
@@ -135,7 +135,7 @@ export function FilterBar() {
             <button
               type="submit"
               disabled={isPending}
-              aria-label="Submit search"
+              aria-label={t("searchPlaceholder")}
               className="size-8 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/70 text-white flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-95 shrink-0"
             >
               {isPending ? (
@@ -158,10 +158,10 @@ export function FilterBar() {
               })
             }
             options={SOURCE_OPTIONS}
-            ariaLabel="Filter jobs by source platform"
+            ariaLabel={t("sourceAll")}
             allLabel={t("sourceAll")}
             isActive={isSourceActive}
-            prefix="Source"
+            prefix={t("sourceAll").split(/[:：]/)[0].trim()}
             minWidthClass="min-w-[150px]"
           />
 
@@ -174,10 +174,10 @@ export function FilterBar() {
               })
             }
             options={statusDropdownOptions}
-            ariaLabel="Filter jobs by status"
+            ariaLabel={t("statusAll")}
             allLabel={t("statusAll")}
             isActive={isStatusActive}
-            prefix="Status"
+            prefix={t("status")}
             minWidthClass="min-w-[145px]"
           />
 
@@ -191,13 +191,13 @@ export function FilterBar() {
               type="button"
               onClick={handleResetAll}
               disabled={isPending}
-              aria-label="Reset all filters"
+              aria-label={t("clearFilter")}
               className="h-11 px-3.5 rounded-xl border border-dashed border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:border-rose-300 dark:hover:border-rose-800 text-slate-600 dark:text-zinc-400 hover:text-rose-600 dark:hover:text-rose-300 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer shrink-0 disabled:opacity-50"
             >
               <RotateCcw
                 className={`w-3.5 h-3.5 ${isPending ? "animate-spin" : ""}`}
               />
-              <span className="hidden sm:inline">Reset</span>
+              <span className="hidden sm:inline">{t("clearFilter")}</span>
             </button>
           )}
         </div>

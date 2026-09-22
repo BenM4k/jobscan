@@ -1,5 +1,6 @@
 import React from "react";
 import { formatDisplayDate } from "./date-filter-utils";
+import { useTranslations, useLocale } from "next-intl";
 
 interface DateRangeDisplayCardProps {
   from?: Date;
@@ -7,6 +8,8 @@ interface DateRangeDisplayCardProps {
 }
 
 export function DateRangeDisplayCard({ from, to }: DateRangeDisplayCardProps) {
+  const t = useTranslations("dashboard");
+  const locale = useLocale();
   const hasSelection = Boolean(from || to);
 
   return (
@@ -25,10 +28,10 @@ export function DateRangeDisplayCard({ from, to }: DateRangeDisplayCardProps) {
               : "text-slate-400 dark:text-zinc-500"
           }`}
         >
-          From Date
+          {t("startDate")}
         </span>
         <div className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
-          {from ? formatDisplayDate(from) : "Not selected"}
+          {from ? formatDisplayDate(from, locale) : t("noneIdentified")}
         </div>
       </div>
 
@@ -40,10 +43,10 @@ export function DateRangeDisplayCard({ from, to }: DateRangeDisplayCardProps) {
               : "text-slate-400 dark:text-zinc-500"
           }`}
         >
-          To Date
+          {t("endDate")}
         </span>
         <div className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
-          {to ? formatDisplayDate(to) : "Not selected"}
+          {to ? formatDisplayDate(to, locale) : t("noneIdentified")}
         </div>
       </div>
     </div>

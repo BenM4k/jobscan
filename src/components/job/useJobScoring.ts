@@ -20,6 +20,7 @@ export function useJobScoring({
   const router = useRouter();
   const [missingResumeOpen, setMissingResumeOpen] = useState(false);
   const pendingScoreIdempotencyKeyRef = useRef<string | null>(null);
+  const pendingScoreResumeIdRef = useRef<string | undefined>(undefined);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const retryRunner = useAsyncJobWithRetry<JobSelect>({
@@ -35,6 +36,7 @@ export function useJobScoring({
       abortControllerRef.current = null;
     }
     pendingScoreIdempotencyKeyRef.current = null;
+    pendingScoreResumeIdRef.current = undefined;
     retryRunner.cancelRetry();
   }, [retryRunner]);
 
@@ -48,12 +50,17 @@ export function useJobScoring({
   }, []);
 
   const handleScoreJob = async (overrideResumeId?: string) => {
-    if (!pendingScoreIdempotencyKeyRef.current) {
-      pendingScoreIdempotencyKeyRef.current = crypto.randomUUID();
-    }
-    const idempotencyKey = pendingScoreIdempotencyKeyRef.current;
     const targetResumeId =
       typeof overrideResumeId === "string" ? overrideResumeId : selectedResumeId;
+
+    if (
+      !pendingScoreIdempotencyKeyRef.current ||
+      pendingScoreResumeIdRef.current !== targetResumeId
+    ) {
+      pendingScoreIdempotencyKeyRef.current = crypto.randomUUID();
+      pendingScoreResumeIdRef.current = targetResumeId;
+    }
+    const idempotencyKey = pendingScoreIdempotencyKeyRef.current;
 
     const result = await retryRunner.execute(async () => {
       const controller = new AbortController();
@@ -105,6 +112,7 @@ export function useJobScoring({
 
     if (result) {
       pendingScoreIdempotencyKeyRef.current = null;
+      pendingScoreResumeIdRef.current = undefined;
       posthog.capture("job_scored", { location: "detail" });
       onJobUpdated(result);
       router.refresh();

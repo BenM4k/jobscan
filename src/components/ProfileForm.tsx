@@ -79,10 +79,10 @@ export function ProfileForm({
     setResumeText(newText);
     if (newText.trim()) {
       const parsed = parseResumeContent(newText);
-      if (parsed.summary) setSummary(parsed.summary);
-      if (parsed.skills.length > 0) setSkills(parsed.skills.join(", "));
-      if (parsed.education.length > 0) setEducation(parsed.education);
-      if (parsed.experience.length > 0) setExperience(parsed.experience);
+      setSummary(parsed.summary);
+      setSkills(parsed.skills.join(", "));
+      setEducation(parsed.education);
+      setExperience(parsed.experience);
     }
   };
 

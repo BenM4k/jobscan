@@ -1,3 +1,5 @@
+import { subMonths, startOfDay } from "date-fns";
+
 export function formatDateToInput(date: Date): string {
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, "0");
@@ -12,16 +14,16 @@ export function parseDateInput(str: string): Date | undefined {
   return new Date(y, m - 1, d);
 }
 
-export function formatDisplayDate(date: Date): string {
-  return new Intl.DateTimeFormat("en-US", {
+export function formatDisplayDate(date: Date, locale?: string): string {
+  return new Intl.DateTimeFormat(locale || undefined, {
     month: "short",
     day: "numeric",
     year: "numeric",
   }).format(date);
 }
 
-export function formatShortDate(date: Date): string {
-  return new Intl.DateTimeFormat("en-US", {
+export function formatShortDate(date: Date, locale?: string): string {
+  return new Intl.DateTimeFormat(locale || undefined, {
     month: "short",
     day: "numeric",
   }).format(date);
@@ -51,16 +53,8 @@ export function getDateFilterBounds(): DateFilterBounds {
     999
   );
 
-  // Exactly 3 months ago from today
-  const threeMonthsAgo = new Date(
-    now.getFullYear(),
-    now.getMonth() - 3,
-    now.getDate(),
-    0,
-    0,
-    0,
-    0
-  );
+  // Exactly 3 months ago from today, normalized to midnight with month clamping
+  const threeMonthsAgo = startOfDay(subMonths(now, 3));
 
   // Blocked to current year AND maximum 3 months back
   const minAllowedDate =

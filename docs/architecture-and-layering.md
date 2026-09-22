@@ -34,7 +34,7 @@ Data Access Layer (DAL) (`src/dal/`)
 Jobpilot standardizes on the **ok-err** pattern for handling operational errors across execution boundaries:
 
 ```ts
-import { ok, err, type Result } from "@/lib/result";
+import { ok, err } from "@/lib/result";
 
 export type Result<T, E = string> = 
   | { ok: true; value: T } 
@@ -74,6 +74,7 @@ export const idempotencyKey = pgTable(
     status: varchar("status", { length: 20 }).default("in_progress").notNull(), // in_progress | completed | failed
     resultRef: uuid("result_ref"), // Foreign key reference to generated entity ID
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (t) => [
     uniqueIndex("idempotency_key_unique_idx").on(t.userId, t.action, t.key),
@@ -88,8 +89,8 @@ export const idempotencyKey = pgTable(
    - If `status === 'completed'`: Return the previously generated result immediately (`{ ok: true, value: existingResult }`).
    - If `status === 'in_progress'`: Return an in-flight ok-err response to prevent redundant background AI executions.
 3. **Execute AI Work:** Call the AI provider and write resulting domain entities to the database.
-4. **Mark `completed`:** Update `idempotency_key` row with `status: 'completed'` and set `resultRef` to the created entity ID.
-5. **Mark `failed` on Error:** If the AI call or database write fails, set `status: 'failed'` to allow user retries.
+4. **Mark `completed`:** Update `idempotency_key` row with `status: 'completed'`, set `resultRef` to the created entity ID, and set `updatedAt` to the current timestamp.
+5. **Mark `failed` on Error:** If the AI call or database write fails, set `status: 'failed'` and update `updatedAt` to allow user retries.
 
 *Note:* Inexpensive operations (e.g. updating pipeline stage) and read operations do not require idempotency keys.
 
@@ -153,5 +154,5 @@ Whenever code changes alter or extend the structural boundaries of the applicati
   - Creating new DAL modules, domain services, or external source adapters.
   - Introducing new background queues, crons, or caching systems.
 - **Files to Update:**
-  - [`AGENTS.md`](file:///home/benny/Github/Projects/SaaS/jobscan/AGENTS.md) (update project structure tree, locked-in principles, or tech stack).
-  - The corresponding deep-dive guide in [`docs/`](file:///home/benny/Github/Projects/SaaS/jobscan/docs/).
+  - [`AGENTS.md`](./AGENTS.md) (update project structure tree, locked-in principles, or tech stack).
+  - The corresponding deep-dive guide in [`docs/`](./docs/).
