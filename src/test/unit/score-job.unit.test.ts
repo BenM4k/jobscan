@@ -73,15 +73,19 @@ async function runScoreJobUnitTests() {
     syncCalled = false;
     syncedJobSkills = null;
     const existingSkills = ["TypeScript", "Next.js"];
-    const failedRes = { ok: false as const, error: new Error("AI provider rate limited") };
+    const failedRes: {
+      ok: boolean;
+      value?: { jobSkills: string[] };
+      error?: Error;
+    } = { ok: false, error: new Error("AI provider rate limited") };
 
-    if (failedRes.ok) {
-      await mockSyncJobSkills("job-1", (failedRes as any).value.jobSkills);
+    if (failedRes.ok && failedRes.value) {
+      await mockSyncJobSkills("job-1", failedRes.value.jobSkills);
     }
     assert(syncCalled === false, "syncJobSkills must be skipped when analysis fails");
 
-    const fallbackJobSkills = failedRes.ok
-      ? (failedRes as any).value.jobSkills
+    const fallbackJobSkills = failedRes.ok && failedRes.value
+      ? failedRes.value.jobSkills
       : existingSkills;
     assert(fallbackJobSkills === existingSkills, "existing job skills preserved on error");
   }

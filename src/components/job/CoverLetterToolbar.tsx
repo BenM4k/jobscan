@@ -34,7 +34,7 @@ export function CoverLetterToolbar({
     return (
       <button
         type="button"
-        onClick={onGenerateStream}
+        onClick={() => onGenerateStream()}
         disabled={isStreaming}
         className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer disabled:opacity-50 shrink-0 font-sans"
       >
@@ -79,7 +79,13 @@ export function CoverLetterToolbar({
 
       <button
         type="button"
-        onClick={onRegenerate || onGenerateStream}
+        onClick={() => {
+          if (onRegenerate) {
+            onRegenerate();
+          } else {
+            onGenerateStream();
+          }
+        }}
         disabled={isStreaming}
         className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer disabled:opacity-50 font-sans"
       >

@@ -37,7 +37,7 @@ export default async function TermsOfServicePage() {
         <Navbar />
       </Suspense>
 
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-12 sm:py-16 z-10">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-12 sm:py-16 z-10">
         {/* Page Header */}
         <div className="mb-10 space-y-2">
           <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-zinc-500 font-mono mb-4">

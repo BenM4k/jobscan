@@ -47,11 +47,13 @@ export function useJobScoring({
     };
   }, []);
 
-  const handleScoreJob = async () => {
+  const handleScoreJob = async (overrideResumeId?: string) => {
     if (!pendingScoreIdempotencyKeyRef.current) {
       pendingScoreIdempotencyKeyRef.current = crypto.randomUUID();
     }
     const idempotencyKey = pendingScoreIdempotencyKeyRef.current;
+    const targetResumeId =
+      typeof overrideResumeId === "string" ? overrideResumeId : selectedResumeId;
 
     const result = await retryRunner.execute(async () => {
       const controller = new AbortController();
@@ -64,7 +66,10 @@ export function useJobScoring({
             "Content-Type": "application/json",
             "Idempotency-Key": idempotencyKey,
           },
-          body: JSON.stringify({ idempotencyKey, resumeId: selectedResumeId }),
+          body: JSON.stringify({
+            idempotencyKey,
+            resumeId: typeof targetResumeId === "string" ? targetResumeId : undefined,
+          }),
           signal: controller.signal,
         });
 

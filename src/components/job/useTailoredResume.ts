@@ -14,9 +14,10 @@ export { parseTailoredResume };
 interface UseTailoredResumeOptions {
   job: JobSelect;
   onJobUpdated: (updated: JobSelect) => void;
+  selectedResumeId?: string;
 }
 
-export function useTailoredResume({ job, onJobUpdated }: UseTailoredResumeOptions) {
+export function useTailoredResume({ job, onJobUpdated, selectedResumeId }: UseTailoredResumeOptions) {
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editedResume, setEditedResume] = useState(job.tailoredResume || "");
@@ -46,7 +47,7 @@ export function useTailoredResume({ job, onJobUpdated }: UseTailoredResumeOption
           "Content-Type": "application/json",
           "Idempotency-Key": idempotencyKey,
         },
-        body: JSON.stringify({ idempotencyKey }),
+        body: JSON.stringify({ idempotencyKey, resumeId: selectedResumeId }),
       });
 
       if (!res.ok) {

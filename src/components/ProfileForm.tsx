@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { saveMasterResumeAction, deleteResumeAction } from "@/actions/profile.actions";
 import { MasterResumeUpload } from "@/components/profile/MasterResumeUpload";
 import { MasterResumeEditor } from "@/components/profile/MasterResumeEditor";
@@ -9,6 +10,7 @@ import { ProfileEditHeader } from "@/components/profile/ProfileEditHeader";
 import { ProfileAiEngineSelect } from "@/components/profile/ProfileAiEngineSelect";
 import { DeleteResumeModal } from "@/components/profile/DeleteResumeModal";
 import { EducationItem, ExperienceItem, ResumeProfileData } from "@/lib/ai";
+import { formatResumeToMarkdown, parseResumeContent } from "@/lib/resume-format";
 import type { UserAiUsage } from "@/services/ai/usage.service";
 import { toast } from "sonner";
 import posthog from "posthog-js";
@@ -46,6 +48,7 @@ export function ProfileForm({
   resumeLanguage = "en",
   resumeSource = "uploaded",
 }: ProfileFormProps) {
+  const router = useRouter();
   const [resumeText, setResumeText] = useState(initialResumeText);
   const [summary, setSummary] = useState(initialSummary);
   const [skills, setSkills] = useState(initialSkills.join(", "));
@@ -68,18 +71,38 @@ export function ProfileForm({
     setEducation(data.education || []);
     setExperience(data.experience || []);
     setRawText(fileRawText);
+    setResumeText(fileRawText);
     setIsEditing(true);
+  };
+
+  const handleResumeTextChange = (newText: string) => {
+    setResumeText(newText);
+    if (newText.trim()) {
+      const parsed = parseResumeContent(newText);
+      if (parsed.summary) setSummary(parsed.summary);
+      if (parsed.skills.length > 0) setSkills(parsed.skills.join(", "));
+      if (parsed.education.length > 0) setEducation(parsed.education);
+      if (parsed.experience.length > 0) setExperience(parsed.experience);
+    }
   };
 
   const handleSave = async () => {
     setIsSaving(true);
+    const formattedContent = formatResumeToMarkdown({
+      summary,
+      skills: parsedSkillsList,
+      education,
+      experience,
+      rawResumeText: resumeText || rawText,
+    });
+
     const res = await saveMasterResumeAction({
       summary,
       skills: parsedSkillsList,
       education,
       experience,
-      rawText,
-      resumeText,
+      rawText: rawText || formattedContent,
+      resumeText: formattedContent,
       aiProvider,
     });
     setIsSaving(false);
@@ -91,9 +114,10 @@ export function ProfileForm({
         experience_count: experience.length,
         education_count: education.length,
       });
-      setResumeText(res.data.resumeText);
+      setResumeText(res.data.resumeText || formattedContent);
       setIsEditing(false);
       toast.success("Master resume saved successfully!");
+      router.refresh();
     } else {
       toast.error(res.error || "Failed to save master resume");
     }
@@ -174,7 +198,7 @@ export function ProfileForm({
         onSkillsChange={setSkills}
         onEducationChange={setEducation}
         onExperienceChange={setExperience}
-        onResumeTextChange={setResumeText}
+        onResumeTextChange={handleResumeTextChange}
       />
 
       <DeleteResumeModal

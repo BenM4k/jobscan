@@ -1,20 +1,34 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth-guard";
-import { getMasterResumesAction } from "@/actions/resume.actions";
+import * as resumeDal from "@/dal/resume.dal";
 import { ResumesManager } from "@/components/resumes/ResumesManager";
 import { FileText } from "lucide-react";
+import { getTranslations } from "next-intl/server";
+import { ResumesSkeleton } from "@/components/resumes/ResumesSkeleton";
 
-export const metadata = {
-  title: "Resume Personas | Jobpilot",
-  description: "Manage multiple tailored and uploaded master resume personas for AI matching and generation.",
-};
+export const instant = false;
 
-async function ResumesContent() {
-  const res = await getMasterResumesAction();
-  const resumes = res.success && res.data ? res.data : [];
+export async function generateMetadata() {
+  const t = await getTranslations("resumes");
+  return {
+    title: `${t("title")} | Jobpilot`,
+    description: t("subtitle"),
+  };
+}
 
-  return <ResumesManager initialResumes={resumes} />;
+async function ResumesContent({ userId }: { userId: string }) {
+  const res = await resumeDal.getMasterResumes(userId);
+  const resumes = res.ok ? res.value : [];
+
+  const versionKey = resumes
+    .map(
+      (r) =>
+        `${r.id}_v${r.version}_${r.isActive ? "1" : "0"}_${new Date(r.updatedAt).getTime()}`,
+    )
+    .join(":");
+
+  return <ResumesManager key={versionKey} initialResumes={resumes} />;
 }
 
 export default async function ResumesPage() {
@@ -23,33 +37,27 @@ export default async function ResumesPage() {
     redirect("/sign-in");
   }
 
+  const t = await getTranslations("resumes");
+
   return (
-    <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 w-full space-y-8 z-10">
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 w-full space-y-8 z-10">
       {/* Header */}
       <div className="space-y-1.5 border-b border-border/80 pb-6">
         <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-md bg-muted text-muted-foreground border border-border text-xs font-medium font-sans">
           <FileText className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-          <span>Multi-Persona Resumes</span>
+          <span>{t("headerBadge")}</span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-sans">
-          Resume Personas
+          {t("title")}
         </h1>
         <p className="text-sm text-muted-foreground max-w-2xl">
-          Manage specialized personas for different job roles, ATS targets, or languages.
-          The active persona is used by default for AI scoring, tailored resumes, and cover letters.
+          {t("subtitle")}
         </p>
       </div>
 
       {/* Dynamic Content */}
-      <Suspense
-        fallback={
-          <div className="space-y-4 animate-pulse">
-            <div className="h-28 rounded-xl bg-muted" />
-            <div className="h-28 rounded-xl bg-muted" />
-          </div>
-        }
-      >
-        <ResumesContent />
+      <Suspense fallback={<ResumesSkeleton />}>
+        <ResumesContent userId={sessionResult.value.user.id} />
       </Suspense>
     </main>
   );

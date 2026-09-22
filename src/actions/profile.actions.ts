@@ -4,7 +4,7 @@ import { requireSession } from "@/lib/auth-guard";
 import * as profileService from "@/services/profile.service";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { formatProfileDateRange } from "@/lib/date-format";
+import { formatResumeToMarkdown } from "@/lib/resume-format";
 
 const updateProfileSchema = z.object({
   resumeText: z.string().min(10, "Resume text must be at least 10 characters"),
@@ -97,33 +97,23 @@ export async function saveMasterResumeAction(data: {
   const validData = parsed.data;
   const profileDal = await import("@/dal/profile.dal");
   
-  // Format readable text if not provided
-  let formattedResume = validData.resumeText || "";
-  if (!formattedResume) {
-    const summaryBlock = validData.summary ? `## Professional Summary\n${validData.summary}` : "";
-    const skillsBlock = validData.skills?.length ? `## Core Skills\n${validData.skills.join(", ")}` : "";
-    const expBlock = validData.experience?.length
-      ? `## Work Experience\n\n` +
-        validData.experience
-          .map((exp) => {
-            const dateRange = formatProfileDateRange(exp.startDate, exp.endDate);
-            return `### ${exp.title} — ${exp.company}${dateRange ? ` (${dateRange})` : ""}\n` +
-              exp.bullets.map((b) => `• ${b}`).join("\n");
-          })
-          .join("\n\n")
-      : "";
-    const eduBlock = validData.education?.length
-      ? `## Education\n\n` +
-        validData.education
-          .map((edu) => {
-            const dateRange = formatProfileDateRange(edu.startDate, edu.endDate);
-            return `• ${edu.degree}${edu.field ? ` in ${edu.field}` : ""} — ${edu.institution}${dateRange ? ` (${dateRange})` : ""}`;
-          })
-          .join("\n")
-      : "";
+  // Format readable text from structured fields if provided, otherwise fallback to resumeText or rawText
+  const hasStructuredFields = Boolean(
+    validData.summary?.trim() ||
+    (validData.skills && validData.skills.length > 0) ||
+    (validData.experience && validData.experience.length > 0) ||
+    (validData.education && validData.education.length > 0)
+  );
 
-    formattedResume = [summaryBlock, skillsBlock, expBlock, eduBlock].filter(Boolean).join("\n\n");
-  }
+  const formattedResume = hasStructuredFields
+    ? formatResumeToMarkdown({
+        summary: validData.summary,
+        skills: validData.skills,
+        education: validData.education,
+        experience: validData.experience,
+        rawResumeText: validData.rawText || validData.resumeText,
+      })
+    : validData.resumeText || validData.rawText || "";
 
   const userId = sessionResult.value.user.id;
 
@@ -142,6 +132,9 @@ export async function saveMasterResumeAction(data: {
   }
 
   revalidatePath("/dashboard/profile");
+  revalidatePath("/dashboard/resumes");
+  revalidatePath("/dashboard/jobs");
+  revalidatePath("/dashboard");
   return { success: true, data: result.value };
 }
 

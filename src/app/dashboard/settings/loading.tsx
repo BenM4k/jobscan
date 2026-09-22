@@ -2,7 +2,7 @@ import React from "react";
 
 export default function SettingsLoading() {
   return (
-    <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 w-full space-y-8 animate-pulse z-10">
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 w-full space-y-8 animate-pulse z-10">
       {/* Header Skeleton */}
       <div className="space-y-3 border-b border-slate-200 dark:border-zinc-800/80 pb-6">
         <div className="h-6 w-36 rounded-md bg-slate-200 dark:bg-zinc-800" />

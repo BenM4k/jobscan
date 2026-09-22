@@ -10,6 +10,7 @@ import { useAsyncJobWithRetry } from "@/hooks/useAsyncJobWithRetry";
 interface UseCoverLetterProps {
   job: JobSelect;
   onJobUpdated: (updated: JobSelect) => void;
+  selectedResumeId?: string;
 }
 
 export interface GenerateCoverLetterOptions {
@@ -19,7 +20,7 @@ export interface GenerateCoverLetterOptions {
   resumeId?: string;
 }
 
-export function useCoverLetter({ job, onJobUpdated }: UseCoverLetterProps) {
+export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCoverLetterProps) {
   const [coverLetter, setCoverLetter] = useState(job.coverLetterDraft || "");
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -53,8 +54,12 @@ export function useCoverLetter({ job, onJobUpdated }: UseCoverLetterProps) {
   }, []);
 
   const handleGenerateStream = async (options?: GenerateCoverLetterOptions) => {
+    const isOptionsObj =
+      options && typeof options === "object" && !("nativeEvent" in options);
+    const safeOptions = isOptionsObj ? options : undefined;
+
     const isRegeneration =
-      options?.regenerate ||
+      safeOptions?.regenerate ||
       Boolean(job.coverLetterDraft) ||
       Boolean(coverLetter);
 
@@ -82,9 +87,9 @@ export function useCoverLetter({ job, onJobUpdated }: UseCoverLetterProps) {
         body: JSON.stringify({
           idempotencyKey,
           regenerate: isRegeneration,
-          instructions: options?.instructions,
-          tone: options?.tone,
-          resumeId: options?.resumeId,
+          instructions: safeOptions?.instructions,
+          tone: safeOptions?.tone,
+          resumeId: safeOptions?.resumeId || selectedResumeId,
         }),
       });
 

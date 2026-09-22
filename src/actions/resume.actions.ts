@@ -39,6 +39,7 @@ export async function setActiveResumeAction(resumeId: string) {
   revalidatePath("/dashboard/resumes");
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/profile");
+  revalidatePath("/dashboard/jobs");
   return { success: true, data: true };
 }
 
@@ -84,6 +85,7 @@ export async function createMasterResumeAction(data: {
   revalidatePath("/dashboard/resumes");
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/profile");
+  revalidatePath("/dashboard/jobs");
   return { success: true, data: res.value };
 }
 
@@ -123,6 +125,7 @@ export async function updateMasterResumeAction(data: {
   revalidatePath("/dashboard/resumes");
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/profile");
+  revalidatePath("/dashboard/jobs");
   return { success: true, data: res.value };
 }
 
@@ -156,6 +159,7 @@ export async function promoteTailoredResumeAction(
   revalidatePath("/dashboard/resumes");
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/profile");
+  revalidatePath("/dashboard/jobs");
 
   return {
     success: true,
@@ -187,6 +191,7 @@ export async function revertActiveResumeAction(previousActiveId: string) {
   revalidatePath("/dashboard/resumes");
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/profile");
+  revalidatePath("/dashboard/jobs");
   return { success: true, data: true };
 }
 
@@ -212,5 +217,6 @@ export async function deleteMasterResumeAction(resumeId: string): Promise<
   revalidatePath("/dashboard/resumes");
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/profile");
+  revalidatePath("/dashboard/jobs");
   return { success: true, data: res.value };
 }

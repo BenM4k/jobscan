@@ -25,6 +25,7 @@ import {
 import { FileText, Info } from "lucide-react";
 import posthog from "posthog-js";
 import { useTranslations } from "next-intl";
+import { CreateResumeModal } from "@/components/resumes/CreateResumeModal";
 
 interface JobDetailViewProps {
   initialJob: JobSelect;
@@ -33,9 +34,11 @@ interface JobDetailViewProps {
 export function JobDetailView({ initialJob }: JobDetailViewProps) {
   const tCommon = useTranslations("common");
   const tDash = useTranslations("dashboard");
+  const tJob = useTranslations("jobDetail");
   const [job, setJob] = useState<JobSelect>(initialJob);
   const [resumes, setResumes] = useState<MasterResumeSelect[]>([]);
   const [selectedResumeId, setSelectedResumeId] = useState<string | undefined>(undefined);
+  const [createResumeOpen, setCreateResumeOpen] = useState(false);
   const router = useRouter();
 
   const scoring = useJobScoring({
@@ -62,6 +65,19 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
       isMounted = false;
     };
   }, []);
+
+  const handleResumeCreated = (newResume: MasterResumeSelect) => {
+    setResumes((prev) => [newResume, ...prev]);
+    setSelectedResumeId(newResume.id);
+    scoring.handleScoreJob(newResume.id);
+  };
+
+  const handleSelectResume = (id: string) => {
+    setSelectedResumeId(id);
+    if (job.fitScore !== null && job.fitScore !== undefined) {
+      scoring.handleScoreJob(id);
+    }
+  };
 
   const handleStatusChange = async (newStatus: JobStatus) => {
     setJob((prev) => ({ ...prev, status: newStatus }));
@@ -90,10 +106,11 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
         job={job}
         isScoring={scoring.isScoring}
         scoringError={scoring.scoringError}
-        onScoreJob={scoring.handleScoreJob}
+        onScoreJob={() => scoring.handleScoreJob()}
         resumes={resumes}
         selectedResumeId={selectedResumeId}
-        onSelectResume={setSelectedResumeId}
+        onSelectResume={handleSelectResume}
+        onAddPersona={() => setCreateResumeOpen(true)}
         retryStatus={scoring.status}
         retryAttempt={scoring.attempt}
         totalAttempts={scoring.totalAttempts}
@@ -103,9 +120,17 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
         onCancelRetry={scoring.cancelRetry}
       />
 
-      <JobTailoredResumeSection job={job} onJobUpdated={handleJobUpdated} />
+      <JobTailoredResumeSection
+        job={job}
+        onJobUpdated={handleJobUpdated}
+        selectedResumeId={selectedResumeId}
+      />
 
-      <JobCoverLetterSection job={job} onJobUpdated={handleJobUpdated} />
+      <JobCoverLetterSection
+        job={job}
+        onJobUpdated={handleJobUpdated}
+        selectedResumeId={selectedResumeId}
+      />
 
       {/* AI Toolkit Area Disclaimer (single instance) */}
       <div className="py-3.5 flex items-center gap-2 text-sm text-muted-foreground font-normal font-sans">
@@ -143,13 +168,30 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
                 scoring.setMissingResumeOpen(false);
                 router.push("/dashboard/profile");
               }}
-              className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors cursor-pointer p-0 bg-transparent border-0"
+              className="text-xs font-normal text-muted-foreground hover:text-foreground transition-colors cursor-pointer p-0 bg-transparent border-0"
             >
               {tDash("goToProfile")}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                scoring.setMissingResumeOpen(false);
+                setCreateResumeOpen(true);
+              }}
+              className="text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-3 py-1.5 transition-colors cursor-pointer shadow-xs"
+            >
+              {tJob("uploadResume")}
             </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Create / Upload Resume Persona Modal */}
+      <CreateResumeModal
+        open={createResumeOpen}
+        onOpenChange={setCreateResumeOpen}
+        onCreated={handleResumeCreated}
+      />
     </div>
   );
 }
