@@ -1,5 +1,6 @@
-import { cookies } from "next/headers";
+import * as rootParams from "next/root-params";
 import { getRequestConfig } from "next-intl/server";
+import { hasLocale } from "next-intl";
 import { routing, Locale } from "./routing";
 import enMessages from "../../messages/en.json";
 import frMessages from "../../messages/fr.json";
@@ -9,16 +10,22 @@ const messagesMap: Record<Locale, typeof enMessages> = {
   fr: frMessages,
 };
 
-export default getRequestConfig(async () => {
-  const store = await cookies();
-  const rawLocale = store.get("NEXT_LOCALE")?.value?.toLowerCase();
-  const locale: Locale =
-    rawLocale && routing.locales.includes(rawLocale as Locale)
-      ? (rawLocale as Locale)
-      : routing.defaultLocale;
+export default getRequestConfig(async ({ locale }) => {
+  if (!locale) {
+    try {
+      const paramValue = await (rootParams as { locale?: () => Promise<string> }).locale?.();
+      if (paramValue && hasLocale(routing.locales, paramValue)) {
+        locale = paramValue;
+      } else {
+        locale = routing.defaultLocale;
+      }
+    } catch {
+      locale = routing.defaultLocale;
+    }
+  }
 
   return {
     locale,
-    messages: messagesMap[locale] ?? enMessages,
+    messages: messagesMap[locale as Locale] ?? enMessages,
   };
 });

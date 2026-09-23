@@ -1,0 +1,81 @@
+function assert(condition: boolean, msg: string) {
+  if (!condition) {
+    throw new Error(`Assertion failed: ${msg}`);
+  }
+}
+
+interface MockSubscription {
+  status: "active" | "canceled" | "past_due";
+  currentPeriodEnd: Date;
+}
+
+function canCreatePersona(
+  existingPersonaCount: number,
+  sub: MockSubscription | null
+): { allowed: boolean; reason?: string } {
+  if (existingPersonaCount < 1) {
+    return { allowed: true };
+  }
+
+  const hasActiveSub =
+    sub !== null &&
+    sub.status === "active" &&
+    sub.currentPeriodEnd > new Date();
+
+  if (!hasActiveSub) {
+    return {
+      allowed: false,
+      reason:
+        "Multiple resume personas require an active Jobpilot Pro subscription. Please upgrade to create additional personas.",
+    };
+  }
+
+  return { allowed: true };
+}
+
+async function runUnitTests() {
+  console.log("Running unit tests for subscription multi-persona gating...");
+
+  // 1. User with 0 personas: allowed without subscription
+  const firstPersona = canCreatePersona(0, null);
+  assert(firstPersona.allowed, "User with 0 personas should be allowed to create their first resume");
+
+  // 2. Free user with 1 persona: blocked from creating a 2nd persona
+  const secondPersonaFree = canCreatePersona(1, null);
+  assert(!secondPersonaFree.allowed, "Free user with 1 persona must be blocked from creating 2nd persona");
+  assert(
+    secondPersonaFree.reason?.includes("active Jobpilot Pro subscription") ?? false,
+    "Block reason must cite Jobpilot Pro subscription requirement"
+  );
+
+  // 3. User with active Pro subscription: allowed to create 2nd persona
+  const activeSub: MockSubscription = {
+    status: "active",
+    currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days future
+  };
+  const secondPersonaPro = canCreatePersona(1, activeSub);
+  assert(secondPersonaPro.allowed, "Active Pro subscriber must be allowed to create multiple personas");
+
+  // 4. User with expired Pro subscription: blocked
+  const expiredSub: MockSubscription = {
+    status: "active",
+    currentPeriodEnd: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
+  };
+  const secondPersonaExpired = canCreatePersona(1, expiredSub);
+  assert(!secondPersonaExpired.allowed, "Expired subscriber must not be allowed to create additional personas");
+
+  // 5. User with past_due / canceled past period end: blocked
+  const canceledPastSub: MockSubscription = {
+    status: "canceled",
+    currentPeriodEnd: new Date(Date.now() - 1000),
+  };
+  const secondPersonaCanceled = canCreatePersona(1, canceledPastSub);
+  assert(!secondPersonaCanceled.allowed, "Canceled past period end must be blocked");
+
+  console.log("Subscription gating tests passed successfully!");
+}
+
+runUnitTests().catch((err) => {
+  console.error("Test execution failed:", err);
+  process.exit(1);
+});

@@ -9,8 +9,6 @@ import * as resumeDal from "@/dal/resume.dal";
 import { parseResumeContent } from "@/dal/profile.dal";
 import { ProfileSkeleton } from "@/components/profile/ProfileSkeleton";
 
-export const instant = false;
-
 function ProfileErrorState({
   title,
   message,
@@ -120,12 +118,7 @@ async function ProfileFormContent() {
   );
 }
 
-export default async function ProfilePage() {
-  const sessionResult = await requireSession();
-  if (!sessionResult.ok || !sessionResult.value) {
-    redirect("/sign-in");
-  }
-
+export default function ProfilePage() {
   return (
     <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-8 z-10">
       <Suspense fallback={<ProfileSkeleton />}>

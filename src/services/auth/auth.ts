@@ -34,6 +34,20 @@ export const auth = betterAuth({
   session: {
     freshAge: 0,
   },
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          try {
+            const { grantCredits } = await import("@/services/billing/billing.service");
+            await grantCredits(user.id, 6, "signup_grant", null);
+          } catch (err) {
+            console.error("[Auth] Failed to grant signup credits:", err);
+          }
+        },
+      },
+    },
+  },
   advanced: {
     database: { generateId: "uuid" },
   },

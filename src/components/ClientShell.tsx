@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
 import { FilterBar, FilterBarSkeleton } from "@/components/FilterBar";
 import { FetchJobsPopover } from "@/components/FetchJobsPopover";
 import { JobListSkeleton } from "@/components/job/JobListSkeleton";
@@ -22,8 +21,6 @@ function ClientShellContent({ children }: ClientShellProps) {
   const tCommon = useTranslations("common");
 
   const { isPending } = useFilterTransition();
-  const searchParams = useSearchParams();
-  const filterKey = searchParams?.toString() ?? "";
 
   return (
     <div className="space-y-7 max-w-7xl w-full mx-auto">
@@ -95,8 +92,8 @@ function ClientShellContent({ children }: ClientShellProps) {
         </Suspense>
       </div>
 
-      {/* Rendered Job List with instant visual feedback and key */}
-      <div className="pt-2" key={filterKey}>
+      {/* Rendered Job List with instant visual feedback */}
+      <div className="pt-2">
         {isPending ? (
           <JobListSkeleton />
         ) : (

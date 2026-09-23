@@ -7,8 +7,6 @@ import { FileText } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { ResumesSkeleton } from "@/components/resumes/ResumesSkeleton";
 
-export const instant = false;
-
 export async function generateMetadata() {
   const t = await getTranslations("resumes");
   return {
@@ -17,7 +15,13 @@ export async function generateMetadata() {
   };
 }
 
-async function ResumesContent({ userId }: { userId: string }) {
+async function ResumesContent() {
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok || !sessionResult.value) {
+    redirect("/sign-in");
+  }
+
+  const userId = sessionResult.value.user.id;
   const res = await resumeDal.getMasterResumes(userId);
   const resumes = res.ok ? res.value : [];
 
@@ -32,11 +36,6 @@ async function ResumesContent({ userId }: { userId: string }) {
 }
 
 export default async function ResumesPage() {
-  const sessionResult = await requireSession();
-  if (!sessionResult.ok || !sessionResult.value) {
-    redirect("/sign-in");
-  }
-
   const t = await getTranslations("resumes");
 
   return (
@@ -57,7 +56,7 @@ export default async function ResumesPage() {
 
       {/* Dynamic Content */}
       <Suspense fallback={<ResumesSkeleton />}>
-        <ResumesContent userId={sessionResult.value.user.id} />
+        <ResumesContent />
       </Suspense>
     </main>
   );

@@ -281,6 +281,33 @@ export async function POST(
       tone,
     });
 
+    const { spendCredits } = await import(
+      "@/services/billing/billing.service"
+    );
+    const spendRes = await spendCredits(userId, "tailored_cover_letter", id);
+    if (!spendRes.ok) {
+      if (idempotencyAttemptId && idempotencyRecordId) {
+        await idempotencyDal.failIdempotentAction(
+          idempotencyRecordId,
+          idempotencyAttemptId
+        );
+      }
+      if (spendRes.error.code === "INSUFFICIENT_CREDITS") {
+        return NextResponse.json(
+          {
+            error: spendRes.error.message,
+            code: "insufficient_credits",
+            details: spendRes.error.details,
+          },
+          { status: 402 }
+        );
+      }
+      return NextResponse.json(
+        { error: spendRes.error.message },
+        { status: 500 }
+      );
+    }
+
     const result = streamText({
       model,
       instructions,

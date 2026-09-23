@@ -16,9 +16,13 @@ export type AppErrorCode =
   | "INTERNAL_ERROR"
   | "CIRCUIT_BREAKER_OPEN"
   | "CONFLICT"
+  | "INSUFFICIENT_CREDITS"
+  | "AI_GENERATION_FAILED"
   | "UNKNOWN";
 
 export class AppError extends Error {
+  public details?: unknown;
+
   constructor(
     public code: AppErrorCode,
     message: string,
@@ -26,5 +30,6 @@ export class AppError extends Error {
   ) {
     super(message);
     this.name = "AppError";
+    this.details = cause;
   }
 }

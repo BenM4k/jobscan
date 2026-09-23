@@ -10,7 +10,6 @@ import { getDashboardFeedData } from "@/services/dashboard.service";
 
 import { requireSession } from "@/lib/auth-guard";
 
-export const instant = false;
 export const maxDuration = 60;
 
 interface DashboardPageProps {
@@ -19,10 +18,8 @@ interface DashboardPageProps {
 
 async function DashboardFeed({
   searchParams,
-  filterKey,
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-  filterKey: string;
 }) {
   const sessionResult = await requireSession();
   const userId = sessionResult.ok ? sessionResult.value?.user?.id : undefined;
@@ -46,7 +43,6 @@ async function DashboardFeed({
 
   return (
     <JobList
-      key={filterKey}
       initialJobs={jobs}
       totalJobs={totalJobs}
       statusFilter={statusFilter}
@@ -58,22 +54,15 @@ async function DashboardFeed({
   );
 }
 
-export default async function DashboardPage({
+export default function DashboardPage({
   searchParams,
 }: DashboardPageProps) {
-  const { status, source, startDate, endDate, q } =
-    await searchParamsCache.parse(searchParams);
-  const filterKey = `${status ?? "all"}_${source ?? "all"}_${startDate ?? ""}_${endDate ?? ""}_${q ?? ""}`;
-
   return (
     <NuqsAdapter>
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-8 z-10">
         <ClientShell>
-          <Suspense
-            key={filterKey}
-            fallback={<JobListSkeleton />}
-          >
-            <DashboardFeed searchParams={searchParams} filterKey={filterKey} />
+          <Suspense fallback={<JobListSkeleton />}>
+            <DashboardFeed searchParams={searchParams} />
           </Suspense>
         </ClientShell>
         <ScrollToTopButton />

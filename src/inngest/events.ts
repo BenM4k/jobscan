@@ -26,6 +26,13 @@ export const jobCreatedEvent = eventType("job.created", {
   }),
 });
 
+export const mockPaymentInitiatedEvent = eventType("mock.payment.initiated", {
+  schema: z.object({
+    type: z.enum(["credit_purchase", "subscription"]),
+    providerReference: z.string(),
+  }),
+});
+
 export type JobFetchRequestedInput = z.infer<
   typeof jobFetchRequestedEvent.schema
 >;
@@ -33,3 +40,6 @@ export type DigestEmailScheduledInput = z.infer<
   typeof digestEmailScheduledEvent.schema
 >;
 export type JobCreatedInput = z.infer<typeof jobCreatedEvent.schema>;
+export type MockPaymentInitiatedInput = z.infer<
+  typeof mockPaymentInitiatedEvent.schema
+>;

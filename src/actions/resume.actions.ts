@@ -64,6 +64,27 @@ export async function createMasterResumeAction(data: {
   }
 
   const userId = session.value.user.id;
+
+  // Gate multiple personas (> 1) on active Pro subscription
+  const existingResumesRes = await resumeDal.getMasterResumes(userId);
+  if (existingResumesRes.ok && existingResumesRes.value.length >= 1) {
+    const { getUserSubscription } = await import("@/dal/billing.dal");
+    const subRes = await getUserSubscription(userId);
+    const hasActiveSub =
+      subRes.ok &&
+      subRes.value &&
+      subRes.value.status === "active" &&
+      new Date(subRes.value.currentPeriodEnd) > new Date();
+
+    if (!hasActiveSub) {
+      return {
+        success: false,
+        error:
+          "Multiple resume personas require an active Jobpilot Pro subscription. Please upgrade to create additional personas.",
+      };
+    }
+  }
+
   const res = await resumeDal.createMasterResume(
     {
       userId,
@@ -144,6 +165,26 @@ export async function promoteTailoredResumeAction(
   const parsed = promoteTailoredResumeSchema.safeParse({ tailoredResumeId, label });
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message || "Invalid arguments" };
+  }
+
+  // Gate multiple personas (> 1) on active Pro subscription
+  const existingResumesRes = await resumeDal.getMasterResumes(session.value.user.id);
+  if (existingResumesRes.ok && existingResumesRes.value.length >= 1) {
+    const { getUserSubscription } = await import("@/dal/billing.dal");
+    const subRes = await getUserSubscription(session.value.user.id);
+    const hasActiveSub =
+      subRes.ok &&
+      subRes.value &&
+      subRes.value.status === "active" &&
+      new Date(subRes.value.currentPeriodEnd) > new Date();
+
+    if (!hasActiveSub) {
+      return {
+        success: false,
+        error:
+          "Creating multiple personas by promoting tailored resumes requires an active Jobpilot Pro subscription.",
+      };
+    }
   }
 
   const res = await resumeDal.promoteTailoredResumeToMaster(

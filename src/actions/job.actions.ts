@@ -6,7 +6,7 @@ import { JobStatus } from "@/services/db/schema";
 import { z } from "zod";
 import { runWithIdempotency } from "@/services/idempotency.service";
 import { checkAiRateLimit } from "@/services/rate-limit";
-import { ok } from "@/lib/result";
+import { ok, err } from "@/lib/result";
 
 import {
   ALL_JOB_SOURCES,
@@ -244,12 +244,32 @@ export async function generateTailoredResumeAction(
     key: parsed.data.idempotencyKey,
     targetId: parsed.data.jobId,
     execute: async () => {
+      const { spendCredits, grantCredits } = await import(
+        "@/services/billing/billing.service"
+      );
+      const spendRes = await spendCredits(
+        userId,
+        "tailored_resume",
+        parsed.data.jobId
+      );
+      if (!spendRes.ok) return err(spendRes.error);
+
       const tailorRes = await generateTailoredResume(
         parsed.data.jobId,
         userId,
         parsed.data.resumeId,
       );
-      if (!tailorRes.ok) return tailorRes;
+      if (!tailorRes.ok) {
+        if (spendRes.value.cost > 0) {
+          await grantCredits(
+            userId,
+            spendRes.value.cost,
+            "refund",
+            parsed.data.jobId
+          );
+        }
+        return tailorRes;
+      }
       return ok({
         data: tailorRes.value,
         resultRef: tailorRes.value.tailoredResumeRecordId,
@@ -282,6 +302,14 @@ export async function generateTailoredResumeAction(
   });
 
   if (!result.ok) {
+    if (result.error.code === "INSUFFICIENT_CREDITS") {
+      return {
+        success: false,
+        code: "insufficient_credits",
+        error: result.error.message,
+        details: result.error.details,
+      };
+    }
     return { success: false, error: result.error.message };
   }
 
@@ -344,6 +372,16 @@ export async function generateTailoredCoverLetterAction(
     key: parsed.data.idempotencyKey,
     targetId: parsed.data.jobId,
     execute: async () => {
+      const { spendCredits, grantCredits } = await import(
+        "@/services/billing/billing.service"
+      );
+      const spendRes = await spendCredits(
+        userId,
+        "tailored_cover_letter",
+        parsed.data.jobId
+      );
+      if (!spendRes.ok) return err(spendRes.error);
+
       const clRes = await generateTailoredCoverLetter(
         parsed.data.jobId,
         userId,
@@ -354,7 +392,17 @@ export async function generateTailoredCoverLetterAction(
           tone: parsed.data.tone,
         }
       );
-      if (!clRes.ok) return clRes;
+      if (!clRes.ok) {
+        if (spendRes.value.cost > 0) {
+          await grantCredits(
+            userId,
+            spendRes.value.cost,
+            "refund",
+            parsed.data.jobId
+          );
+        }
+        return clRes;
+      }
       return ok({
         data: clRes.value,
         resultRef: clRes.value.coverLetterRecordId,
@@ -386,6 +434,14 @@ export async function generateTailoredCoverLetterAction(
   });
 
   if (!result.ok) {
+    if (result.error.code === "INSUFFICIENT_CREDITS") {
+      return {
+        success: false,
+        code: "insufficient_credits",
+        error: result.error.message,
+        details: result.error.details,
+      };
+    }
     return { success: false, error: result.error.message };
   }
 
