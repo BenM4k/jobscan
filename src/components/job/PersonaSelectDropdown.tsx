@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { MasterResumeSelect } from "@/services/db/schema";
 import {
@@ -12,12 +13,13 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, Check, FileText } from "lucide-react";
+import { ChevronDown, Check, FileText, Plus, ExternalLink } from "lucide-react";
 
 interface PersonaSelectDropdownProps {
   resumes: MasterResumeSelect[];
   selectedResumeId?: string;
   onSelectResume?: (id: string) => void;
+  onAddPersona?: () => void;
   size?: "sm" | "xs";
   showIcon?: boolean;
   disabled?: boolean;
@@ -27,19 +29,34 @@ export function PersonaSelectDropdown({
   resumes,
   selectedResumeId,
   onSelectResume,
+  onAddPersona,
   size = "sm",
   showIcon = true,
   disabled = false,
 }: PersonaSelectDropdownProps) {
+  const router = useRouter();
   const t = useTranslations("jobDetail");
 
-  if (resumes.length <= 1) return null;
+  const heightClass = size === "xs" ? "h-6 px-2 text-xs" : "h-7 px-2.5 text-xs";
+  const maxWidthClass = size === "xs" ? "max-w-[90px]" : "max-w-[110px]";
+
+  if (resumes.length === 0) {
+    if (!onAddPersona) return null;
+    return (
+      <button
+        type="button"
+        onClick={onAddPersona}
+        disabled={disabled}
+        className={`inline-flex items-center gap-1.5 rounded-lg border border-dashed border-blue-500/50 bg-blue-50/50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100/50 dark:hover:bg-blue-900/30 font-medium transition-colors cursor-pointer ${heightClass}`}
+      >
+        <Plus className="size-3" />
+        <span>{t("uploadResume")}</span>
+      </button>
+    );
+  }
 
   const selectedPersona =
     resumes.find((r) => r.id === selectedResumeId) || resumes[0];
-
-  const heightClass = size === "xs" ? "h-6 px-2 text-xs" : "h-7 px-2.5 text-xs";
-  const maxWidthClass = size === "xs" ? "max-w-[90px]" : "max-w-[100px]";
 
   return (
     <DropdownMenu>
@@ -81,6 +98,27 @@ export function PersonaSelectDropdown({
               )}
             </DropdownMenuItem>
           ))}
+        </DropdownMenuGroup>
+
+        <DropdownMenuSeparator />
+
+        <DropdownMenuGroup className="space-y-0.5">
+          {onAddPersona && (
+            <DropdownMenuItem
+              onClick={onAddPersona}
+              className="flex items-center gap-2 text-xs px-2 py-1.5 cursor-pointer rounded-md text-blue-600 dark:text-blue-400 font-medium"
+            >
+              <Plus className="size-3.5 shrink-0" />
+              <span>{t("addPersona")}</span>
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem
+            onClick={() => router.push("/dashboard/resumes")}
+            className="flex items-center justify-between w-full text-xs px-2 py-1.5 cursor-pointer rounded-md text-muted-foreground hover:text-foreground"
+          >
+            <span className="truncate">{t("managePersonas")}</span>
+            <ExternalLink className="size-3 shrink-0 ml-auto text-muted-foreground/70" />
+          </DropdownMenuItem>
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>

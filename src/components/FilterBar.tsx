@@ -1,54 +1,58 @@
 "use client";
 
-import React from "react";
-import { useQueryState, parseAsStringEnum } from "nuqs";
-import { pipelineStatusEnum, type PipelineStatus } from "@/services/db/schema";
+import React, { useState } from "react";
+import { useQueryState, parseAsString, parseAsStringEnum } from "nuqs";
+import { pipelineStatusEnum } from "@/services/db/schema";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { useTranslations } from "next-intl";
+import { Search, X, RotateCcw, Loader2 } from "lucide-react";
+import {
+  SOURCE_OPTIONS,
+  STATUS_OPTIONS,
+  type Source,
+  type SourceOption,
+  type StatusOption,
+} from "./filters/filter-options";
+import { FilterSelect } from "./filters/FilterSelect";
+import { useFilterTransition } from "./filters/FilterTransitionContext";
 
-export type Source =
-  | "greenhouse"
-  | "remoteok"
-  | "lever"
-  | "ashby"
-  | "reliefweb"
-  | "emploicd"
-  | "congojob"
-  | "unjobs"
-  | "manual";
-
-export type SourceOption = "all" | Source;
-export type StatusOption = "all" | PipelineStatus;
-
-const SOURCE_OPTIONS: { value: Source; label: string }[] = [
-  { value: "reliefweb", label: "🇨🇩 ReliefWeb" },
-  { value: "emploicd", label: "🇨🇩 Emploi.cd" },
-  { value: "congojob", label: "🇨🇩 CongoJob" },
-  { value: "unjobs", label: "🇨🇩 UNJobs" },
-  { value: "greenhouse", label: "Greenhouse" },
-  { value: "ashby", label: "Ashby" },
-  { value: "lever", label: "Lever" },
-  { value: "remoteok", label: "RemoteOK" },
-  { value: "manual", label: "Manual" },
-];
-
-const STATUS_OPTIONS: { value: PipelineStatus; key: string }[] = [
-  { value: "saved", key: "statusSaved" },
-  { value: "applied", key: "statusApplied" },
-  { value: "interviewing", key: "statusInterviewing" },
-  { value: "offer", key: "statusOffer" },
-  { value: "rejected", key: "statusRejected" },
-  { value: "withdrawn", key: "statusWithdrawn" },
-];
+export { FilterBarSkeleton } from "./filters/FilterBarSkeleton";
+export type { Source, SourceOption, StatusOption };
 
 export function FilterBar() {
   const t = useTranslations("dashboard");
+  const { isPending, startTransition } = useFilterTransition();
+
+  const [searchQuery, setSearchQuery] = useQueryState(
+    "q",
+    parseAsString.withDefault("").withOptions({ shallow: false }),
+  );
+  const [inputValue, setInputValue] = useState(searchQuery);
+  const [prevSearchQuery, setPrevSearchQuery] = useState(searchQuery);
+
+  if (prevSearchQuery !== searchQuery) {
+    setPrevSearchQuery(searchQuery);
+    setInputValue(searchQuery);
+  }
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSearchQuery(inputValue.trim() || "", {
+      startTransition,
+      shallow: false,
+    });
+  };
+
+  const handleClearSearch = () => {
+    setInputValue("");
+    setSearchQuery("", { startTransition, shallow: false });
+  };
+
   const [statusFilter, setStatusFilter] = useQueryState(
     "status",
-    parseAsStringEnum<StatusOption>([
-      "all",
-      ...pipelineStatusEnum.enumValues,
-    ]).withDefault("all"),
+    parseAsStringEnum<StatusOption>(["all", ...pipelineStatusEnum.enumValues])
+      .withDefault("all")
+      .withOptions({ shallow: false }),
   );
 
   const [sourceFilter, setSourceFilter] = useQueryState(
@@ -64,133 +68,140 @@ export function FilterBar() {
       "lever",
       "ashby",
       "manual",
-    ]).withDefault("all"),
+    ])
+      .withDefault("all")
+      .withOptions({ shallow: false }),
+  );
+
+  const [startDate, setStartDate] = useQueryState(
+    "startDate",
+    parseAsString.withDefault("").withOptions({ shallow: false }),
+  );
+  const [endDate, setEndDate] = useQueryState(
+    "endDate",
+    parseAsString.withDefault("").withOptions({ shallow: false }),
   );
 
   const isSourceActive = sourceFilter !== "all";
   const isStatusActive = statusFilter !== "all";
+  const isDateActive = Boolean(startDate || endDate);
+  const isSearchActive = Boolean(searchQuery && searchQuery.trim().length > 0);
+  const hasActiveFilters =
+    isSourceActive || isStatusActive || isDateActive || isSearchActive;
 
-  const formatStatus = (key: string) => {
-    const raw = t(key);
-    return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+  const handleResetAll = () => {
+    setInputValue("");
+    setSearchQuery("", { startTransition, shallow: false });
+    setStatusFilter("all", { startTransition, shallow: false });
+    setSourceFilter("all", { startTransition, shallow: false });
+    setStartDate(null, { startTransition, shallow: false });
+    setEndDate(null, { startTransition, shallow: false });
   };
 
+  const statusDropdownOptions = STATUS_OPTIONS.map((opt) => {
+    const raw = t(opt.key);
+    const label = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+    return { value: opt.value, label };
+  });
+
   return (
-    <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 text-xs font-normal">
-      {/* Source Dropdown Filter Pill */}
-      <div className="relative">
-        <select
-          value={sourceFilter}
-          onChange={(e) =>
-            setSourceFilter(e.target.value as SourceOption, { shallow: false })
-          }
-          aria-label="Filter jobs by source platform"
-          className={`appearance-none rounded-xl px-3.5 py-1.5 sm:px-4 sm:py-2 pr-7 transition cursor-pointer text-base sm:text-xs focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500 font-medium border ${
-            isSourceActive
-              ? "bg-blue-50 dark:bg-blue-950/60 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300"
-              : "bg-white dark:bg-[#18181B] border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 hover:border-slate-300 dark:hover:border-zinc-700"
-          }`}
+    <div className="p-2 sm:p-2.5 rounded-2xl bg-slate-100/70 dark:bg-zinc-900/40 border border-slate-200/80 dark:border-zinc-800/80 shadow-2xs">
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
+        {/* Search Input with embedded icon button */}
+        <form
+          onSubmit={handleSearchSubmit}
+          className="relative flex-1 min-w-60"
         >
-          <option value="all">{t("sourceAll")}</option>
-          {SOURCE_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {isSourceActive && sourceFilter === opt.value
-                ? `Source: ${opt.label}`
-                : opt.label}
-            </option>
-          ))}
-        </select>
-        <span
-          className={`absolute right-2.5 top-2 sm:top-2.5 pointer-events-none text-[10px] ${
-            isSourceActive
-              ? "text-blue-600 dark:text-blue-400"
-              : "text-gray-400 dark:text-zinc-500"
-          }`}
-          aria-hidden="true"
-        >
-          ▾
-        </span>
+          <input
+            id="job-search-input"
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder={t("searchPlaceholder")}
+            aria-label={t("searchPlaceholder")}
+            className="w-full h-11 pl-4 pr-20 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-2xs"
+          />
+          <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            {inputValue && !isPending && (
+              <button
+                type="button"
+                onClick={handleClearSearch}
+                aria-label={t("clearFilter")}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer p-1 rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800 transition"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+            <button
+              type="submit"
+              disabled={isPending}
+              aria-label={t("searchPlaceholder")}
+              className="size-8 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/70 text-white flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-95 shrink-0"
+            >
+              {isPending ? (
+                <Loader2 className="size-4 animate-spin text-white" />
+              ) : (
+                <Search className="size-4" />
+              )}
+            </button>
+          </div>
+        </form>
+
+        {/* Filter Controls Group - Symmetrical, uniform h-11 selects */}
+        <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap sm:flex-nowrap">
+          <FilterSelect
+            value={sourceFilter}
+            onChange={(val) =>
+              setSourceFilter(val as SourceOption, {
+                startTransition,
+                shallow: false,
+              })
+            }
+            options={SOURCE_OPTIONS}
+            ariaLabel={t("sourceAll")}
+            allLabel={t("sourceAll")}
+            isActive={isSourceActive}
+            prefix={t("sourceAll").split(/[:：]/)[0].trim()}
+            minWidthClass="min-w-[150px]"
+          />
+
+          <FilterSelect
+            value={statusFilter}
+            onChange={(val) =>
+              setStatusFilter(val as StatusOption, {
+                startTransition,
+                shallow: false,
+              })
+            }
+            options={statusDropdownOptions}
+            ariaLabel={t("statusAll")}
+            allLabel={t("statusAll")}
+            isActive={isStatusActive}
+            prefix={t("status")}
+            minWidthClass="min-w-[145px]"
+          />
+
+          <div className="w-full sm:w-auto flex-1 sm:flex-initial">
+            <DateRangeFilter />
+          </div>
+
+          {/* Reset All Filters Button */}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={handleResetAll}
+              disabled={isPending}
+              aria-label={t("clearFilter")}
+              className="h-11 px-3.5 rounded-xl border border-dashed border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:border-rose-300 dark:hover:border-rose-800 text-slate-600 dark:text-zinc-400 hover:text-rose-600 dark:hover:text-rose-300 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer shrink-0 disabled:opacity-50"
+            >
+              <RotateCcw
+                className={`w-3.5 h-3.5 ${isPending ? "animate-spin" : ""}`}
+              />
+              <span className="hidden sm:inline">{t("clearFilter")}</span>
+            </button>
+          )}
+        </div>
       </div>
-
-      {/* Status Dropdown Filter Pill */}
-      <div className="relative">
-        <select
-          value={statusFilter}
-          onChange={(e) =>
-            setStatusFilter(e.target.value as StatusOption, { shallow: false })
-          }
-          aria-label="Filter jobs by status"
-          className={`appearance-none rounded-xl px-3.5 py-1.5 sm:px-4 sm:py-2 pr-7 transition cursor-pointer text-base sm:text-xs focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500 font-medium border ${
-            isStatusActive
-              ? "bg-blue-50 dark:bg-blue-950/60 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300"
-              : "bg-white dark:bg-[#18181B] border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 hover:border-slate-300 dark:hover:border-zinc-700"
-          }`}
-        >
-          <option value="all">{t("statusAll")}</option>
-          {STATUS_OPTIONS.map((opt) => {
-            const label = formatStatus(opt.key);
-            return (
-              <option key={opt.value} value={opt.value}>
-                {isStatusActive && statusFilter === opt.value
-                  ? `Status: ${label}`
-                  : label}
-              </option>
-            );
-          })}
-        </select>
-        <span
-          className={`absolute right-2.5 top-2 sm:top-2.5 pointer-events-none text-[10px] ${
-            isStatusActive
-              ? "text-blue-600 dark:text-blue-400"
-              : "text-gray-400 dark:text-zinc-500"
-          }`}
-          aria-hidden="true"
-        >
-          ▾
-        </span>
-      </div>
-
-      {/* Date Range Filter */}
-      <DateRangeFilter />
-
-      <button
-        aria-label={t("country")}
-        className="bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl hover:border-slate-300 dark:hover:border-zinc-700 transition flex items-center gap-1 font-medium cursor-pointer"
-      >
-        <span>{t("country")}</span>
-        <span
-          className="text-[10px] text-gray-400 dark:text-zinc-500 ml-0.5"
-          aria-hidden="true"
-        >
-          ▾
-        </span>
-      </button>
-
-      <button
-        aria-label={t("city")}
-        className="bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl hover:border-slate-300 dark:hover:border-zinc-700 transition flex items-center gap-1 font-medium cursor-pointer"
-      >
-        <span>{t("city")}</span>
-        <span
-          className="text-[10px] text-gray-400 dark:text-zinc-500 ml-0.5"
-          aria-hidden="true"
-        >
-          ▾
-        </span>
-      </button>
-
-      <button
-        aria-label={t("workplace")}
-        className="bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl hover:border-slate-300 dark:hover:border-zinc-700 transition flex items-center gap-1 font-medium cursor-pointer"
-      >
-        <span>{t("workplace")}</span>
-        <span
-          className="text-[10px] text-gray-400 dark:text-zinc-500 ml-0.5"
-          aria-hidden="true"
-        >
-          ▾
-        </span>
-      </button>
     </div>
   );
 }

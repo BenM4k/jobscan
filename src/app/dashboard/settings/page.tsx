@@ -100,7 +100,7 @@ async function SettingsContent() {
 
 export default function SettingsPage() {
   return (
-    <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 w-full space-y-8 z-10">
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 w-full space-y-8 z-10">
       {/* Header */}
       <div className="space-y-1.5 border-b border-slate-200 dark:border-zinc-800/80 pb-6">
         <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800/80 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700/60 text-xs font-medium font-sans">

@@ -47,7 +47,7 @@ export function JobListEmptyState() {
   };
 
   return (
-    <div className="text-center py-12 sm:py-16 px-6 border-2 border-dashed border-gray-200 dark:border-slate-800 rounded-3xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl shadow-xl shadow-gray-200/40 dark:shadow-none transition-all duration-300 space-y-5">
+    <div className="text-center py-12 sm:py-16 px-6 transition-all duration-300 space-y-5">
       <div className="w-14 h-14 rounded-2xl bg-linear-to-tr from-blue-500 to-indigo-600 text-white flex items-center justify-center mx-auto text-2xl font-black shadow-lg shadow-blue-500/25">
         ✦
       </div>
@@ -90,17 +90,19 @@ export function JobListEmptyState() {
           onCancel={checkSyncRunner.cancelRetry}
         />
 
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={checkSyncRunner.isLoading}
-          onClick={handleManualCheck}
-          className="gap-2 text-xs font-medium rounded-xl h-8.5 px-4 cursor-pointer"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${checkSyncRunner.isLoading ? "animate-spin text-blue-600" : ""}`} />
-          <span>{checkSyncRunner.isLoading ? t("checkingBgIngestion") : t("checkForIngestedJobs")}</span>
-        </Button>
+        <div className="pt-12 sm:pt-16">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={checkSyncRunner.isLoading}
+            onClick={handleManualCheck}
+            className="gap-2 text-xs font-semibold rounded-xl h-8.5 px-4 cursor-pointer text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50/60 dark:hover:bg-blue-950/30 border-blue-200/80 dark:border-blue-800/60 transition-colors"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${checkSyncRunner.isLoading ? "animate-spin" : ""}`} />
+            <span>{checkSyncRunner.isLoading ? t("checkingBgIngestion") : t("checkForIngestedJobs")}</span>
+          </Button>
+        </div>
       </div>
     </div>
   );

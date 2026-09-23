@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { JobSelect } from "@/dal/jobs.dal";
 import { toast } from "sonner";
 import posthog from "posthog-js";
@@ -14,14 +14,16 @@ export { parseTailoredResume };
 interface UseTailoredResumeOptions {
   job: JobSelect;
   onJobUpdated: (updated: JobSelect) => void;
+  selectedResumeId?: string;
 }
 
-export function useTailoredResume({ job, onJobUpdated }: UseTailoredResumeOptions) {
+export function useTailoredResume({ job, onJobUpdated, selectedResumeId }: UseTailoredResumeOptions) {
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editedResume, setEditedResume] = useState(job.tailoredResume || "");
   const [isCopied, setIsCopied] = useState(false);
   const pendingIdempotencyKeyRef = useRef<string | null>(null);
+  const pendingResumeIdRef = useRef<string | undefined>(undefined);
 
   const retryRunner = useAsyncJobWithRetry<{
     data: JobSelect;
@@ -33,9 +35,19 @@ export function useTailoredResume({ job, onJobUpdated }: UseTailoredResumeOption
     enableToasts: true,
   });
 
+  const cancelRetry = useCallback(() => {
+    pendingIdempotencyKeyRef.current = null;
+    pendingResumeIdRef.current = undefined;
+    retryRunner.cancelRetry();
+  }, [retryRunner]);
+
   const handleGenerate = async () => {
-    if (!pendingIdempotencyKeyRef.current) {
+    if (
+      !pendingIdempotencyKeyRef.current ||
+      pendingResumeIdRef.current !== selectedResumeId
+    ) {
       pendingIdempotencyKeyRef.current = crypto.randomUUID();
+      pendingResumeIdRef.current = selectedResumeId;
     }
     const idempotencyKey = pendingIdempotencyKeyRef.current;
 
@@ -46,7 +58,7 @@ export function useTailoredResume({ job, onJobUpdated }: UseTailoredResumeOption
           "Content-Type": "application/json",
           "Idempotency-Key": idempotencyKey,
         },
-        body: JSON.stringify({ idempotencyKey }),
+        body: JSON.stringify({ idempotencyKey, resumeId: selectedResumeId }),
       });
 
       if (!res.ok) {
@@ -68,6 +80,7 @@ export function useTailoredResume({ job, onJobUpdated }: UseTailoredResumeOption
 
     if (result) {
       pendingIdempotencyKeyRef.current = null;
+      pendingResumeIdRef.current = undefined;
       posthog.capture("tailored_resume_generated");
       setEditedResume(result.tailoredResume);
       onJobUpdated(result.data);
@@ -134,7 +147,7 @@ export function useTailoredResume({ job, onJobUpdated }: UseTailoredResumeOption
     totalAttempts: retryRunner.totalAttempts,
     retryCountdown: retryRunner.countdown,
     retryMessage: retryRunner.message,
-    cancelRetry: retryRunner.cancelRetry,
+    cancelRetry,
     retryNow: retryRunner.retryNow,
     isSaving,
     isEditing,

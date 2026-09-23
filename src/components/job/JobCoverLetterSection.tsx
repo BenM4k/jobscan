@@ -18,11 +18,13 @@ import { RetryProgressBadge } from "@/components/ui/RetryProgressBadge";
 interface JobCoverLetterSectionProps {
   job: JobSelect;
   onJobUpdated: (updated: JobSelect) => void;
+  selectedResumeId?: string;
 }
 
 export function JobCoverLetterSection({
   job,
   onJobUpdated,
+  selectedResumeId,
 }: JobCoverLetterSectionProps) {
   const t = useTranslations("jobDetail");
   const tCommon = useTranslations("common");
@@ -48,7 +50,7 @@ export function JobCoverLetterSection({
     handleSave,
     handleDownloadPdf,
     handleCopy,
-  } = useCoverLetter({ job, onJobUpdated });
+  } = useCoverLetter({ job, onJobUpdated, selectedResumeId });
 
   const hasContent = hasCoverLetter || Boolean(coverLetter);
   const isIdle = !hasContent && !isStreaming;

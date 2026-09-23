@@ -4,7 +4,8 @@ import { JobList } from "@/components/JobList";
 import { searchParamsCache } from "@/lib/search-params";
 import { JobStatus } from "@/services/db/schema";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
-import { JobCardSkeleton } from "@/components/JobCardSkeleton";
+import { JobListSkeleton } from "@/components/job/JobListSkeleton";
+import { ScrollToTopButton } from "@/components/job/ScrollToTopButton";
 import { getDashboardFeedData } from "@/services/dashboard.service";
 
 import { requireSession } from "@/lib/auth-guard";
@@ -18,8 +19,10 @@ interface DashboardPageProps {
 
 async function DashboardFeed({
   searchParams,
+  filterKey,
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  filterKey: string;
 }) {
   const sessionResult = await requireSession();
   const userId = sessionResult.ok ? sessionResult.value?.user?.id : undefined;
@@ -60,22 +63,22 @@ async function DashboardFeed({
 export default async function DashboardPage({
   searchParams,
 }: DashboardPageProps) {
+  const { status, source, startDate, endDate, q } =
+    await searchParamsCache.parse(searchParams);
+  const filterKey = `${status ?? "all"}_${source ?? "all"}_${startDate ?? ""}_${endDate ?? ""}_${q ?? ""}`;
+
   return (
     <NuqsAdapter>
-      <main className="flex-1 max-w-6xl w-full mx-auto p-6 space-y-8 z-10">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-8 z-10">
         <ClientShell>
           <Suspense
-            fallback={
-              <div className="space-y-4">
-                <JobCardSkeleton />
-                <JobCardSkeleton />
-                <JobCardSkeleton />
-              </div>
-            }
+            key={filterKey}
+            fallback={<JobListSkeleton />}
           >
-            <DashboardFeed searchParams={searchParams} />
+            <DashboardFeed searchParams={searchParams} filterKey={filterKey} />
           </Suspense>
         </ClientShell>
+        <ScrollToTopButton />
       </main>
     </NuqsAdapter>
   );

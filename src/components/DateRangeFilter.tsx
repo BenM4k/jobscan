@@ -2,94 +2,124 @@
 
 import React, { useState } from "react";
 import { useQueryState, parseAsString } from "nuqs";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { useTranslations } from "next-intl";
-
-function formatDateToInput(date: Date): string {
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
+import { Popover, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { useTranslations, useLocale } from "next-intl";
+import { RotateCcw } from "lucide-react";
+import type { DateRange } from "react-day-picker";
+import {
+  formatDateToInput,
+  parseDateInput,
+  formatShortDate,
+  getDateFilterBounds,
+} from "./filters/date-filter-utils";
+import { DateRangeDisplayCard } from "./filters/DateRangeDisplayCard";
+import { DateRangePresets } from "./filters/DateRangePresets";
+import { DateRangeTrigger } from "./filters/DateRangeTrigger";
+import { useFilterTransition } from "./filters/FilterTransitionContext";
 
 export function DateRangeFilter() {
   const t = useTranslations("dashboard");
+  const locale = useLocale();
+  const { startTransition } = useFilterTransition();
+
   const [startDate, setStartDate] = useQueryState(
     "startDate",
-    parseAsString.withDefault(""),
+    parseAsString.withDefault("").withOptions({ shallow: false }),
   );
   const [endDate, setEndDate] = useQueryState(
     "endDate",
-    parseAsString.withDefault(""),
+    parseAsString.withDefault("").withOptions({ shallow: false }),
   );
 
-  const [tempStart, setTempStart] = useState(startDate);
-  const [tempEnd, setTempEnd] = useState(endDate);
+  const [isOpen, setIsOpen] = useState(false);
 
-  const handleApplyCustom = () => {
-    setStartDate(tempStart || null, { shallow: false });
-    setEndDate(tempEnd || null, { shallow: false });
+  const [tempRange, setTempRange] = useState<DateRange | undefined>(() => ({
+    from: parseDateInput(startDate),
+    to: parseDateInput(endDate),
+  }));
+
+  const { endOfToday, minAllowedDate } = getDateFilterBounds();
+
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    if (open) {
+      setTempRange({
+        from: parseDateInput(startDate),
+        to: parseDateInput(endDate),
+      });
+    }
+  };
+
+  const handleApply = () => {
+    setStartDate(tempRange?.from ? formatDateToInput(tempRange.from) : null, {
+      startTransition,
+      shallow: false,
+    });
+    setEndDate(tempRange?.to ? formatDateToInput(tempRange.to) : null, {
+      startTransition,
+      shallow: false,
+    });
+    setIsOpen(false);
+  };
+
+  const handleClear = () => {
+    setTempRange(undefined);
+    setStartDate(null, { startTransition, shallow: false });
+    setEndDate(null, { startTransition, shallow: false });
+    setIsOpen(false);
   };
 
   const handlePreset = (days?: number) => {
     if (!days) {
-      setTempStart("");
-      setTempEnd("");
-      setStartDate(null, { shallow: false });
-      setEndDate(null, { shallow: false });
+      handleClear();
       return;
     }
-
     const today = new Date();
     const past = new Date();
     past.setDate(today.getDate() - days);
 
-    const startStr = formatDateToInput(past);
-    const endStr = formatDateToInput(today);
+    const clampedPast = past < minAllowedDate ? minAllowedDate : past;
 
-    setTempStart(startStr);
-    setTempEnd(endStr);
-    setStartDate(startStr, { shallow: false });
-    setEndDate(endStr, { shallow: false });
+    const range = { from: clampedPast, to: today };
+    setTempRange(range);
+    setStartDate(formatDateToInput(clampedPast), {
+      startTransition,
+      shallow: false,
+    });
+    setEndDate(formatDateToInput(today), { startTransition, shallow: false });
+    setIsOpen(false);
   };
 
-  // Compute label text for trigger pill
-  let label = t("dateRangeAll");
-  const datePrefix = t("startDate").split(" ")[0] || "Date";
-  if (startDate && endDate) {
-    label = `${datePrefix}: ${startDate} - ${endDate}`;
-  } else if (startDate) {
-    label = `${datePrefix}: ≥ ${startDate}`;
-  } else if (endDate) {
-    label = `${datePrefix}: ≤ ${endDate}`;
-  }
-
+  const fromDate = parseDateInput(startDate);
+  const toDate = parseDateInput(endDate);
   const isFiltered = Boolean(startDate || endDate);
 
+  let displayTitle = t("filterByDate");
+  let displayValue = t("allTime");
+  if (fromDate && toDate) {
+    displayTitle = t("customRange");
+    displayValue = `${formatShortDate(fromDate, locale)} – ${formatShortDate(toDate, locale)}`;
+  } else if (fromDate) {
+    displayTitle = t("startDate");
+    displayValue = formatShortDate(fromDate, locale);
+  } else if (toDate) {
+    displayTitle = t("endDate");
+    displayValue = formatShortDate(toDate, locale);
+  }
+
   return (
-    <Popover>
-      <PopoverTrigger
-        aria-label={t("filterByDate")}
-        className={`appearance-none rounded-xl px-3.5 py-1.5 sm:px-4 sm:py-2 transition cursor-pointer text-xs focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500 flex items-center gap-1 font-medium border ${
-          isFiltered
-            ? "bg-blue-50 dark:bg-blue-950/60 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300"
-            : "bg-white dark:bg-[#18181B] border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 hover:border-slate-300 dark:hover:border-zinc-700"
-        }`}
-      >
-        <span className="truncate max-w-[160px] sm:max-w-[200px]">{label}</span>
-        <span
-          className={`text-[10px] ml-0.5 ${
-            isFiltered ? "text-blue-600 dark:text-blue-400" : "text-gray-400 dark:text-zinc-500"
-          }`}
-          aria-hidden="true"
-        >
-          ▾
-        </span>
-      </PopoverTrigger>
+    <Popover open={isOpen} onOpenChange={handleOpenChange}>
+      <DateRangeTrigger
+        isFiltered={isFiltered}
+        displayTitle={displayTitle}
+        displayValue={displayValue}
+        ariaLabel={t("filterByDate")}
+      />
 
       <PopoverContent
         align="start"
-        className="w-72 p-4 bg-white dark:bg-[#121215] border border-slate-300 dark:border-zinc-800 rounded-2xl shadow-xl space-y-4"
+        className="w-[calc(100vw-2rem)] sm:w-auto max-w-97.5 sm:max-w-none p-3.5 sm:p-4 bg-white dark:bg-[#121215] border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xl space-y-3.5"
       >
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-gray-900 dark:text-slate-100 uppercase tracking-wider">
@@ -97,85 +127,56 @@ export function DateRangeFilter() {
           </span>
           {isFiltered && (
             <button
-              onClick={() => handlePreset(undefined)}
-              className="text-[11px] text-rose-500 hover:text-rose-600 font-medium cursor-pointer"
+              type="button"
+              onClick={handleClear}
+              className="text-xs text-rose-500 hover:text-rose-600 font-semibold cursor-pointer flex items-center gap-1 transition"
             >
-              {t("clearFilter")}
+              <RotateCcw className="size-3" />
+              <span>{t("clearFilter")}</span>
             </button>
           )}
         </div>
 
-        {/* Presets */}
-        <div className="grid grid-cols-2 gap-1.5">
-          <button
-            onClick={() => handlePreset(undefined)}
-            className="px-2.5 py-1.5 rounded-xl border border-slate-300 dark:border-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-800 text-xs text-gray-800 dark:text-zinc-300 font-medium transition cursor-pointer"
-          >
-            {t("allTime")}
-          </button>
-          <button
-            onClick={() => handlePreset(1)}
-            className="px-2.5 py-1.5 rounded-xl border border-slate-300 dark:border-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-800 text-xs text-gray-800 dark:text-zinc-300 font-medium transition cursor-pointer"
-          >
-            {t("last24h")}
-          </button>
-          <button
-            onClick={() => handlePreset(7)}
-            className="px-2.5 py-1.5 rounded-xl border border-slate-300 dark:border-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-800 text-xs text-gray-800 dark:text-zinc-300 font-medium transition cursor-pointer"
-          >
-            {t("last7Days")}
-          </button>
-          <button
-            onClick={() => handlePreset(30)}
-            className="px-2.5 py-1.5 rounded-xl border border-slate-300 dark:border-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-800 text-xs text-gray-800 dark:text-zinc-300 font-medium transition cursor-pointer"
-          >
-            {t("last30Days")}
-          </button>
+        {/* Noticeable Date Displays Card */}
+        <DateRangeDisplayCard from={tempRange?.from} to={tempRange?.to} />
+
+        {/* Presets with generous padding */}
+        <DateRangePresets
+          isFiltered={isFiltered}
+          onSelectPreset={handlePreset}
+        />
+
+        {/* shadcn Calendar with year blocked to current year & max 3 months back */}
+        <div className="border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden p-1 flex justify-center bg-slate-50/50 dark:bg-zinc-950/40 w-full">
+          <Calendar
+            mode="range"
+            selected={tempRange}
+            onSelect={setTempRange}
+            disabled={[{ after: endOfToday }, { before: minAllowedDate }]}
+            startMonth={minAllowedDate}
+            endMonth={endOfToday}
+            numberOfMonths={1}
+            captionLayout="label"
+          />
         </div>
 
-        {/* Custom Range */}
-        <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-zinc-800">
-          <span className="text-[11px] text-gray-500 dark:text-zinc-500 font-semibold block">
-            {t("customRange")}
-          </span>
-          <div className="space-y-2">
-            <div>
-              <label
-                htmlFor="start-date-input"
-                className="text-[10px] text-gray-600 dark:text-zinc-400 font-medium block mb-1"
-              >
-                {t("startDate")}
-              </label>
-              <input
-                id="start-date-input"
-                type="date"
-                value={tempStart}
-                onChange={(e) => setTempStart(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-zinc-900 border border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 text-base sm:text-xs rounded-xl p-2 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="end-date-input"
-                className="text-[10px] text-gray-600 dark:text-zinc-400 font-medium block mb-1"
-              >
-                {t("endDate")}
-              </label>
-              <input
-                id="end-date-input"
-                type="date"
-                value={tempEnd}
-                onChange={(e) => setTempEnd(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-zinc-900 border border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 text-base sm:text-xs rounded-xl p-2 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <button
-              onClick={handleApplyCustom}
-              className="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs py-2 rounded-xl transition shadow-xs cursor-pointer"
-            >
-              {t("applyRange")}
-            </button>
-          </div>
+        {/* Bottom Actions */}
+        <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 dark:border-zinc-800">
+          <button
+            type="button"
+            onClick={() => setIsOpen(false)}
+            className="flex-1 sm:flex-initial px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer text-center"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleApply}
+            disabled={!tempRange?.from}
+            className="flex-1 sm:flex-initial px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-xs rounded-xl transition shadow-xs cursor-pointer text-center"
+          >
+            {t("applyRange")}
+          </button>
         </div>
       </PopoverContent>
     </Popover>

@@ -12,8 +12,13 @@ import {
 } from "@/components/ui/dialog";
 import { createMasterResumeAction } from "@/actions/resume.actions";
 import { MasterResumeSelect } from "@/services/db/schema";
+import { MasterResumeUpload } from "@/components/profile/MasterResumeUpload";
+import { MasterResumeEditor } from "@/components/profile/MasterResumeEditor";
+import { formatResumeToMarkdown, parseResumeContent } from "@/lib/resume-format";
+import { EducationItem, ExperienceItem, ResumeProfileData } from "@/lib/ai";
 import { toast } from "sonner";
-import { Plus, Sparkles } from "lucide-react";
+import { Sparkles, Plus } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface CreateResumeModalProps {
   open: boolean;
@@ -28,113 +33,184 @@ export function CreateResumeModal({
 }: CreateResumeModalProps) {
   const [label, setLabel] = useState("");
   const [language, setLanguage] = useState<"en" | "fr">("en");
-  const [content, setContent] = useState("");
+
+  const [summary, setSummary] = useState("");
+  const [skills, setSkills] = useState("");
+  const [education, setEducation] = useState<EducationItem[]>([]);
+  const [experience, setExperience] = useState<ExperienceItem[]>([]);
+  const [rawText, setRawText] = useState("");
+  const [resumeText, setResumeText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const t = useTranslations("resumes.create");
+  const tCommon = useTranslations("common");
+
+  const resetForm = () => {
+    setLabel("");
+    setLanguage("en");
+    setSummary("");
+    setSkills("");
+    setEducation([]);
+    setExperience([]);
+    setRawText("");
+    setResumeText("");
+  };
+
+  const handleResumeTextChange = (newText: string) => {
+    setResumeText(newText);
+    if (newText.trim()) {
+      const parsed = parseResumeContent(newText);
+      setSummary(parsed.summary);
+      setSkills(parsed.skills.join(", "));
+      setEducation(parsed.education);
+      setExperience(parsed.experience);
+    }
+  };
+
+  const handleExtracted = (data: ResumeProfileData, fileRawText: string) => {
+    setSummary(data.summary || "");
+    setSkills(data.skills?.join(", ") || "");
+    setEducation(data.education || []);
+    setExperience(data.experience || []);
+    setRawText(fileRawText);
+    setResumeText(fileRawText);
+    if (!label.trim() && data.summary) {
+      const firstLine = data.summary.split(".")[0];
+      if (firstLine && firstLine.length < 50) {
+        setLabel(firstLine);
+      }
+    }
+  };
+
+  const parsedSkillsList = skills
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim()) {
-      toast.error("Resume content cannot be empty");
+    const formattedContent = formatResumeToMarkdown({
+      summary,
+      skills: parsedSkillsList,
+      education,
+      experience,
+      rawResumeText: resumeText || rawText,
+    });
+
+    if (!formattedContent.trim()) {
+      toast.error(t("contentRequired"));
       return;
     }
 
     try {
       setIsSubmitting(true);
       const res = await createMasterResumeAction({
-        label: label.trim() || "Untitled Persona",
-        content: content.trim(),
+        label: label.trim() || "New Persona",
+        content: formattedContent,
         language,
+        skills: parsedSkillsList,
       });
 
       if (!res.success || !res.data) {
-        toast.error(res.error || "Failed to create resume persona");
+        toast.error(res.error || t("createFailed"));
         return;
       }
 
-      toast.success(`Persona "${res.data.label}" created and set as active`);
+      toast.success(t("createSuccess", { label: res.data.label }));
       onCreated(res.data);
       onOpenChange(false);
-      setLabel("");
-      setContent("");
+      resetForm();
     } catch (err) {
       console.error(err);
-      toast.error("An unexpected error occurred");
+      toast.error(t("unexpectedError"));
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const hasContent = Boolean(
+    summary || skills || education.length > 0 || experience.length > 0 || resumeText
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg p-6 space-y-4">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-6 gap-5">
+        <DialogHeader className="border-b border-border/60 pb-3">
           <div className="flex items-center gap-2">
             <Sparkles className="size-4 text-blue-600 dark:text-blue-400 shrink-0" />
-            <DialogTitle className="text-base font-semibold text-foreground">
-              Add Resume Persona
+            <DialogTitle className="text-base font-bold text-foreground">
+              {t("title")}
             </DialogTitle>
           </div>
           <DialogDescription className="text-xs text-muted-foreground font-normal leading-relaxed">
-            Create a specialized persona (e.g. Frontend Specialist, Tech Lead, bilingual).
-            New personas are automatically set as active.
+            {t("description")}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 pt-1">
-          <div className="space-y-1.5">
-            <label
-              htmlFor="persona-label"
-              className="text-xs font-medium text-foreground block"
-            >
-              Persona Label
-            </label>
-            <input
-              id="persona-label"
-              type="text"
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder="e.g. Senior Fullstack Engineer"
-              className="w-full h-9 px-3 rounded-lg border border-border bg-background text-foreground text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-blue-500"
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto pr-1 space-y-5">
+          {/* Persona Metadata */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground block">
+                {t("personaLabel")}
+              </label>
+              <input
+                type="text"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder={t("personaLabelPlaceholder")}
+                className="w-full h-9 px-3 rounded-lg border border-border bg-background text-foreground text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground block">
+                {t("targetLanguage")}
+              </label>
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value as "en" | "fr")}
+                className="w-full h-9 px-3 rounded-lg border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+              >
+                <option value="en">English (en)</option>
+                <option value="fr">French (fr)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* AI Document Upload */}
+          <MasterResumeUpload
+            onExtracted={handleExtracted}
+            disabled={isSubmitting}
+            isReplacing={hasContent}
+          />
+
+          {/* Structured Output Review & Editor */}
+          <div className="border-t border-border/60 pt-4">
+            <div className="mb-2">
+              <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">
+                {t("reviewCustomization")}
+              </h4>
+              <p className="text-xs text-muted-foreground">
+                {t("reviewCustomizationSubtitle")}
+              </p>
+            </div>
+
+            <MasterResumeEditor
+              summary={summary}
+              skills={skills}
+              education={education}
+              experience={experience}
+              resumeText={resumeText}
+              onSummaryChange={setSummary}
+              onSkillsChange={setSkills}
+              onEducationChange={setEducation}
+              onExperienceChange={setExperience}
+              onResumeTextChange={handleResumeTextChange}
             />
           </div>
 
-          <div className="space-y-1.5">
-            <label
-              htmlFor="persona-language"
-              className="text-xs font-medium text-foreground block"
-            >
-              Primary Language
-            </label>
-            <select
-              id="persona-language"
-              value={language}
-              onChange={(e) => setLanguage(e.target.value as "en" | "fr")}
-              className="w-full h-9 px-3 rounded-lg border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-            >
-              <option value="en">English (en)</option>
-              <option value="fr">French (fr)</option>
-            </select>
-          </div>
-
-          <div className="space-y-1.5">
-            <label
-              htmlFor="persona-content"
-              className="text-xs font-medium text-foreground block"
-            >
-              Resume Text Content
-            </label>
-            <textarea
-              id="persona-content"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              rows={8}
-              placeholder="Paste your plain text resume or markdown here..."
-              required
-              className="w-full p-3 rounded-lg border border-border bg-background text-foreground text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono resize-y"
-            />
-          </div>
-
-          <DialogFooter className="flex flex-row items-center justify-end gap-2 pt-3 border-t border-border/40">
+          <DialogFooter className="flex flex-row items-center justify-end gap-2 pt-4 border-t border-border/60">
             <Button
               type="button"
               variant="outline"
@@ -142,16 +218,16 @@ export function CreateResumeModal({
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
             >
-              Cancel
+              {tCommon("cancel")}
             </Button>
             <Button
               type="submit"
               size="sm"
-              disabled={isSubmitting || !content.trim()}
-              className="gap-1.5"
+              disabled={isSubmitting || !hasContent}
+              className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md shadow-blue-500/20 px-4 py-2 text-xs font-semibold gap-1.5"
             >
               <Plus className="size-3.5" />
-              <span>{isSubmitting ? "Creating..." : "Create Persona"}</span>
+              <span>{isSubmitting ? t("creating") : t("createAction")}</span>
             </Button>
           </DialogFooter>
         </form>

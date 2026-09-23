@@ -2,7 +2,8 @@ import React from "react";
 
 export function AddJobSkeleton() {
   return (
-    <div className="max-w-6xl w-full mx-auto space-y-6 animate-pulse font-sans">
+    <div className="max-w-7xl w-full mx-auto space-y-6 animate-pulse font-sans">
+      {/* Title + subtitle */}
       <div className="space-y-2">
         <div className="h-5 w-32 bg-slate-200 dark:bg-zinc-800 rounded-md" />
         <div className="h-8 w-64 bg-slate-200 dark:bg-zinc-800 rounded-lg" />

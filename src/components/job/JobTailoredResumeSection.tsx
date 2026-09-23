@@ -18,11 +18,13 @@ import { RetryProgressBadge } from "@/components/ui/RetryProgressBadge";
 interface JobTailoredResumeSectionProps {
   job: JobSelect;
   onJobUpdated: (updated: JobSelect) => void;
+  selectedResumeId?: string;
 }
 
 export function JobTailoredResumeSection({
   job,
   onJobUpdated,
+  selectedResumeId,
 }: JobTailoredResumeSectionProps) {
   const t = useTranslations("jobDetail");
   const tCommon = useTranslations("common");
@@ -48,7 +50,7 @@ export function JobTailoredResumeSection({
     handleSave,
     handleDownloadPdf,
     handleCopy,
-  } = useTailoredResume({ job, onJobUpdated });
+  } = useTailoredResume({ job, onJobUpdated, selectedResumeId });
 
   return (
     <section

@@ -10,6 +10,7 @@ import { useAsyncJobWithRetry } from "@/hooks/useAsyncJobWithRetry";
 interface UseCoverLetterProps {
   job: JobSelect;
   onJobUpdated: (updated: JobSelect) => void;
+  selectedResumeId?: string;
 }
 
 export interface GenerateCoverLetterOptions {
@@ -19,13 +20,14 @@ export interface GenerateCoverLetterOptions {
   resumeId?: string;
 }
 
-export function useCoverLetter({ job, onJobUpdated }: UseCoverLetterProps) {
+export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCoverLetterProps) {
   const [coverLetter, setCoverLetter] = useState(job.coverLetterDraft || "");
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const pendingIdempotencyKeyRef = useRef<string | null>(null);
+  const pendingResumeIdRef = useRef<string | undefined>(undefined);
 
   const retryRunner = useAsyncJobWithRetry<string>({
     jobName: "Cover Letter Generation",
@@ -40,6 +42,7 @@ export function useCoverLetter({ job, onJobUpdated }: UseCoverLetterProps) {
       abortControllerRef.current = null;
     }
     pendingIdempotencyKeyRef.current = null;
+    pendingResumeIdRef.current = undefined;
     retryRunner.cancelRetry();
   }, [retryRunner]);
 
@@ -53,16 +56,27 @@ export function useCoverLetter({ job, onJobUpdated }: UseCoverLetterProps) {
   }, []);
 
   const handleGenerateStream = async (options?: GenerateCoverLetterOptions) => {
+    const isOptionsObj =
+      options && typeof options === "object" && !("nativeEvent" in options);
+    const safeOptions = isOptionsObj ? options : undefined;
+
     const isRegeneration =
-      options?.regenerate ||
+      safeOptions?.regenerate ||
       Boolean(job.coverLetterDraft) ||
       Boolean(coverLetter);
+
+    const targetResumeId = safeOptions?.resumeId || selectedResumeId;
 
     if (isRegeneration) {
       // Always mint a fresh idempotency key when regenerating
       pendingIdempotencyKeyRef.current = crypto.randomUUID();
-    } else if (!pendingIdempotencyKeyRef.current) {
+      pendingResumeIdRef.current = targetResumeId;
+    } else if (
+      !pendingIdempotencyKeyRef.current ||
+      pendingResumeIdRef.current !== targetResumeId
+    ) {
       pendingIdempotencyKeyRef.current = crypto.randomUUID();
+      pendingResumeIdRef.current = targetResumeId;
     }
     const idempotencyKey = pendingIdempotencyKeyRef.current;
 
@@ -82,9 +96,9 @@ export function useCoverLetter({ job, onJobUpdated }: UseCoverLetterProps) {
         body: JSON.stringify({
           idempotencyKey,
           regenerate: isRegeneration,
-          instructions: options?.instructions,
-          tone: options?.tone,
-          resumeId: options?.resumeId,
+          instructions: safeOptions?.instructions,
+          tone: safeOptions?.tone,
+          resumeId: targetResumeId,
         }),
       });
 
@@ -102,7 +116,9 @@ export function useCoverLetter({ job, onJobUpdated }: UseCoverLetterProps) {
         throw errorObj;
       }
 
-      if (!res.body) throw new Error("No readable stream response received");
+      if (!res.body) {
+        throw new Error("No response body received from server");
+      }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -121,6 +137,7 @@ export function useCoverLetter({ job, onJobUpdated }: UseCoverLetterProps) {
 
     if (result) {
       pendingIdempotencyKeyRef.current = null;
+      pendingResumeIdRef.current = undefined;
       posthog.capture("cover_letter_generated");
       onJobUpdated({ ...job, coverLetterDraft: result });
     }

@@ -7,8 +7,6 @@ import {
 import {
   tailoredCoverLetterActionSchema,
   coverLetterPromptFieldsSchema,
-  coverLetterInstructionsSchema,
-  coverLetterToneSchema,
 } from "@/actions/job.schema";
 
 describe("Cover Letter Regeneration Unit Tests", () => {

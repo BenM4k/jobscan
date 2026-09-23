@@ -67,7 +67,7 @@ export default async function LandingPage() {
       </header>
 
       {/* Floating Tactical Widgets */}
-      <main className="relative flex-1 flex flex-col items-center justify-center text-center px-6 py-20 max-w-5xl mx-auto">
+      <main className="relative flex-1 flex flex-col items-center justify-center text-center px-4 sm:px-6 py-20 max-w-7xl w-full mx-auto">
         {/* Floating Top-Left Sticky Note Widget */}
         <div
           aria-hidden="true"
