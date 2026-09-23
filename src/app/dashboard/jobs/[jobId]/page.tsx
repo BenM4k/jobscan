@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import * as jobsDal from "@/dal/jobs.dal";
+import * as resumeDal from "@/dal/resume.dal";
 import { requireSession } from "@/lib/auth-guard";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -25,26 +26,32 @@ async function JobDetailContent({
   }
 
   const { jobId } = await params;
-  const jobResult = await jobsDal.getJobById(jobId, sessionResult.value.user.id);
+  const userId = sessionResult.value.user.id;
+
+  const [jobResult, resumesResult] = await Promise.all([
+    jobsDal.getJobById(jobId, userId),
+    resumeDal.getMasterResumes(userId),
+  ]);
 
   if (!jobResult.ok || !jobResult.value) {
     return (
       <div className="py-12 border-b border-border/40">
         <div className="flex items-start gap-3">
-          <AlertCircle className="size-[18px] text-muted-foreground shrink-0 mt-0.5" />
+          <AlertCircle className="size-4.5 text-muted-foreground shrink-0 mt-0.5" />
           <div className="space-y-1 font-sans">
             <h2 className="text-sm font-medium text-foreground dark:text-zinc-100">
               Job posting not found
             </h2>
             <p className="text-sm text-gray-500 dark:text-zinc-400 font-normal leading-relaxed max-w-md">
-              The requested opportunity could not be found or may have been removed from your pipeline.
+              The requested opportunity could not be found or may have been
+              removed from your pipeline.
             </p>
             <div className="pt-2">
               <Link
                 href="/dashboard"
                 className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5"
               >
-                <ArrowLeft className="size-[18px]" />
+                <ArrowLeft className="size-4.5" />
                 <span>Return to pipeline</span>
               </Link>
             </div>
@@ -54,7 +61,14 @@ async function JobDetailContent({
     );
   }
 
-  return <JobDetailView initialJob={jobResult.value} />;
+  return (
+    <JobDetailView
+      initialJob={jobResult.value}
+      initialResumes={
+        resumesResult.ok && resumesResult.value ? resumesResult.value : []
+      }
+    />
+  );
 }
 
 export default async function JobDetailPage({ params }: JobDetailPageProps) {
@@ -66,12 +80,15 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
   return (
     <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 font-sans">
       {/* Breadcrumb Navigation */}
-      <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-muted-foreground font-normal font-sans">
+      <nav
+        aria-label="Breadcrumb"
+        className="flex items-center gap-2 text-xs text-muted-foreground font-normal font-sans"
+      >
         <Link
           href="/dashboard"
           className="hover:text-foreground transition-colors inline-flex items-center gap-1.5 font-normal"
         >
-          <ArrowLeft className="size-[18px]" />
+          <ArrowLeft className="size-4.5" />
           <span>Pipeline</span>
         </Link>
         <span className="text-muted-foreground/40">/</span>

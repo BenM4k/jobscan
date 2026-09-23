@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { JobSelect } from "@/dal/jobs.dal";
 import { JobStatus } from "@/services/db/schema";
 import {
@@ -41,12 +41,6 @@ export function JobList({
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
 
   const [jobToDelete, setJobToDelete] = useState<JobSelect | null>(null);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setJobsList(initialJobs);
-    setHasMore(initialJobs.length >= 20);
-  }, [initialJobs]);
 
   const loadMore = useCallback(async () => {
     if (isLoadingMore || !hasMore) return;

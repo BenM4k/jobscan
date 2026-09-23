@@ -86,7 +86,11 @@
     "signUpError": "Failed to create account. Please try again.",
     "forgotPasswordError": "Failed to send reset link. Please try again.",
     "resetPasswordError": "Failed to reset password. Please try again.",
-    "unexpectedError": "An unexpected error occurred. Please try again."
+    "unexpectedError": "An unexpected error occurred. Please try again.",
+    "rememberMe": "Remember me",
+    "orDivider": "Or continue with",
+    "signInWithPasskey": "Sign in with passkey",
+    "passkeySignInError": "Failed to sign in with passkey. Please check your authenticator or device."
   },
   "dashboard": {
     "title": "Job Pilot Pipeline",
@@ -411,5 +415,37 @@
     "cancel": "Cancel",
     "executingRetry": "Executing retry {attempt} of {total}...",
     "retry": "Retry"
+  },
+  "settings": {
+    "sessionsTitle": "Active Sessions",
+    "sessionsSubtitle": "Manage and revoke your active device sessions across browsers and platforms.",
+    "currentDevice": "This Device (Current)",
+    "activeDevice": "Active Device",
+    "revoke": "Revoke",
+    "revoking": "Revoking...",
+    "revokeAllOther": "Revoke All Other Sessions",
+    "revokingAll": "Revoking All...",
+    "noSessions": "No active sessions found.",
+    "sessionRevokedSuccess": "Session revoked successfully.",
+    "sessionRevokedError": "Failed to revoke session.",
+    "otherSessionsRevokedSuccess": "All other sessions have been revoked.",
+    "otherSessionsRevokedError": "Failed to revoke other sessions.",
+    "unknownBrowser": "Unknown Browser",
+    "unknownDevice": "Unknown Device",
+    "unknownIp": "Unknown IP",
+    "created": "Created",
+    "expires": "Expires",
+    "passkeysTitle": "Passkeys & Biometrics",
+    "passkeysSubtitle": "Sign in faster and more securely with fingerprint, face recognition, or a physical security key.",
+    "addPasskey": "Add Passkey",
+    "addingPasskey": "Registering...",
+    "passkeyNamePrompt": "Enter a name for this passkey (e.g. MacBook Touch ID, Work Laptop)",
+    "noPasskeys": "No passkeys registered yet. Add one to enable passwordless sign-in.",
+    "passkeyAddedSuccess": "Passkey registered successfully.",
+    "passkeyAddedError": "Failed to register passkey.",
+    "deletePasskey": "Delete",
+    "deleting": "Deleting...",
+    "passkeyDeletedSuccess": "Passkey removed.",
+    "passkeyDeletedError": "Failed to remove passkey."
   }
 }

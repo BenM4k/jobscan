@@ -86,7 +86,11 @@
     "signUpError": "Échec de la création du compte. Veuillez réessayer.",
     "forgotPasswordError": "Échec de l'envoi du lien de réinitialisation. Veuillez réessayer.",
     "resetPasswordError": "Échec de la réinitialisation du mot de passe. Veuillez réessayer.",
-    "unexpectedError": "Une erreur inattendue est survenue. Veuillez réessayer."
+    "unexpectedError": "Une erreur inattendue est survenue. Veuillez réessayer.",
+    "rememberMe": "Se souvenir de moi",
+    "orDivider": "Ou continuer avec",
+    "signInWithPasskey": "Se connecter avec une clé d'accès",
+    "passkeySignInError": "Échec de connexion avec clé d'accès. Veuillez vérifier votre appareil."
   },
   "dashboard": {
     "title": "Pipeline Job Pilot",
@@ -411,5 +415,37 @@
     "cancel": "Annuler",
     "executingRetry": "Exécution de la tentative {attempt} sur {total}...",
     "retry": "Réessayer"
+  },
+  "settings": {
+    "sessionsTitle": "Sessions Actives",
+    "sessionsSubtitle": "Gérez et révoquez vos sessions actives sur tous vos appareils et navigateurs.",
+    "currentDevice": "Cet Appareil (Actuel)",
+    "activeDevice": "Appareil Actif",
+    "revoke": "Révoquer",
+    "revoking": "Révocation...",
+    "revokeAllOther": "Révoquer toutes les autres sessions",
+    "revokingAll": "Révocation...",
+    "noSessions": "Aucune session active trouvée.",
+    "sessionRevokedSuccess": "Session révoquée avec succès.",
+    "sessionRevokedError": "Échec de la révocation de la session.",
+    "otherSessionsRevokedSuccess": "Toutes les autres sessions ont été révoquées.",
+    "otherSessionsRevokedError": "Échec de la révocation des autres sessions.",
+    "unknownBrowser": "Navigateur inconnu",
+    "unknownDevice": "Appareil inconnu",
+    "unknownIp": "IP inconnue",
+    "created": "Créée le",
+    "expires": "Expire le",
+    "passkeysTitle": "Clés d'Accès & Biométrie",
+    "passkeysSubtitle": "Connectez-vous plus rapidement et en toute sécurité avec empreinte, reconnaissance faciale ou clé de sécurité.",
+    "addPasskey": "Ajouter une Clé d'Accès",
+    "addingPasskey": "Enregistrement...",
+    "passkeyNamePrompt": "Nom de cette clé d'accès (ex. MacBook Touch ID, Ordinateur de bureau)",
+    "noPasskeys": "Aucune clé d'accès enregistrée. Ajoutez-en une pour vous connecter sans mot de passe.",
+    "passkeyAddedSuccess": "Clé d'accès enregistrée avec succès.",
+    "passkeyAddedError": "Échec de l'enregistrement de la clé d'accès.",
+    "deletePasskey": "Supprimer",
+    "deleting": "Suppression...",
+    "passkeyDeletedSuccess": "Clé d'accès supprimée.",
+    "passkeyDeletedError": "Échec de la suppression de la clé d'accès."
   }
 }

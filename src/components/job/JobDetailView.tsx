@@ -1,10 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { JobSelect } from "@/dal/jobs.dal";
 import { JobStatus } from "@/services/db/schema";
 import { transitionJobStatusAction } from "@/actions/job.actions";
-import { getMasterResumesAction } from "@/actions/resume.actions";
 import { MasterResumeSelect } from "@/services/db/schema";
 import { JobDetailHeader } from "./JobDetailHeader";
 import { JobScoreSection } from "./JobScoreSection";
@@ -28,14 +27,21 @@ import { useTranslations } from "next-intl";
 
 interface JobDetailViewProps {
   initialJob: JobSelect;
+  initialResumes?: MasterResumeSelect[];
 }
 
-export function JobDetailView({ initialJob }: JobDetailViewProps) {
+export function JobDetailView({
+  initialJob,
+  initialResumes = [],
+}: JobDetailViewProps) {
   const tCommon = useTranslations("common");
   const tDash = useTranslations("dashboard");
   const [job, setJob] = useState<JobSelect>(initialJob);
-  const [resumes, setResumes] = useState<MasterResumeSelect[]>([]);
-  const [selectedResumeId, setSelectedResumeId] = useState<string | undefined>(undefined);
+  const resumes = initialResumes;
+  const initialActive = initialResumes.find((r) => r.isActive);
+  const [selectedResumeId, setSelectedResumeId] = useState<string | undefined>(
+    initialActive?.id || initialResumes[0]?.id
+  );
   const router = useRouter();
 
   const scoring = useJobScoring({
@@ -43,25 +49,6 @@ export function JobDetailView({ initialJob }: JobDetailViewProps) {
     selectedResumeId,
     onJobUpdated: setJob,
   });
-
-  useEffect(() => {
-    let isMounted = true;
-    getMasterResumesAction().then((res) => {
-      if (!isMounted) return;
-      if (res.success && res.data) {
-        setResumes(res.data);
-        const active = res.data.find((r) => r.isActive);
-        if (active) {
-          setSelectedResumeId(active.id);
-        } else if (res.data.length > 0) {
-          setSelectedResumeId(res.data[0].id);
-        }
-      }
-    });
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   const handleStatusChange = async (newStatus: JobStatus) => {
     setJob((prev) => ({ ...prev, status: newStatus }));
