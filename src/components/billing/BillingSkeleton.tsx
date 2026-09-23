@@ -1,5 +1,6 @@
 import React from "react";
 
+/** Renders the loading placeholder for the billing dashboard. */
 export function BillingSkeleton() {
   return (
     <div className="space-y-6 max-w-5xl mx-auto py-6 px-4 animate-pulse">

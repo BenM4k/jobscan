@@ -26,6 +26,7 @@ const initiateSubscriptionSchema = z.object({
   idempotencyKey: z.string().uuid("Invalid idempotency key UUID"),
 });
 
+/** Loads the authenticated user's balance, subscription, and available billing products. */
 export async function getBillingOverviewAction() {
   const session = await requireSession();
   if (!session.ok || !session.value) {
@@ -60,6 +61,7 @@ export async function getBillingOverviewAction() {
   };
 }
 
+/** Validates and starts an idempotent credit-pack purchase for the authenticated user. */
 export async function initiateCreditPurchaseAction(input: {
   creditPackId: string;
   phoneNumber: string;
@@ -91,6 +93,7 @@ export async function initiateCreditPurchaseAction(input: {
   return { success: true, data: res.value };
 }
 
+/** Retrieves the payment provider status for an in-progress purchase. */
 export async function checkPurchaseStatusAction(providerReference: string) {
   const session = await requireSession();
   if (!session.ok || !session.value) {
@@ -103,6 +106,7 @@ export async function checkPurchaseStatusAction(providerReference: string) {
   return { success: true, data: { status } };
 }
 
+/** Validates and starts an idempotent subscription purchase for the authenticated user. */
 export async function initiateSubscriptionAction(input: {
   planId: string;
   phoneNumber: string;
@@ -134,6 +138,7 @@ export async function initiateSubscriptionAction(input: {
   return { success: true, data: res.value };
 }
 
+/** Cancels the authenticated user's active subscription. */
 export async function cancelSubscriptionAction() {
   const session = await requireSession();
   if (!session.ok || !session.value) {
@@ -151,6 +156,7 @@ export async function cancelSubscriptionAction() {
   return { success: true, data: res.value };
 }
 
+/** Returns recent credit-ledger entries for the authenticated user. */
 export async function getCreditLedgerAction(limit = 50) {
   const session = await requireSession();
   if (!session.ok || !session.value) {

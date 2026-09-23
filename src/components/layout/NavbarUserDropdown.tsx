@@ -21,6 +21,7 @@ interface NavbarUserDropdownProps {
   userName?: string | null;
 }
 
+/** Renders the desktop account menu with billing, settings, and sign-out actions. */
 export function NavbarUserDropdown({
   userEmail,
   userName,

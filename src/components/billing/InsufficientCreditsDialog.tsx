@@ -22,6 +22,7 @@ interface InsufficientCreditsDialogProps {
   currentBalance?: number;
 }
 
+/** Explains a credit shortfall and directs the user to available purchase options. */
 export function InsufficientCreditsDialog({
   open,
   onOpenChange,

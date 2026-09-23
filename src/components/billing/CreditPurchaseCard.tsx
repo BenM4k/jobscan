@@ -16,6 +16,7 @@ interface CreditPurchaseCardProps {
   onBalanceUpdated?: () => void;
 }
 
+/** Lets a user select a credit pack and tracks its mobile-money purchase status. */
 export function CreditPurchaseCard({
   packs,
   onBalanceUpdated,

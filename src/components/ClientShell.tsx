@@ -14,6 +14,7 @@ interface ClientShellProps {
   children: React.ReactNode;
 }
 
+/** Coordinates client-side job progress, notices, and completion events. */
 function ClientShellContent({ children }: ClientShellProps) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);

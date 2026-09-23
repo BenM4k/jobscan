@@ -43,6 +43,7 @@ export async function setActiveResumeAction(resumeId: string) {
   return { success: true, data: true };
 }
 
+/** Creates a master resume while enforcing subscription-based persona limits. */
 export async function createMasterResumeAction(data: {
   label: string;
   content: string;
@@ -150,6 +151,7 @@ export async function updateMasterResumeAction(data: {
   return { success: true, data: res.value };
 }
 
+/** Promotes a tailored resume into a new master-resume persona. */
 export async function promoteTailoredResumeAction(
   tailoredResumeId: string,
   label: string

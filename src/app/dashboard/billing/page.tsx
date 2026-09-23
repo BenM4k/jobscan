@@ -11,6 +11,7 @@ export const metadata = {
   description: "Manage your Jobpilot AI credits, subscription, and billing history.",
 };
 
+/** Loads the authenticated user's billing products, account state, and ledger. */
 async function BillingContent() {
   const session = await requireSession();
   if (!session.ok || !session.value) {
@@ -47,6 +48,7 @@ async function BillingContent() {
   );
 }
 
+/** Renders the billing dashboard with its loading fallback. */
 export default function BillingPage() {
   return (
     <Suspense fallback={<BillingSkeleton />}>

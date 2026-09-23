@@ -16,6 +16,7 @@ export const metadata = {
   description: "Global feature toggles and per-user overrides for beta testing and gradual rollouts.",
 };
 
+/** Renders the loading placeholder for the feature-flag administration console. */
 function AdminFlagsSkeleton() {
   return (
     <div className="space-y-6 animate-pulse">
@@ -25,6 +26,7 @@ function AdminFlagsSkeleton() {
   );
 }
 
+/** Loads the protected feature-flag administration data for an authorized admin. */
 async function AdminFlagsContent() {
   const sessionResult = await requireSession();
   if (!sessionResult.ok || !sessionResult.value) {
@@ -70,6 +72,7 @@ async function AdminFlagsContent() {
   );
 }
 
+/** Renders the feature-flag administration page with a suspense boundary. */
 export default function AdminFlagsPage() {
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 w-full space-y-8 z-10">

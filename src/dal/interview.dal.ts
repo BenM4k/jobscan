@@ -13,6 +13,7 @@ export interface InterviewQuestionItem {
   suggestedTalkingPoints: string[];
 }
 
+/** Persists a generated interview-question set for a pipeline entry. */
 export async function createInterviewQuestionSet(
   pipelineEntryId: string,
   questions: InterviewQuestionItem[]
@@ -33,6 +34,7 @@ export async function createInterviewQuestionSet(
   }
 }
 
+/** Retrieves the latest interview-question set for a pipeline entry. */
 export async function getInterviewQuestionSetByEntryId(
   pipelineEntryId: string
 ): Promise<Result<{ id: string; questions: unknown } | null, AppError>> {

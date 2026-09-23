@@ -239,6 +239,7 @@ export async function getCreditPacks(
   }
 }
 
+/** Retrieves a credit pack by its identifier. */
 export async function getCreditPackById(
   id: string
 ): Promise<Result<CreditPackSelect | null, AppError>> {
@@ -300,6 +301,7 @@ export async function createCreditPurchase(data: {
   }
 }
 
+/** Retrieves a credit purchase by its payment-provider reference. */
 export async function getCreditPurchaseByReference(
   providerReference: string
 ): Promise<Result<CreditPurchaseSelect | null, AppError>> {
@@ -316,6 +318,7 @@ export async function getCreditPurchaseByReference(
   }
 }
 
+/** Associates a pending credit purchase with its payment-provider reference. */
 export async function updateCreditPurchaseReference(
   id: string,
   providerReference: string
@@ -332,6 +335,7 @@ export async function updateCreditPurchaseReference(
   }
 }
 
+/** Associates a user's subscription with its payment-provider reference. */
 export async function updateSubscriptionReference(
   userId: string,
   providerSubscriptionId: string
@@ -348,6 +352,7 @@ export async function updateSubscriptionReference(
   }
 }
 
+/** Retrieves a subscription by its payment-provider reference. */
 export async function getSubscriptionByProviderReference(
   providerSubscriptionId: string
 ): Promise<Result<SubscriptionSelect | null, AppError>> {
@@ -364,6 +369,7 @@ export async function getSubscriptionByProviderReference(
   }
 }
 
+/** Retrieves a credit purchase by its internal identifier. */
 export async function getCreditPurchaseById(
   id: string
 ): Promise<Result<CreditPurchaseSelect | null, AppError>> {
@@ -455,6 +461,7 @@ export async function getSubscriptionPlans(
   }
 }
 
+/** Retrieves a subscription plan by its stable product key. */
 export async function getSubscriptionPlanByKey(
   key: string
 ): Promise<Result<SubscriptionPlanSelect | null, AppError>> {
@@ -623,6 +630,7 @@ export async function getExpiredSubscriptions(): Promise<
   }
 }
 
+/** Marks a user's subscription as past due. */
 export async function markSubscriptionPastDue(
   userId: string
 ): Promise<Result<SubscriptionSelect, AppError>> {

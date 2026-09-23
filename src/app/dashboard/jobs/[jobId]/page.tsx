@@ -69,6 +69,7 @@ async function JobDetailContent({
   );
 }
 
+/** Renders a job's detail workspace and defers data loading behind suspense. */
 export default function JobDetailPage({ params }: JobDetailPageProps) {
   return (
     <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 font-sans">

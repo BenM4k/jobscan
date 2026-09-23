@@ -7,6 +7,7 @@ import * as jobService from "@/services/job.service";
 import * as jobsDal from "@/dal/jobs.dal";
 import { ok, err } from "@/lib/result";
 
+/** Generates and persists a tailored resume after authentication and credit checks. */
 export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },

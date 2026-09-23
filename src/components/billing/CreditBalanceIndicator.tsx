@@ -9,6 +9,7 @@ interface CreditBalanceIndicatorProps {
   className?: string;
 }
 
+/** Shows the user's available credits and links to billing. */
 export function CreditBalanceIndicator({
   balance,
   className = "",

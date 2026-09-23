@@ -17,6 +17,7 @@ interface UseTailoredResumeOptions {
   selectedResumeId?: string;
 }
 
+/** Manages tailored-resume generation, persistence, clipboard state, and credit errors. */
 export function useTailoredResume({ job, onJobUpdated, selectedResumeId }: UseTailoredResumeOptions) {
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);

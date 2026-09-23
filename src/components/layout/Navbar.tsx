@@ -16,6 +16,7 @@ interface NavbarProps {
   userName?: string | null;
 }
 
+/** Loads account navigation data and renders the responsive dashboard navbar. */
 export async function Navbar({ userId, userEmail, userName }: NavbarProps) {
   const t = await getTranslations("nav");
 
@@ -71,6 +72,7 @@ export async function Navbar({ userId, userEmail, userName }: NavbarProps) {
   );
 }
 
+/** Renders the dashboard navbar loading placeholder. */
 export function NavbarSkeleton() {
   return (
     <nav

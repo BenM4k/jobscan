@@ -22,6 +22,7 @@ interface JobTailoredResumeSectionProps {
   selectedResumeId?: string;
 }
 
+/** Provides tailored-resume generation, editing, saving, and export controls for a job. */
 export function JobTailoredResumeSection({
   job,
   onJobUpdated,

@@ -14,6 +14,7 @@ interface NavbarMobileProps {
   creditBalance?: number;
 }
 
+/** Renders the mobile dashboard menu, credit balance, and account controls. */
 export function NavbarMobile({ navLinks, userEmail, creditBalance = 0 }: NavbarMobileProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();

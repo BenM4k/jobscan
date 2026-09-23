@@ -25,6 +25,7 @@ export interface RateLimitedPayload {
   error?: string;
 }
 
+/** Runs an asynchronous job with retry timing, progress messages, and cancellation. */
 export function useAsyncJobWithRetry<T>({
   jobName,
   maxRetries = 2,

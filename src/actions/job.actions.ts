@@ -197,6 +197,7 @@ export async function scoreJobAction(
   };
 }
 
+/** Generates a credit-backed tailored resume for the authenticated user and job. */
 export async function generateTailoredResumeAction(
   jobId: string,
   idempotencyKey: string,
@@ -320,6 +321,7 @@ export async function generateTailoredResumeAction(
   };
 }
 
+/** Generates a credit-backed cover letter for the authenticated user and job. */
 export async function generateTailoredCoverLetterAction(
   jobId: string,
   idempotencyKey: string,

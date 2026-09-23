@@ -22,6 +22,7 @@ interface JobCoverLetterSectionProps {
   selectedResumeId?: string;
 }
 
+/** Provides cover-letter generation, editing, saving, and copy controls for a job. */
 export function JobCoverLetterSection({
   job,
   onJobUpdated,

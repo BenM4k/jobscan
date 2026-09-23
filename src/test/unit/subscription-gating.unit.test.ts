@@ -1,3 +1,4 @@
+/** Throws when a subscription-gating unit-test expectation is not satisfied. */
 function assert(condition: boolean, msg: string) {
   if (!condition) {
     throw new Error(`Assertion failed: ${msg}`);
@@ -9,6 +10,7 @@ interface MockSubscription {
   currentPeriodEnd: Date;
 }
 
+/** Determines whether a plan permits creating another resume persona. */
 function canCreatePersona(
   existingPersonaCount: number,
   sub: MockSubscription | null
@@ -33,6 +35,7 @@ function canCreatePersona(
   return { allowed: true };
 }
 
+/** Exercises persona creation limits for free, active, and inactive subscriptions. */
 async function runUnitTests() {
   console.log("Running unit tests for subscription multi-persona gating...");
 

@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/auth-guard";
 import { Navbar, NavbarSkeleton } from "@/components/layout/Navbar";
 import { DashboardFooter } from "@/components/layout/DashboardFooter";
 
+/** Resolves the authenticated user data needed by the dashboard navigation. */
 async function DashboardNavbar() {
   const sessionResult = await requireSession();
 
@@ -22,6 +23,7 @@ async function DashboardNavbar() {
   );
 }
 
+/** Provides the shared navigation, background, and footer for dashboard pages. */
 export default function DashboardLayout({
   children,
 }: {
@@ -48,4 +50,3 @@ export default function DashboardLayout({
     </div>
   );
 }
-

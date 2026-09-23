@@ -1,5 +1,6 @@
 import { AppError } from "@/lib/errors";
 
+/** Throws when a billing DAL unit-test expectation is not satisfied. */
 function assert(condition: boolean, msg: string) {
   if (!condition) {
     throw new Error(`Assertion failed: ${msg}`);
@@ -101,6 +102,7 @@ class MockBillingStore {
   }
 }
 
+/** Exercises balance, ledger, idempotency, and atomic purchase behavior in memory. */
 async function runUnitTests() {
   console.log("Running unit tests for billing transactional logic & idempotency...");
 

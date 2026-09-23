@@ -1,12 +1,14 @@
 import { MockMobileMoneyProvider } from "@/services/billing/mock-provider";
 import { getPaymentProvider } from "@/services/billing/provider-factory";
 
+/** Throws when a payment-provider unit-test expectation is not satisfied. */
 function assert(condition: boolean, msg: string) {
   if (!condition) {
     throw new Error(`Assertion failed: ${msg}`);
   }
 }
 
+/** Exercises simulated credit-purchase and subscription provider flows. */
 async function runUnitTests() {
   console.log("Running unit tests for MockMobileMoneyProvider...");
 

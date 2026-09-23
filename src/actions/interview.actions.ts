@@ -17,6 +17,7 @@ const interviewActionSchema = z.object({
   resumeId: z.string().uuid().optional(),
 });
 
+/** Generates a billed, idempotent interview-question set for a pipeline entry. */
 export async function generateInterviewQuestionsAction(data: {
   jobId: string;
   pipelineEntryId: string;

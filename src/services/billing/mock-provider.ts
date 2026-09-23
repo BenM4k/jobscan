@@ -18,6 +18,7 @@ import { mockPaymentInitiatedEvent } from "@/inngest/events";
  * after a 3-second delay mimicking an asynchronous payment webhook callback.
  */
 export class MockMobileMoneyProvider implements PaymentProvider {
+  /** Starts a simulated credit purchase and schedules asynchronous confirmation. */
   async initiateCreditPurchase(
     params: InitiateCreditPurchaseParams
   ): Promise<PaymentInitiateResult> {
@@ -50,6 +51,7 @@ export class MockMobileMoneyProvider implements PaymentProvider {
     };
   }
 
+  /** Starts a simulated subscription purchase and schedules asynchronous confirmation. */
   async initiateSubscription(
     params: InitiateSubscriptionParams
   ): Promise<PaymentInitiateResult> {
@@ -82,6 +84,7 @@ export class MockMobileMoneyProvider implements PaymentProvider {
     };
   }
 
+  /** Resolves the current simulated status of a purchase or subscription reference. */
   async checkPurchaseStatus(
     providerReference: string
   ): Promise<"pending" | "confirmed" | "failed"> {

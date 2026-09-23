@@ -21,6 +21,7 @@ const interviewQuestionsSchema = z.object({
   ),
 });
 
+/** Generates role-specific interview questions and persists them for a pipeline entry. */
 export async function generateInterviewQuestions(
   jobId: string,
   userId: string,

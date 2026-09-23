@@ -15,6 +15,7 @@ export async function generateMetadata() {
   };
 }
 
+/** Loads the authenticated user's master resumes for the persona manager. */
 async function ResumesContent() {
   const sessionResult = await requireSession();
   if (!sessionResult.ok || !sessionResult.value) {
@@ -35,6 +36,7 @@ async function ResumesContent() {
   return <ResumesManager key={versionKey} initialResumes={resumes} />;
 }
 
+/** Renders the localized master-resume management page. */
 export default async function ResumesPage() {
   const t = await getTranslations("resumes");
 

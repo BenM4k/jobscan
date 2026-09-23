@@ -9,6 +9,7 @@ interface CreditLedgerHistoryProps {
   entries: CreditLedgerSelect[];
 }
 
+/** Displays the user's credit transactions in reverse chronological order. */
 export function CreditLedgerHistory({ entries }: CreditLedgerHistoryProps) {
   const t = useTranslations("billing");
 

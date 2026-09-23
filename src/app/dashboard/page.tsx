@@ -54,6 +54,7 @@ async function DashboardFeed({
   );
 }
 
+/** Renders the searchable job pipeline dashboard. */
 export default function DashboardPage({
   searchParams,
 }: DashboardPageProps) {
@@ -70,4 +71,3 @@ export default function DashboardPage({
     </NuqsAdapter>
   );
 }
-

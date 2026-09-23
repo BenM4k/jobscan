@@ -22,6 +22,7 @@ interface BillingDashboardViewProps {
   initialLedger: CreditLedgerSelect[];
 }
 
+/** Displays billing balances, products, subscription controls, and ledger history. */
 export function BillingDashboardView({
   initialBalance,
   initialSubscription,

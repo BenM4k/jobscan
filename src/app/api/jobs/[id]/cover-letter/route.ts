@@ -15,6 +15,7 @@ import {
 } from "@/services/tailoring.service";
 import { coverLetterPromptFieldsSchema } from "@/actions/job.schema";
 
+/** Streams a newly generated cover letter after authentication and credit checks. */
 export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },

@@ -20,6 +20,7 @@ export interface GenerateCoverLetterOptions {
   resumeId?: string;
 }
 
+/** Manages cover-letter generation, persistence, clipboard state, and credit errors. */
 export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCoverLetterProps) {
   const [coverLetter, setCoverLetter] = useState(job.coverLetterDraft || "");
   const [isSaving, setIsSaving] = useState(false);

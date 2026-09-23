@@ -18,6 +18,7 @@ interface SubscriptionCardProps {
   onSubscriptionUpdated?: () => void;
 }
 
+/** Displays subscription plans and manages subscription purchase or cancellation. */
 export function SubscriptionCard({
   plan,
   subscription,
