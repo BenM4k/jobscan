@@ -44,8 +44,6 @@ async function DashboardFeed({
     userId,
   });
 
-  const filterKey = `${statusFilter ?? "all"}-${sourceFilter ?? "all"}-${startDate ?? ""}-${endDate ?? ""}-${queryFilter ?? ""}`;
-
   return (
     <JobList
       key={filterKey}
