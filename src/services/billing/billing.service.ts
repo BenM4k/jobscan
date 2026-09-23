@@ -106,11 +106,18 @@ export async function initiateCreditPurchase(
 
   const { purchase, isExisting } = purchaseRes.value;
 
-  if (isExisting && purchase.providerReference) {
+  if (isExisting) {
+    if (purchase.providerReference) {
+      return ok({
+        purchaseId: purchase.id,
+        providerReference: purchase.providerReference,
+        status: purchase.status as "pending" | "confirmed" | "failed",
+      });
+    }
     return ok({
       purchaseId: purchase.id,
-      providerReference: purchase.providerReference,
-      status: purchase.status as "pending" | "confirmed" | "failed",
+      providerReference: "",
+      status: "pending",
     });
   }
 
@@ -122,10 +129,13 @@ export async function initiateCreditPurchase(
     phoneNumber,
   });
 
-  await billingDal.updateCreditPurchaseReference(
+  const updateRefRes = await billingDal.updateCreditPurchaseReference(
     purchase.id,
     initiateRes.providerReference,
   );
+  if (!updateRefRes.ok) {
+    return err(updateRefRes.error);
+  }
 
   return ok({
     purchaseId: purchase.id,
@@ -151,8 +161,13 @@ export async function confirmCreditPurchase(
 
   const purchase = purchaseRes.value;
   const packRes = await billingDal.getCreditPackById(purchase.creditPackId);
-  const creditAmount =
-    packRes.ok && packRes.value ? packRes.value.creditAmount : 10;
+  if (!packRes.ok) {
+    return err(packRes.error);
+  }
+  if (!packRes.value) {
+    return err(new AppError("NOT_FOUND", "Credit pack not found"));
+  }
+  const creditAmount = packRes.value.creditAmount;
 
   const confirmRes = await billingDal.confirmCreditPurchaseAtomic(
     providerReference,
@@ -199,6 +214,14 @@ export async function initiateSubscription(
 
   if (!subRes.ok) return err(subRes.error);
 
+  if (subRes.value.isExistingIdempotent && subRes.value.subscription.providerSubscriptionId) {
+    return ok({
+      userId,
+      providerReference: subRes.value.subscription.providerSubscriptionId.split(",").pop() || "",
+      status: "pending",
+    });
+  }
+
   const initiateRes = await provider.initiateSubscription({
     userId,
     planId: plan.id,
@@ -206,10 +229,13 @@ export async function initiateSubscription(
     phoneNumber,
   });
 
-  await billingDal.updateSubscriptionReference(
+  const updateRefRes = await billingDal.updateSubscriptionReference(
     userId,
     initiateRes.providerReference,
   );
+  if (!updateRefRes.ok) {
+    return err(updateRefRes.error);
+  }
 
   return ok({
     userId,
@@ -289,4 +315,41 @@ export async function processExpiredSubscriptions(): Promise<
   }
 
   return ok({ processedCount: processed });
+}
+
+/**
+ * Determines whether a subscription has active Pro access.
+ * Grants access to active or canceled subscriptions while currentPeriodEnd is later than now.
+ */
+export function hasProAccess(
+  sub: { status: string; currentPeriodEnd: Date | string } | null | undefined
+): boolean {
+  if (!sub) return false;
+  const isStatusEligible = sub.status === "active" || sub.status === "canceled";
+  if (!isStatusEligible) return false;
+  const periodEnd =
+    sub.currentPeriodEnd instanceof Date
+      ? sub.currentPeriodEnd
+      : new Date(sub.currentPeriodEnd);
+  return periodEnd.getTime() > Date.now();
+}
+
+/**
+ * Validates whether the user can create an additional persona given their existing count and subscription.
+ */
+export function canCreatePersona(
+  existingPersonaCount: number,
+  sub: { status: string; currentPeriodEnd: Date | string } | null | undefined
+): { allowed: boolean; reason?: string } {
+  if (existingPersonaCount < 1) {
+    return { allowed: true };
+  }
+  if (!hasProAccess(sub)) {
+    return {
+      allowed: false,
+      reason:
+        "Multiple resume personas require an active Jobpilot Pro subscription. Please upgrade to create additional personas.",
+    };
+  }
+  return { allowed: true };
 }

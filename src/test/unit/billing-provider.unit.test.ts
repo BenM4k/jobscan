@@ -1,3 +1,6 @@
+process.env.PAYMENT_PROVIDER = "mock";
+process.env.DISABLE_MOCK_PAYMENT_TIMER = "true";
+
 import { MockMobileMoneyProvider } from "@/services/billing/mock-provider";
 import { getPaymentProvider } from "@/services/billing/provider-factory";
 
@@ -52,7 +55,6 @@ async function runUnitTests() {
   assert(unknownStatus === "failed", "Unknown purchase reference must return 'failed'");
 
   console.log("MockMobileMoneyProvider tests passed successfully!");
-  process.exit(0);
 }
 
 runUnitTests().catch((err) => {

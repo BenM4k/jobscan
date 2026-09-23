@@ -50,29 +50,37 @@ export function InsufficientCreditsDialog({
 
         <div className="my-2 p-3 rounded-lg bg-zinc-100 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/60 text-xs space-y-1.5">
           <div className="flex justify-between text-muted-foreground">
-            <span>Required for this action:</span>
-            <span className="font-semibold text-foreground">{requiredCost} credits</span>
+            <span>{t("requiredCost")}</span>
+            <span className="font-semibold text-foreground">
+              {requiredCost} {t("credits").toLowerCase()}
+            </span>
           </div>
           <div className="flex justify-between text-muted-foreground">
-            <span>Current balance:</span>
-            <span className="font-semibold text-foreground">{currentBalance} credits</span>
+            <span>{t("currentBalance")}</span>
+            <span className="font-semibold text-foreground">
+              {currentBalance} {t("credits").toLowerCase()}
+            </span>
           </div>
           <div className="flex justify-between border-t border-zinc-200 dark:border-zinc-700 pt-1.5 text-amber-600 dark:text-amber-400 font-medium">
-            <span>Shortfall:</span>
-            <span>{shortfall} credits</span>
+            <span>{t("shortfall")}</span>
+            <span>
+              {shortfall} {t("credits").toLowerCase()}
+            </span>
           </div>
         </div>
 
         <DialogFooter className="flex-row gap-2 sm:justify-end">
           <DialogClose render={<Button variant="outline" className="w-full sm:w-auto" />}>
-            Dismiss
+            {t("dismiss")}
           </DialogClose>
-          <Link href="/dashboard/billing" className="w-full sm:w-auto">
-            <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white gap-1.5">
-              <span>{t("topUp")}</span>
-              <ArrowRight className="size-3.5" />
-            </Button>
-          </Link>
+          <Button
+            render={<Link href="/dashboard/billing" />}
+            nativeButton={false}
+            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
+          >
+            <span>{t("topUp")}</span>
+            <ArrowRight className="size-3.5" />
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

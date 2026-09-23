@@ -558,6 +558,23 @@
     "actionTailoredResume": "Tailored Resume Generation",
     "actionTailoredCoverLetter": "Tailored Cover Letter Generation",
     "actionInterviewPrep": "Interview Prep Questions",
-    "actionRefund": "AI Generation Refund"
+    "actionRefund": "AI Generation Refund",
+    "requiredCost": "Required for this action:",
+    "currentBalance": "Current balance:",
+    "shortfall": "Shortfall:",
+    "dismiss": "Dismiss",
+    "perMonth": "/mo",
+    "statusActive": "ACTIVE",
+    "statusCanceled": "CANCELED",
+    "phoneRequired": "Please enter a valid phone number",
+    "initiateError": "Failed to initiate purchase",
+    "subInitiateError": "Failed to initiate subscription",
+    "unexpectedError": "Unexpected error starting purchase",
+    "unexpectedSubError": "Unexpected error subscribing",
+    "subActivated": "Subscription activated successfully!",
+    "subFailed": "Subscription payment failed. Please try again.",
+    "subCanceled": "Subscription canceled. Access continues until period end.",
+    "subCancelError": "Failed to cancel subscription",
+    "balanceAriaLabel": "Credit balance: {balance}"
   }
 }

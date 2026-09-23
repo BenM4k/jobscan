@@ -23,12 +23,21 @@ async function DashboardNavbar() {
   );
 }
 
+// TODO: Cache Components adoption. Refactor this route so this opt-out can be removed.
+// See: https://nextjs.org/docs/app/guides/migrating-to-cache-components
+export const instant = false;
+
 /** Provides the shared navigation, background, and footer for dashboard pages. */
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok || !sessionResult.value) {
+    redirect("/sign-in");
+  }
+
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0A0A0C] text-gray-900 dark:text-zinc-100 font-sans flex flex-col relative overflow-hidden transition-colors duration-300">
       {/* Subtle Dot Grid Background Pattern */}

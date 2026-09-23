@@ -6,6 +6,7 @@ import { checkAiRateLimit } from "@/services/rate-limit";
 import { runWithIdempotency } from "@/services/idempotency.service";
 import { generateInterviewQuestions } from "@/services/interview.service";
 import * as interviewDal from "@/dal/interview.dal";
+import { getPipelineEntryById } from "@/dal/pipeline.dal";
 import { spendCredits, grantCredits } from "@/services/billing/billing.service";
 import { ok, err } from "@/lib/result";
 import { AppError } from "@/lib/errors";
@@ -36,7 +37,16 @@ export async function generateInterviewQuestionsAction(data: {
 
   const userId = session.value.user.id;
 
-  // 1. Rate limit check
+  // 1. Verify pipeline entry belongs to user and matches submitted jobId
+  const entryRes = await getPipelineEntryById(parsed.data.pipelineEntryId, userId);
+  if (!entryRes.ok || !entryRes.value) {
+    return { success: false, error: "Pipeline entry not found" };
+  }
+  if (entryRes.value.jobId !== parsed.data.jobId) {
+    return { success: false, error: "Pipeline entry does not match submitted job" };
+  }
+
+  // 2. Rate limit check
   const rateLimitRes = await checkAiRateLimit(userId, "interview_prep");
   if (!rateLimitRes.allowed) {
     return {
@@ -47,14 +57,14 @@ export async function generateInterviewQuestionsAction(data: {
     };
   }
 
-  // 2. Idempotent execution
+  // 3. Idempotent execution
   const result = await runWithIdempotency({
     userId,
     action: "interview_prep",
     key: parsed.data.idempotencyKey,
     targetId: parsed.data.pipelineEntryId,
     execute: async () => {
-      // 3. Spend credits before AI call
+      // 4. Spend credits before AI call
       const spendRes = await spendCredits(userId, "interview_prep", parsed.data.pipelineEntryId);
       if (!spendRes.ok) return err(spendRes.error);
 
@@ -79,7 +89,7 @@ export async function generateInterviewQuestionsAction(data: {
     },
     resolveExisting: async (record) => {
       const entryId = record.targetId || parsed.data.pipelineEntryId;
-      const existing = await interviewDal.getInterviewQuestionSetByEntryId(entryId);
+      const existing = await interviewDal.getInterviewQuestionSetByEntryId(entryId, userId);
       if (!existing.ok || !existing.value) {
         return err(new AppError("NOT_FOUND", "Existing interview questions not found"));
       }

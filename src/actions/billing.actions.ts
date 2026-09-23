@@ -93,6 +93,10 @@ export async function initiateCreditPurchaseAction(input: {
   return { success: true, data: res.value };
 }
 
+const checkPurchaseStatusSchema = z.object({
+  providerReference: z.string().min(1, "Provider reference is required").max(255),
+});
+
 /** Retrieves the payment provider status for an in-progress purchase. */
 export async function checkPurchaseStatusAction(providerReference: string) {
   const session = await requireSession();
@@ -100,8 +104,26 @@ export async function checkPurchaseStatusAction(providerReference: string) {
     return { success: false, error: session.ok ? "Unauthorized" : session.error.message };
   }
 
+  const parsed = checkPurchaseStatusSchema.safeParse({ providerReference });
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid reference" };
+  }
+
+  const userId = session.value.user.id;
+
+  // Load the matching purchase or subscription and verify ownership
+  const purchaseRes = await billingDal.getCreditPurchaseByReference(parsed.data.providerReference);
+  const subRes = await billingDal.getSubscriptionByProviderReference(parsed.data.providerReference);
+
+  const isPurchaseOwner = purchaseRes.ok && purchaseRes.value && purchaseRes.value.userId === userId;
+  const isSubOwner = subRes.ok && subRes.value && subRes.value.userId === userId;
+
+  if (!isPurchaseOwner && !isSubOwner) {
+    return { success: false, error: "Payment reference not found or access denied" };
+  }
+
   const provider = getPaymentProvider();
-  const status = await provider.checkPurchaseStatus(providerReference);
+  const status = await provider.checkPurchaseStatus(parsed.data.providerReference);
 
   return { success: true, data: { status } };
 }
@@ -163,8 +185,13 @@ export async function getCreditLedgerAction(limit = 50) {
     return { success: false, error: session.ok ? "Unauthorized" : session.error.message };
   }
 
+  const safeLimit =
+    typeof limit === "number" && Number.isInteger(limit) && limit > 0
+      ? Math.min(limit, 100)
+      : 50;
+
   const userId = session.value.user.id;
-  const res = await billingDal.getCreditLedger(userId, limit);
+  const res = await billingDal.getCreditLedger(userId, safeLimit);
 
   if (!res.ok) {
     return { success: false, error: res.error.message };

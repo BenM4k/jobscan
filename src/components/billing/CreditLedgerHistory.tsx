@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useFormatter } from "next-intl";
 import { CreditLedgerSelect } from "@/dal/billing.dal";
 import { History, ArrowDownRight, ArrowUpRight } from "lucide-react";
 
@@ -12,6 +12,7 @@ interface CreditLedgerHistoryProps {
 /** Displays the user's credit transactions in reverse chronological order. */
 export function CreditLedgerHistory({ entries }: CreditLedgerHistoryProps) {
   const t = useTranslations("billing");
+  const format = useFormatter();
 
   const getActionLabel = (action: string) => {
     switch (action) {
@@ -33,75 +34,88 @@ export function CreditLedgerHistory({ entries }: CreditLedgerHistoryProps) {
   };
 
   return (
-    <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 p-6 shadow-xs">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="size-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 flex items-center justify-center">
-          <History className="size-5" />
-        </div>
-        <div>
-          <h2 className="text-base font-semibold text-foreground">
+    <section aria-labelledby="history-heading" className="space-y-6">
+      {/* Section Header */}
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-2.5">
+          <div className="size-8 rounded-md bg-muted text-muted-foreground flex items-center justify-center border border-border shrink-0">
+            <History className="size-4" />
+          </div>
+          <h2
+            id="history-heading"
+            className="text-lg sm:text-xl font-bold text-foreground"
+          >
             {t("historyTitle")}
           </h2>
-          <p className="text-xs text-muted-foreground">{t("historySubtitle")}</p>
         </div>
+        <p className="text-sm text-muted-foreground pl-10.5 max-w-xl leading-relaxed">
+          {t("historySubtitle")}
+        </p>
       </div>
 
       {entries.length === 0 ? (
-        <div className="py-8 text-center text-xs text-muted-foreground">
+        <div className="py-12 text-center text-sm text-muted-foreground rounded-xl border border-dashed border-border/70 bg-muted/10">
           {t("noHistory")}
         </div>
       ) : (
-        <div className="divide-y divide-zinc-100 dark:divide-zinc-800/80">
+        <div className="space-y-3 pt-2">
           {entries.map((entry) => {
             const isPositive = entry.amount > 0;
-            const dateStr = new Date(entry.createdAt).toLocaleDateString(undefined, {
+            const dateStr = format.dateTime(new Date(entry.createdAt), {
               month: "short",
               day: "numeric",
               hour: "2-digit",
               minute: "2-digit",
+              timeZone: "UTC",
             });
 
             return (
               <div
                 key={entry.id}
-                className="py-3 flex items-center justify-between text-xs"
+                className="p-4 sm:p-4.5 rounded-xl border border-border/70 bg-card/60 hover:bg-muted/20 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs"
               >
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-3.5">
                   <div
-                    className={`size-7 rounded-lg flex items-center justify-center ${
+                    className={`size-9 rounded-lg flex items-center justify-center shrink-0 border ${
                       isPositive
-                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
+                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                        : "bg-muted text-muted-foreground border-border"
                     }`}
                   >
                     {isPositive ? (
-                      <ArrowDownRight className="size-3.5" />
+                      <ArrowDownRight className="size-4" />
                     ) : (
-                      <ArrowUpRight className="size-3.5" />
+                      <ArrowUpRight className="size-4" />
                     )}
                   </div>
                   <div>
-                    <div className="font-medium text-foreground">
+                    <div className="text-sm font-semibold text-foreground">
                       {getActionLabel(entry.action)}
                     </div>
-                    <div className="text-[11px] text-muted-foreground">
+                    <div className="text-xs text-muted-foreground mt-0.5">
                       {dateStr}
                     </div>
                   </div>
                 </div>
 
-                <div className="text-right">
+                <div className="sm:text-right pl-12 sm:pl-0 flex sm:flex-col items-center sm:items-end justify-between gap-1">
                   <div
-                    className={`font-semibold ${
+                    className={`text-sm sm:text-base font-bold ${
                       isPositive
                         ? "text-emerald-600 dark:text-emerald-400"
                         : "text-foreground"
                     }`}
                   >
-                    {isPositive ? `+${entry.amount}` : entry.amount} credits
+                    {isPositive ? `+${entry.amount}` : entry.amount}{" "}
+                    <span className="text-xs font-normal text-muted-foreground">
+                      {t("credits").toLowerCase()}
+                    </span>
                   </div>
-                  <div className="text-[11px] text-muted-foreground">
-                    Balance: {entry.balanceAfter}
+                  <div className="text-xs text-muted-foreground">
+                    {t("balance")}:{" "}
+                    <span className="font-semibold text-foreground">
+                      {entry.balanceAfter}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -109,6 +123,7 @@ export function CreditLedgerHistory({ entries }: CreditLedgerHistoryProps) {
           })}
         </div>
       )}
-    </div>
+    </section>
   );
 }
+

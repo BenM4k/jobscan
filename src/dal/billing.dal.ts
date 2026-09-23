@@ -16,7 +16,7 @@ import {
   SubscriptionPlanSelect,
   SubscriptionSelect,
 } from "@/services/db/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and } from "drizzle-orm";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 
@@ -159,6 +159,66 @@ export async function spendCreditsWithLock(
 }
 
 /**
+ * Executor-based helper to lock balance, grant credits, and log to ledger using an existing transaction.
+ */
+export async function executeGrantCredits(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  userId: string,
+  amount: number,
+  action: "purchase" | "signup_grant" | "refund",
+  relatedId?: string | null
+): Promise<Result<{ balanceAfter: number }, AppError>> {
+  if (amount <= 0) {
+    const [existing] = await tx
+      .select()
+      .from(creditBalance)
+      .where(eq(creditBalance.userId, userId))
+      .limit(1);
+    return ok({ balanceAfter: existing ? existing.balance : 0 });
+  }
+
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtext('credit_balance_' || ${userId}))`
+  );
+
+  const [existing] = await tx
+    .select()
+    .from(creditBalance)
+    .where(eq(creditBalance.userId, userId))
+    .for("update")
+    .limit(1);
+
+  const currentBalance = existing ? existing.balance : 0;
+  const balanceAfter = currentBalance + amount;
+
+  await tx
+    .insert(creditBalance)
+    .values({
+      userId,
+      balance: balanceAfter,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [creditBalance.userId],
+      set: {
+        balance: balanceAfter,
+        updatedAt: new Date(),
+      },
+    });
+
+  await tx.insert(creditLedger).values({
+    userId,
+    action,
+    amount,
+    relatedId: relatedId || null,
+    balanceAfter,
+    createdAt: new Date(),
+  });
+
+  return ok({ balanceAfter });
+}
+
+/**
  * Transactionally locks user balance, grants credits (purchase, signup, refund), and logs to ledger.
  */
 export async function grantCreditsWithLock(
@@ -174,47 +234,10 @@ export async function grantCreditsWithLock(
 
   try {
     return await db.transaction(async (tx) => {
-      await tx.execute(
-        sql`SELECT pg_advisory_xact_lock(hashtext('credit_balance_' || ${userId}))`
-      );
-
-      const [existing] = await tx
-        .select()
-        .from(creditBalance)
-        .where(eq(creditBalance.userId, userId))
-        .for("update")
-        .limit(1);
-
-      const currentBalance = existing ? existing.balance : 0;
-      const balanceAfter = currentBalance + amount;
-
-      await tx
-        .insert(creditBalance)
-        .values({
-          userId,
-          balance: balanceAfter,
-          updatedAt: new Date(),
-        })
-        .onConflictDoUpdate({
-          target: [creditBalance.userId],
-          set: {
-            balance: balanceAfter,
-            updatedAt: new Date(),
-          },
-        });
-
-      await tx.insert(creditLedger).values({
-        userId,
-        action,
-        amount,
-        relatedId: relatedId || null,
-        balanceAfter,
-        createdAt: new Date(),
-      });
-
-      return ok({ balanceAfter });
+      return executeGrantCredits(tx, userId, amount, action, relatedId);
     });
   } catch (error) {
+    if (error instanceof AppError) return err(error);
     console.error(`[Billing DAL] Error granting credits for ${userId}:`, error);
     return err(new AppError("DB_ERROR", "Failed to grant credits", error));
   }
@@ -268,19 +291,6 @@ export async function createCreditPurchase(data: {
 }): Promise<Result<{ purchase: CreditPurchaseSelect; isExisting: boolean }, AppError>> {
   try {
     return await db.transaction(async (tx) => {
-      // Check existing purchase for this idempotency key
-      const [existing] = await tx
-        .select()
-        .from(creditPurchase)
-        .where(
-          sql`${creditPurchase.userId} = ${data.userId} AND ${creditPurchase.idempotencyKey} = ${data.idempotencyKey}`
-        )
-        .limit(1);
-
-      if (existing) {
-        return ok({ purchase: existing, isExisting: true });
-      }
-
       const [created] = await tx
         .insert(creditPurchase)
         .values({
@@ -291,9 +301,31 @@ export async function createCreditPurchase(data: {
           providerReference: data.providerReference || null,
           idempotencyKey: data.idempotencyKey,
         })
+        .onConflictDoNothing({
+          target: [creditPurchase.userId, creditPurchase.idempotencyKey],
+        })
         .returning();
 
-      return ok({ purchase: created, isExisting: false });
+      if (created) {
+        return ok({ purchase: created, isExisting: false });
+      }
+
+      const [existing] = await tx
+        .select()
+        .from(creditPurchase)
+        .where(
+          and(
+            eq(creditPurchase.userId, data.userId),
+            eq(creditPurchase.idempotencyKey, data.idempotencyKey)
+          )
+        )
+        .limit(1);
+
+      if (!existing) {
+        return err(new AppError("DB_ERROR", "Failed to retrieve existing credit purchase"));
+      }
+
+      return ok({ purchase: existing, isExisting: true });
     });
   } catch (error) {
     console.error("[Billing DAL] Failed to create credit purchase:", error);
@@ -341,9 +373,26 @@ export async function updateSubscriptionReference(
   providerSubscriptionId: string
 ): Promise<Result<void, AppError>> {
   try {
+    const [sub] = await db
+      .select({ providerSubscriptionId: subscription.providerSubscriptionId })
+      .from(subscription)
+      .where(eq(subscription.userId, userId))
+      .limit(1);
+
+    const existingRefs = sub?.providerSubscriptionId
+      ? sub.providerSubscriptionId.split(",").map((r) => r.trim()).filter(Boolean)
+      : [];
+
+    if (!existingRefs.includes(providerSubscriptionId)) {
+      existingRefs.push(providerSubscriptionId);
+    }
+
     await db
       .update(subscription)
-      .set({ providerSubscriptionId, updatedAt: new Date() })
+      .set({
+        providerSubscriptionId: existingRefs.join(","),
+        updatedAt: new Date(),
+      })
       .where(eq(subscription.userId, userId));
     return ok(undefined);
   } catch (error) {
@@ -360,7 +409,9 @@ export async function getSubscriptionByProviderReference(
     const [row] = await db
       .select()
       .from(subscription)
-      .where(eq(subscription.providerSubscriptionId, providerSubscriptionId))
+      .where(
+        sql`${subscription.providerSubscriptionId} = ${providerSubscriptionId} OR ${subscription.providerSubscriptionId} LIKE ${'%' + providerSubscriptionId + '%'}`
+      )
       .limit(1);
     return ok(row || null);
   } catch (error) {
@@ -423,7 +474,8 @@ export async function confirmCreditPurchaseAtomic(
         .returning();
 
       // Grant credits inside the same transaction
-      const grantRes = await grantCreditsWithLock(
+      const grantRes = await executeGrantCredits(
+        tx,
         purchase.userId,
         creditAmount,
         "purchase",
@@ -499,6 +551,8 @@ export async function getUserSubscription(
 
 /**
  * Creates or updates subscription row in pending/past_due state.
+ * Preserves active subscription status and period if already active.
+ * Reuses existing subscription if idempotencyKey matches.
  */
 export async function createOrUpdateSubscription(data: {
   userId: string;
@@ -506,34 +560,63 @@ export async function createOrUpdateSubscription(data: {
   provider: string;
   idempotencyKey?: string;
   providerSubscriptionId?: string;
-}): Promise<Result<SubscriptionSelect, AppError>> {
+}): Promise<Result<{ subscription: SubscriptionSelect; isExistingIdempotent: boolean }, AppError>> {
   try {
-    const currentPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-    const [sub] = await db
-      .insert(subscription)
-      .values({
-        userId: data.userId,
-        planId: data.planId,
-        status: "past_due", // pending activation
-        currentPeriodEnd,
-        provider: data.provider,
-        providerSubscriptionId: data.providerSubscriptionId || null,
-        idempotencyKey: data.idempotencyKey || null,
-      })
-      .onConflictDoUpdate({
-        target: [subscription.userId],
-        set: {
+    return await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(subscription)
+        .where(eq(subscription.userId, data.userId))
+        .for("update")
+        .limit(1);
+
+      if (existing) {
+        if (data.idempotencyKey && existing.idempotencyKey === data.idempotencyKey) {
+          return ok({ subscription: existing, isExistingIdempotent: true });
+        }
+
+        const isActive = existing.status === "active" && existing.currentPeriodEnd > new Date();
+        const status = isActive ? existing.status : "past_due";
+        const currentPeriodEnd = isActive
+          ? existing.currentPeriodEnd
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+        const [updated] = await tx
+          .update(subscription)
+          .set({
+            planId: data.planId,
+            status,
+            currentPeriodEnd,
+            provider: data.provider,
+            providerSubscriptionId:
+              data.providerSubscriptionId !== undefined
+                ? data.providerSubscriptionId
+                : existing.providerSubscriptionId,
+            idempotencyKey: data.idempotencyKey || existing.idempotencyKey,
+            updatedAt: new Date(),
+          })
+          .where(eq(subscription.userId, data.userId))
+          .returning();
+
+        return ok({ subscription: updated, isExistingIdempotent: false });
+      }
+
+      const currentPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const [created] = await tx
+        .insert(subscription)
+        .values({
+          userId: data.userId,
           planId: data.planId,
-          status: "past_due",
+          status: "past_due", // pending activation
+          currentPeriodEnd,
           provider: data.provider,
           providerSubscriptionId: data.providerSubscriptionId || null,
           idempotencyKey: data.idempotencyKey || null,
-          updatedAt: new Date(),
-        },
-      })
-      .returning();
+        })
+        .returning();
 
-    return ok(sub);
+      return ok({ subscription: created, isExistingIdempotent: false });
+    });
   } catch (error) {
     console.error("[Billing DAL] Failed to create or update subscription:", error);
     return err(new AppError("DB_ERROR", "Failed to create subscription", error));
@@ -551,7 +634,9 @@ export async function confirmSubscriptionAtomic(
       const [sub] = await tx
         .select()
         .from(subscription)
-        .where(eq(subscription.providerSubscriptionId, providerSubscriptionId))
+        .where(
+          sql`${subscription.providerSubscriptionId} = ${providerSubscriptionId} OR ${subscription.providerSubscriptionId} LIKE ${'%' + providerSubscriptionId + '%'}`
+        )
         .for("update")
         .limit(1);
 
@@ -569,6 +654,7 @@ export async function confirmSubscriptionAtomic(
         .set({
           status: "active",
           currentPeriodEnd: nextPeriodEnd,
+          providerSubscriptionId,
           updatedAt: new Date(),
         })
         .where(eq(subscription.userId, sub.userId))

@@ -80,6 +80,7 @@ Generate 5 high-yield interview questions tailored to this role and this candida
         generateText({
           model,
           prompt,
+          timeout: 30_000,
           output: Output.object({
             schema: interviewQuestionsSchema,
           }),
