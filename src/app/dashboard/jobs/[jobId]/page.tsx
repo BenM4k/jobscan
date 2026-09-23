@@ -8,8 +8,6 @@ import { ArrowLeft, AlertCircle } from "lucide-react";
 import { JobDetailView } from "@/components/job/JobDetailView";
 import { JobDetailSkeleton } from "@/components/job/JobDetailSkeleton";
 
-export const instant = false;
-
 interface JobDetailPageProps {
   params: Promise<{ jobId: string }>;
 }
@@ -71,12 +69,8 @@ async function JobDetailContent({
   );
 }
 
-export default async function JobDetailPage({ params }: JobDetailPageProps) {
-  const sessionResult = await requireSession();
-  if (!sessionResult.ok || !sessionResult.value) {
-    redirect("/sign-in");
-  }
-
+/** Renders a job's detail workspace and defers data loading behind suspense. */
+export default function JobDetailPage({ params }: JobDetailPageProps) {
   return (
     <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 font-sans">
       {/* Breadcrumb Navigation */}

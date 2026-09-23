@@ -13,7 +13,6 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export const instant = false;
 
 export default async function TermsOfServicePage() {
   const t = await getTranslations("terms");

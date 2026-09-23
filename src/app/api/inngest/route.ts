@@ -6,6 +6,8 @@ import {
   scheduledDigestCron,
   sendDigestEmail,
   scoreJobOnCreation,
+  mockPaymentConfirmationJob,
+  checkSubscriptionExpiryCron,
 } from "@/inngest/functions";
 
 export const { GET, POST, PUT } = serve({
@@ -16,6 +18,8 @@ export const { GET, POST, PUT } = serve({
     scheduledDigestCron,
     sendDigestEmail,
     scoreJobOnCreation,
+    mockPaymentConfirmationJob,
+    checkSubscriptionExpiryCron,
   ],
 });
 

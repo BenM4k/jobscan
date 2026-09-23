@@ -1,7 +1,5 @@
 import Link from "next/link";
 
-export const instant = false;
-
 export default function NotFound() {
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 flex flex-col items-center justify-center p-6 text-center">

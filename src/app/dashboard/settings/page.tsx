@@ -19,8 +19,6 @@ import { Sliders, Shield } from "lucide-react";
 import Link from "next/link";
 import { isAdmin } from "@/services/auth/admin";
 
-export const instant = false;
-
 export const metadata = {
   title: "Settings & Preferences | Jobpilot",
   description: "Manage your user account settings, active sessions, passkeys, and preferences.",

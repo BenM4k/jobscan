@@ -15,12 +15,15 @@ import {
 } from "@/services/tailoring.service";
 import { coverLetterPromptFieldsSchema } from "@/actions/job.schema";
 
+/** Streams a newly generated cover letter after authentication and credit checks. */
 export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   let idempotencyRecordId: string | null = null;
   let idempotencyAttemptId: string | null = null;
+
+  let safeRefund = async () => {};
 
   try {
     const sessionResult = await requireSession();
@@ -281,6 +284,46 @@ export async function POST(
       tone,
     });
 
+    const { spendCredits, grantCredits } = await import(
+      "@/services/billing/billing.service"
+    );
+    const spendRes = await spendCredits(userId, "tailored_cover_letter", id);
+    if (!spendRes.ok) {
+      if (idempotencyAttemptId && idempotencyRecordId) {
+        await idempotencyDal.failIdempotentAction(
+          idempotencyRecordId,
+          idempotencyAttemptId
+        );
+      }
+      if (spendRes.error.code === "INSUFFICIENT_CREDITS") {
+        return NextResponse.json(
+          {
+            error: spendRes.error.message,
+            code: "insufficient_credits",
+            details: spendRes.error.details,
+          },
+          { status: 402 }
+        );
+      }
+      return NextResponse.json(
+        { error: spendRes.error.message },
+        { status: 500 }
+      );
+    }
+
+    const creditCost = spendRes.value.cost;
+    let isRefunded = false;
+    safeRefund = async () => {
+      if (!isRefunded && creditCost > 0) {
+        isRefunded = true;
+        try {
+          await grantCredits(userId, creditCost, "refund", id);
+        } catch (refundErr) {
+          console.error("Failed to refund credits for cover letter:", refundErr);
+        }
+      }
+    };
+
     const result = streamText({
       model,
       instructions,
@@ -288,6 +331,16 @@ export async function POST(
       temperature: isRegeneration ? 0.6 : 0.4,
       timeout: 30_000,
       telemetry: { isEnabled: false },
+      onError: async ({ error }) => {
+        await safeRefund();
+        if (idempotencyAttemptId && idempotencyRecordId) {
+          await idempotencyDal.failIdempotentAction(
+            idempotencyRecordId,
+            idempotencyAttemptId
+          );
+        }
+        console.error("StreamText error in cover letter:", error);
+      },
       onFinish: async ({ text }) => {
         try {
           if (text && text.trim().length > 0) {
@@ -335,11 +388,13 @@ export async function POST(
               }
             }
           } else {
+            await safeRefund();
             if (idempotencyAttemptId && idempotencyRecordId) {
               await idempotencyDal.failIdempotentAction(idempotencyRecordId, idempotencyAttemptId);
             }
           }
         } catch (saveError) {
+          await safeRefund();
           if (idempotencyAttemptId && idempotencyRecordId) {
             await idempotencyDal.failIdempotentAction(idempotencyRecordId, idempotencyAttemptId);
           }
@@ -364,6 +419,7 @@ export async function POST(
       },
     });
   } catch (error) {
+    await safeRefund();
     if (idempotencyRecordId && idempotencyAttemptId) {
       await idempotencyDal.failIdempotentAction(idempotencyRecordId, idempotencyAttemptId);
     }

@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Settings, User, LogOut, ChevronDown, FileText } from "lucide-react";
+import { Settings, User, LogOut, ChevronDown, FileText, Coins } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -21,6 +21,7 @@ interface NavbarUserDropdownProps {
   userName?: string | null;
 }
 
+/** Renders the desktop account menu with billing, settings, and sign-out actions. */
 export function NavbarUserDropdown({
   userEmail,
   userName,
@@ -109,6 +110,14 @@ export function NavbarUserDropdown({
             >
               <Settings className="size-4 text-muted-foreground" />
               <span>{t("settings")}</span>
+            </DropdownMenuItem>
+
+            <DropdownMenuItem
+              render={<Link href="/dashboard/billing" />}
+              className="cursor-pointer px-3 py-2.5"
+            >
+              <Coins className="size-4 text-muted-foreground" />
+              <span>{t("billing")}</span>
             </DropdownMenuItem>
           </DropdownMenuGroup>
 

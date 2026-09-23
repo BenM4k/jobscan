@@ -14,6 +14,7 @@ import {
 import { useTranslations } from "next-intl";
 import { useCoverLetter } from "./useCoverLetter";
 import { RetryProgressBadge } from "@/components/ui/RetryProgressBadge";
+import { InsufficientCreditsDialog } from "@/components/billing/InsufficientCreditsDialog";
 
 interface JobCoverLetterSectionProps {
   job: JobSelect;
@@ -21,6 +22,7 @@ interface JobCoverLetterSectionProps {
   selectedResumeId?: string;
 }
 
+/** Provides cover-letter generation, editing, saving, and copy controls for a job. */
 export function JobCoverLetterSection({
   job,
   onJobUpdated,
@@ -50,6 +52,9 @@ export function JobCoverLetterSection({
     handleSave,
     handleDownloadPdf,
     handleCopy,
+    isInsufficientCreditsOpen,
+    setIsInsufficientCreditsOpen,
+    insufficientCreditsData,
   } = useCoverLetter({ job, onJobUpdated, selectedResumeId });
 
   const hasContent = hasCoverLetter || Boolean(coverLetter);
@@ -191,6 +196,13 @@ export function JobCoverLetterSection({
           </div>
         </div>
       )}
+
+      <InsufficientCreditsDialog
+        open={isInsufficientCreditsOpen}
+        onOpenChange={setIsInsufficientCreditsOpen}
+        requiredCost={insufficientCreditsData.requiredCost}
+        currentBalance={insufficientCreditsData.currentBalance}
+      />
     </section>
   );
 }

@@ -7,6 +7,8 @@ import { NavLinks, NavLinkItem } from "@/components/layout/NavLinks";
 import { NavbarMobile } from "@/components/layout/NavbarMobile";
 import { NavbarUserDropdown } from "@/components/layout/NavbarUserDropdown";
 import { NavbarTelemetry } from "@/components/layout/NavbarTelemetry";
+import { CreditBalanceIndicator } from "@/components/billing/CreditBalanceIndicator";
+import { getCreditBalance } from "@/dal/billing.dal";
 
 interface NavbarProps {
   userId?: string;
@@ -14,8 +16,12 @@ interface NavbarProps {
   userName?: string | null;
 }
 
+/** Loads account navigation data and renders the responsive dashboard navbar. */
 export async function Navbar({ userId, userEmail, userName }: NavbarProps) {
   const t = await getTranslations("nav");
+
+  const balanceRes = userId ? await getCreditBalance(userId) : null;
+  const creditBalance = balanceRes?.ok ? balanceRes.value : 0;
 
   const navLinks: NavLinkItem[] = [
     { href: "/dashboard", label: t("pipeline"), icon: "📊" },
@@ -48,13 +54,47 @@ export async function Navbar({ userId, userEmail, userName }: NavbarProps) {
         <div className="hidden md:flex items-center gap-4 text-sm font-medium">
           {userEmail && <NavLinks links={navLinks} />}
 
+          {userId && <CreditBalanceIndicator balance={creditBalance} />}
+
           <PreferencesWidget />
 
           <NavbarUserDropdown userEmail={userEmail} userName={userName} />
         </div>
 
         {/* Mobile Header Right: Unified Widget + Hamburger & Mobile Drawer */}
-        <NavbarMobile navLinks={navLinks} userEmail={userEmail} />
+        <NavbarMobile
+          navLinks={navLinks}
+          userEmail={userEmail}
+          creditBalance={creditBalance}
+        />
+      </div>
+    </nav>
+  );
+}
+
+/** Renders the dashboard navbar loading placeholder. */
+export function NavbarSkeleton() {
+  return (
+    <nav
+      aria-label="Main navigation loading"
+      className="sticky border-b border-slate-300 dark:border-zinc-800 bg-white/80 dark:bg-[#0A0A0C]/90 backdrop-blur-xl top-0 z-50 h-16 transition-colors duration-300"
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        <Link
+          href="/"
+          aria-label="JobPilot Home"
+          className="flex items-center gap-3 group"
+        >
+          <Logo size={36} showText badgeText="PRO" />
+        </Link>
+        <div className="hidden md:flex items-center gap-4">
+          <div className="w-16 h-4 bg-slate-200 dark:bg-zinc-800 rounded animate-pulse" />
+          <div className="w-16 h-4 bg-slate-200 dark:bg-zinc-800 rounded animate-pulse" />
+          <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-zinc-800 animate-pulse" />
+        </div>
+        <div className="flex md:hidden items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-zinc-800 animate-pulse" />
+        </div>
       </div>
     </nav>
   );

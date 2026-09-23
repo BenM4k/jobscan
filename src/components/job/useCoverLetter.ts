@@ -20,11 +20,17 @@ export interface GenerateCoverLetterOptions {
   resumeId?: string;
 }
 
+/** Manages cover-letter generation, persistence, clipboard state, and credit errors. */
 export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCoverLetterProps) {
   const [coverLetter, setCoverLetter] = useState(job.coverLetterDraft || "");
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [isInsufficientCreditsOpen, setIsInsufficientCreditsOpen] = useState(false);
+  const [insufficientCreditsData, setInsufficientCreditsData] = useState<{
+    requiredCost: number;
+    currentBalance: number;
+  }>({ requiredCost: 5, currentBalance: 0 });
   const abortControllerRef = useRef<AbortController | null>(null);
   const pendingIdempotencyKeyRef = useRef<string | null>(null);
   const pendingResumeIdRef = useRef<string | undefined>(undefined);
@@ -104,6 +110,13 @@ export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCover
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
+        if (res.status === 402 || errJson.code === "insufficient_credits") {
+          setIsInsufficientCreditsOpen(true);
+          setInsufficientCreditsData({
+            requiredCost: errJson.details?.requiredCost ?? 5,
+            currentBalance: errJson.details?.currentBalance ?? 0,
+          });
+        }
         const msg = errJson.error || `Failed to generate cover letter (${res.status})`;
         const errorObj = new Error(msg) as Error & {
           status?: number;
@@ -221,5 +234,8 @@ export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCover
     handleSave,
     handleDownloadPdf,
     handleCopy,
+    isInsufficientCreditsOpen,
+    setIsInsufficientCreditsOpen,
+    insufficientCreditsData,
   };
 }

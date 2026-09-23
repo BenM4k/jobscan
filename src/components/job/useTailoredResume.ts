@@ -17,11 +17,17 @@ interface UseTailoredResumeOptions {
   selectedResumeId?: string;
 }
 
+/** Manages tailored-resume generation, persistence, clipboard state, and credit errors. */
 export function useTailoredResume({ job, onJobUpdated, selectedResumeId }: UseTailoredResumeOptions) {
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editedResume, setEditedResume] = useState(job.tailoredResume || "");
   const [isCopied, setIsCopied] = useState(false);
+  const [isInsufficientCreditsOpen, setIsInsufficientCreditsOpen] = useState(false);
+  const [insufficientCreditsData, setInsufficientCreditsData] = useState<{
+    requiredCost: number;
+    currentBalance: number;
+  }>({ requiredCost: 5, currentBalance: 0 });
   const pendingIdempotencyKeyRef = useRef<string | null>(null);
   const pendingResumeIdRef = useRef<string | undefined>(undefined);
 
@@ -63,6 +69,14 @@ export function useTailoredResume({ job, onJobUpdated, selectedResumeId }: UseTa
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
+        if (res.status === 402 || errJson.code === "insufficient_credits") {
+          setIsInsufficientCreditsOpen(true);
+          setInsufficientCreditsData({
+            requiredCost: errJson.details?.requiredCost ?? 5,
+            currentBalance: errJson.details?.currentBalance ?? 0,
+          });
+        }
+
         const msg = errJson.error || `Tailoring failed with status ${res.status}`;
         const errorObj = new Error(msg) as Error & {
           status?: number;
@@ -161,5 +175,8 @@ export function useTailoredResume({ job, onJobUpdated, selectedResumeId }: UseTa
     handleSave,
     handleDownloadPdf,
     handleCopy,
+    isInsufficientCreditsOpen,
+    setIsInsufficientCreditsOpen,
+    insufficientCreditsData,
   };
 }

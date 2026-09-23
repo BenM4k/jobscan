@@ -6,8 +6,6 @@ import { Logo } from "@/components/Logo";
 import { getTranslations } from "next-intl/server";
 import { DashboardFooter } from "@/components/layout/DashboardFooter";
 
-export const instant = false;
-
 async function LandingNavbar() {
   const sessionResult = await requireSession();
   const userEmail = sessionResult.ok ? sessionResult.value?.user?.email : null;

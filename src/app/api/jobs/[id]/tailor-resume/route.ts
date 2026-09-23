@@ -5,8 +5,9 @@ import { generateTailoredResume } from "@/services/tailoring.service";
 import { checkAiRateLimit } from "@/services/rate-limit";
 import * as jobService from "@/services/job.service";
 import * as jobsDal from "@/dal/jobs.dal";
-import { ok } from "@/lib/result";
+import { ok, err } from "@/lib/result";
 
+/** Generates and persists a tailored resume after authentication and credit checks. */
 export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -79,8 +80,17 @@ export async function POST(
       key: idempotencyKey,
       targetId: id,
       execute: async () => {
+        const { spendCredits, grantCredits } = await import(
+          "@/services/billing/billing.service"
+        );
+        const spendRes = await spendCredits(userId, "tailored_resume", id);
+        if (!spendRes.ok) return err(spendRes.error);
+
         const tailorRes = await generateTailoredResume(id, userId, resumeId);
         if (!tailorRes.ok) {
+          if (spendRes.value.cost > 0) {
+            await grantCredits(userId, spendRes.value.cost, "refund", id);
+          }
           return tailorRes;
         }
 
@@ -115,6 +125,16 @@ export async function POST(
     });
 
     if (!result.ok) {
+      if (result.error.code === "INSUFFICIENT_CREDITS") {
+        return NextResponse.json(
+          {
+            error: result.error.message,
+            code: "insufficient_credits",
+            details: result.error.details,
+          },
+          { status: 402 }
+        );
+      }
       if (result.error.code === "OPERATION_IN_PROGRESS") {
         return NextResponse.json(
           { error: "Tailored resume generation is currently in progress", inProgress: true },

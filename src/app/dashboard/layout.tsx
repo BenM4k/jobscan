@@ -1,15 +1,39 @@
-import { requireSession } from "@/lib/auth-guard";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { Navbar } from "@/components/layout/Navbar";
+import { requireSession } from "@/lib/auth-guard";
+import { Navbar, NavbarSkeleton } from "@/components/layout/Navbar";
 import { DashboardFooter } from "@/components/layout/DashboardFooter";
 
+/** Resolves the authenticated user data needed by the dashboard navigation. */
+async function DashboardNavbar() {
+  const sessionResult = await requireSession();
+
+  if (!sessionResult.ok || !sessionResult.value) {
+    redirect("/sign-in");
+  }
+
+  const session = sessionResult.value;
+
+  return (
+    <Navbar
+      userId={session.user.id}
+      userEmail={session.user.email}
+      userName={session.user.name}
+    />
+  );
+}
+
+// TODO: Cache Components adoption. Refactor this route so this opt-out can be removed.
+// See: https://nextjs.org/docs/app/guides/migrating-to-cache-components
+export const instant = false;
+
+/** Provides the shared navigation, background, and footer for dashboard pages. */
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const sessionResult = await requireSession();
-
   if (!sessionResult.ok || !sessionResult.value) {
     redirect("/sign-in");
   }
@@ -25,11 +49,9 @@ export default async function DashboardLayout({
         }}
       />
 
-      <Navbar
-        userId={sessionResult.value.user.id}
-        userEmail={sessionResult.value.user.email}
-        userName={sessionResult.value.user.name}
-      />
+      <Suspense fallback={<NavbarSkeleton />}>
+        <DashboardNavbar />
+      </Suspense>
 
       <div className="flex-1 flex flex-col z-10">{children}</div>
 

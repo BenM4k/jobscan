@@ -10,3 +10,7 @@ export {
 export {
   scoreJobOnCreation,
 } from "./functions/scoring";
+export {
+  mockPaymentConfirmationJob,
+  checkSubscriptionExpiryCron,
+} from "./functions/billing";

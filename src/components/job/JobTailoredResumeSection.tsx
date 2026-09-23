@@ -14,6 +14,7 @@ import { useTranslations } from "next-intl";
 import { useTailoredResume } from "./useTailoredResume";
 import { TailoredResumeActions } from "./TailoredResumeActions";
 import { RetryProgressBadge } from "@/components/ui/RetryProgressBadge";
+import { InsufficientCreditsDialog } from "@/components/billing/InsufficientCreditsDialog";
 
 interface JobTailoredResumeSectionProps {
   job: JobSelect;
@@ -21,6 +22,7 @@ interface JobTailoredResumeSectionProps {
   selectedResumeId?: string;
 }
 
+/** Provides tailored-resume generation, editing, saving, and export controls for a job. */
 export function JobTailoredResumeSection({
   job,
   onJobUpdated,
@@ -50,6 +52,9 @@ export function JobTailoredResumeSection({
     handleSave,
     handleDownloadPdf,
     handleCopy,
+    isInsufficientCreditsOpen,
+    setIsInsufficientCreditsOpen,
+    insufficientCreditsData,
   } = useTailoredResume({ job, onJobUpdated, selectedResumeId });
 
   return (
@@ -211,6 +216,13 @@ export function JobTailoredResumeSection({
           </div>
         </div>
       )}
+
+      <InsufficientCreditsDialog
+        open={isInsufficientCreditsOpen}
+        onOpenChange={setIsInsufficientCreditsOpen}
+        requiredCost={insufficientCreditsData.requiredCost}
+        currentBalance={insufficientCreditsData.currentBalance}
+      />
     </section>
   );
 }

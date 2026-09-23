@@ -46,6 +46,9 @@ For any non-trivial request:
   - `PipelineEntry`: User job tracking stages (`saved`, `applied`, `interviewing`, etc.).
   - `JobMatchScore`: Match score between a job and a master resume.
   - `TailoredResume` & `TailoredCoverLetter`: Job-specific AI-customized application assets.
+  - `CreditBalance` & `CreditLedger`: User credit balance and immutable append-only transaction audit journal.
+  - `CreditPack` & `CreditPurchase`: Purchasable credit bundles and mobile money transaction records.
+  - `SubscriptionPlan` & `Subscription`: Recurring tier configuration ($15/mo Pro) and active subscription lifecycle status.
   - `IdempotencyKey`: Client UUID guards preventing duplicate billing for paid AI actions.
   - `AiCallLog`: Usage, latency, and estimated token cost audit telemetry.
 
@@ -83,6 +86,7 @@ src/
       profile/              # Resume management (transitional legacy mirror)
       jobs/[jobId]/         # Job details, score breakdown, AI tailoring
       add-job/              # Manual job addition
+      billing/              # Credits & subscription billing hub
       settings/             # Account preferences & user feature flags
       admin/                # Admin feature flag rollout console
     api/
@@ -94,11 +98,13 @@ src/
     shared/                 # Reusable domain components composed from ui/
     layout/                 # App navigation (Navbar, NavbarUserDropdown using shadcn DropdownMenu)
     job/                    # JobScoreSection, MatchExplanation, SkillGapBreakdown, JobCard
+    billing/                # CreditBalanceIndicator, CreditPurchaseCard, SubscriptionCard, InsufficientCreditsDialog
     settings/               # Settings & feature flag cards
     admin/                  # Admin feature flag manager
 
   actions/                  # Server actions (validation + auth boundary → service layer)
   services/                 # Service layer (business logic, orchestration, external integrations)
+    billing/                # Payment provider abstraction, mock mobile money, credit & subscription business logic
     adapters/               # ATS on-demand adapters (Ashby, Greenhouse, Lever, RemoteOK)
     crawler/sources/        # Regional & scraper sources (CongoJob, Emploi.cd, FECRDC, UNJobs, ReliefWeb)
     ai/                     # Vercel AI SDK clients, embeddings, score-cache, rate-limiting, tracker
@@ -108,9 +114,9 @@ src/
     reliability/            # Adapter circuit breaker with exponential backoff
     cache/                  # Redis client (sole importer of @upstash/redis)
     auth/                   # better-auth configuration & admin check
-    db/schema/              # Modular Drizzle schemas (pipeline, resume, scoring, ops, auth)
+    db/schema/              # Modular Drizzle schemas (pipeline, resume, scoring, ops, auth, billing)
 
-  dal/                      # Data Access Layer (the ONLY layer calling Drizzle directly)
+  dal/                      # Data Access Layer (the ONLY layer calling Drizzle directly: jobs, billing, growth, etc.)
   inngest/                  # Inngest client, typed event schemas, and background functions
   lib/                      # Shared utilities, SimHash, Result (ok-err), error types, Zod schemas
   test/                     # Standalone test suites (src/test/unit/, src/test/integration/)
@@ -150,6 +156,7 @@ For detailed guides, schemas, algorithms, and workflows, consult the correspondi
 | Topic | Document | Contents |
 | :--- | :--- | :--- |
 | **Architecture & Layering** | [`docs/architecture-and-layering.md`](./docs/architecture-and-layering.md) | Request flow, `Result` types, action idempotency state machine, feature flags, circuit breaker, Inngest. |
+| **Billing & Monetization** | [`docs/billing-and-monetization.md`](./docs/billing-and-monetization.md) | Two-layer monetization: credit packs (spendable per AI action, scoring free), Pro subscription ($15/mo gating personas, digests, hybrid scoring), payment provider abstraction, mock mobile money, idempotency, non-retryable 402 handling. |
 | **Job Ingestion & Sources** | [`docs/job-ingestion-and-sources.md`](./docs/job-ingestion-and-sources.md) | ATS adapters, crawler sources, two-step ingestion pipeline, SimHash deduplication ($k \le 3$), adding new sources. |
 | **AI & Matching Engine** | [`docs/ai-and-matching.md`](./docs/ai-and-matching.md) | Dual-language hybrid matching (pgvector + tsvector), skill extraction, recency decay ($\lambda = 0.0495$), rate limiter, AI cost tracking, persona promotion. |
 | **Database & Models** | [`docs/database-and-models.md`](./docs/database-and-models.md) | Drizzle ORM schemas, canonical tables, legacy table isolation, pgvector literal workaround, migrations. |

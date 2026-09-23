@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { requireSession } from "@/lib/auth-guard";
 import { isAdmin } from "@/services/auth/admin";
 import { redirect } from "next/navigation";
@@ -15,7 +16,18 @@ export const metadata = {
   description: "Global feature toggles and per-user overrides for beta testing and gradual rollouts.",
 };
 
-export default async function AdminFlagsPage() {
+/** Renders the loading placeholder for the feature-flag administration console. */
+function AdminFlagsSkeleton() {
+  return (
+    <div className="space-y-6 animate-pulse">
+      <div className="h-48 bg-slate-100 dark:bg-zinc-800/50 rounded-2xl border border-slate-200 dark:border-zinc-800" />
+      <div className="h-64 bg-slate-100 dark:bg-zinc-800/50 rounded-2xl border border-slate-200 dark:border-zinc-800" />
+    </div>
+  );
+}
+
+/** Loads the protected feature-flag administration data for an authorized admin. */
+async function AdminFlagsContent() {
   const sessionResult = await requireSession();
   if (!sessionResult.ok || !sessionResult.value) {
     redirect("/sign-in");
@@ -26,7 +38,7 @@ export default async function AdminFlagsPage() {
   // Verify admin access via stopgap ADMIN_USER_IDS check
   if (!isAdmin(user)) {
     return (
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-16 text-center space-y-4">
+      <div className="py-16 text-center space-y-4">
         <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 mx-auto flex items-center justify-center">
           <ShieldAlert className="w-6 h-6" />
         </div>
@@ -43,7 +55,7 @@ export default async function AdminFlagsPage() {
             </Button>
           </Link>
         </div>
-      </main>
+      </div>
     );
   }
 
@@ -52,6 +64,16 @@ export default async function AdminFlagsPage() {
     getAdminFeatureFlagAssignments(),
   ]);
 
+  return (
+    <AdminFeatureFlagsManager
+      initialFlags={flags}
+      initialOverrides={overrides}
+    />
+  );
+}
+
+/** Renders the feature-flag administration page with a suspense boundary. */
+export default function AdminFlagsPage() {
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 w-full space-y-8 z-10">
       {/* Header */}
@@ -68,10 +90,9 @@ export default async function AdminFlagsPage() {
         </p>
       </div>
 
-      <AdminFeatureFlagsManager
-        initialFlags={flags}
-        initialOverrides={overrides}
-      />
+      <Suspense fallback={<AdminFlagsSkeleton />}>
+        <AdminFlagsContent />
+      </Suspense>
     </main>
   );
 }

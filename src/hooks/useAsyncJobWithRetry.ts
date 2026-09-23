@@ -25,6 +25,7 @@ export interface RateLimitedPayload {
   error?: string;
 }
 
+/** Runs an asynchronous job with retry timing, progress messages, and cancellation. */
 export function useAsyncJobWithRetry<T>({
   jobName,
   maxRetries = 2,
@@ -140,6 +141,13 @@ export function useAsyncJobWithRetry<T>({
             rawError.toLowerCase().includes("rate limit") ||
             parsedPayload.status === 429;
 
+          const isNonRetryable =
+            parsedPayload.code === "insufficient_credits" ||
+            parsedPayload.status === 402 ||
+            parsedPayload.status === 400 ||
+            parsedPayload.status === 401 ||
+            parsedPayload.status === 404;
+
           const waitSeconds =
             typeof parsedPayload.retryAfterSeconds === "number" &&
             parsedPayload.retryAfterSeconds > 0
@@ -148,7 +156,7 @@ export function useAsyncJobWithRetry<T>({
               ? 10
               : defaultDelaySeconds * currentAttempt;
 
-          if (currentAttempt < totalAttempts) {
+          if (currentAttempt < totalAttempts && !isNonRetryable) {
             if (isCancelledRef.current) return null;
             setStatus("retrying");
             setCountdown(waitSeconds);

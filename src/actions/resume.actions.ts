@@ -43,6 +43,7 @@ export async function setActiveResumeAction(resumeId: string) {
   return { success: true, data: true };
 }
 
+/** Creates a master resume while enforcing subscription-based persona limits. */
 export async function createMasterResumeAction(data: {
   label: string;
   content: string;
@@ -64,6 +65,30 @@ export async function createMasterResumeAction(data: {
   }
 
   const userId = session.value.user.id;
+
+  // Gate multiple personas (> 1) on active Pro subscription
+  const existingResumesRes = await resumeDal.getMasterResumes(userId);
+  if (!existingResumesRes.ok) {
+    return { success: false, error: existingResumesRes.error.message };
+  }
+
+  const { getUserSubscription } = await import("@/dal/billing.dal");
+  const { canCreatePersona } = await import("@/services/billing/billing.service");
+  const subRes = await getUserSubscription(userId);
+  const gateCheck = canCreatePersona(
+    existingResumesRes.value.length,
+    subRes.ok ? subRes.value : null
+  );
+
+  if (!gateCheck.allowed) {
+    return {
+      success: false,
+      error:
+        gateCheck.reason ||
+        "Multiple resume personas require an active Jobpilot Pro subscription. Please upgrade to create additional personas.",
+    };
+  }
+
   const res = await resumeDal.createMasterResume(
     {
       userId,
@@ -129,6 +154,7 @@ export async function updateMasterResumeAction(data: {
   return { success: true, data: res.value };
 }
 
+/** Promotes a tailored resume into a new master-resume persona. */
 export async function promoteTailoredResumeAction(
   tailoredResumeId: string,
   label: string
@@ -144,6 +170,28 @@ export async function promoteTailoredResumeAction(
   const parsed = promoteTailoredResumeSchema.safeParse({ tailoredResumeId, label });
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message || "Invalid arguments" };
+  }
+
+  // Gate multiple personas (> 1) on active Pro subscription
+  const existingResumesRes = await resumeDal.getMasterResumes(session.value.user.id);
+  if (!existingResumesRes.ok) {
+    return { success: false, error: existingResumesRes.error.message };
+  }
+
+  const { getUserSubscription } = await import("@/dal/billing.dal");
+  const { canCreatePersona } = await import("@/services/billing/billing.service");
+  const subRes = await getUserSubscription(session.value.user.id);
+  const gateCheck = canCreatePersona(
+    existingResumesRes.value.length,
+    subRes.ok ? subRes.value : null
+  );
+
+  if (!gateCheck.allowed) {
+    return {
+      success: false,
+      error:
+        "Creating multiple personas by promoting tailored resumes requires an active Jobpilot Pro subscription.",
+    };
   }
 
   const res = await resumeDal.promoteTailoredResumeToMaster(
