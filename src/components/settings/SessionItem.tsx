@@ -55,7 +55,7 @@ export function SessionItem({
               {item.ipAddress || t("unknownIp")}
             </span>
             <span>•</span>
-            <span>
+            <span suppressHydrationWarning>
               {t("created")}: {createdFormatted}
             </span>
           </div>

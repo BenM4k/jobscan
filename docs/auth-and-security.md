@@ -8,9 +8,10 @@ This document describes authentication, authorization, content sanitization, and
 
 Jobpilot uses **better-auth** for session handling, authentication plugins, and user identity.
 
-- **Server Instance (`src/services/auth/auth.ts`):** Handles credential verification, session creation, and database adapters. Marked with `import "server-only"`.
-- **Client Instance (`src/services/auth/auth-client.ts`):** Exports client hooks (`useSession`, `signIn`, `signOut`) for use in Client Components.
-- **Strict Separation:** **Never** import `src/services/auth/auth.ts` into Client Components.
+- **Server Instance (`src/services/auth/auth.ts`):** Handles credential verification, session creation, passkey plugin, and database adapters. Marked with `import "server-only"`. Configures `session: { freshAge: 0 }` to avoid session staleness errors on valid sessions.
+- **Client Instance (`src/services/auth/auth-client.ts`):** Exports client hooks (`useSession`, `signIn`, `signOut`, passkey plugin) for use in Client Components.
+- **Auth DAL (`src/dal/auth.dal.ts`):** Provides direct, type-safe queries for active sessions (`getActiveSessionsForUser`) and registered credentials (`getUserPasskeys`), avoiding brittle header-forwarding middleware in Server Components.
+- **Strict Separation:** **Never** import `src/services/auth/auth.ts` or `src/dal/auth.dal.ts` into Client Components.
 - **Route Handler:** Exposed at `src/app/api/auth/[...all]/route.ts`.
 
 ---

@@ -6,6 +6,7 @@ import { auth } from "@/services/auth/auth";
 import { getUserFeatureFlags } from "@/services/flags";
 import { getUserAiUsage } from "@/services/ai/usage.service";
 import * as growthDal from "@/dal/growth.dal";
+import * as authDal from "@/dal/auth.dal";
 import { AccountSettingsCard } from "@/components/settings/AccountSettingsCard";
 import { SessionManagementCard } from "@/components/settings/SessionManagementCard";
 import type { SessionData } from "@/components/settings/session-utils";
@@ -32,17 +33,64 @@ async function SettingsContent() {
   }
 
   const user = sessionResult.value.user;
-  const currentToken = sessionResult.value.session.token;
+  const currentSession = sessionResult.value.session;
+  const currentToken = currentSession.token;
   const reqHeaders = await headers();
 
   // Fetch user flags, preferences, AI usage, sessions, and passkeys concurrently on server
-  const [flags, prefResult, aiUsageResult, sessions, passkeys] = await Promise.all([
+  const [flags, prefResult, aiUsageResult, sessionsResult, passkeysResult] = await Promise.all([
     getUserFeatureFlags(user.id),
     growthDal.getUserPreferences(user.id),
     getUserAiUsage(user.id),
-    auth.api.listSessions({ headers: reqHeaders }).catch(() => []),
-    auth.api.listPasskeys({ headers: reqHeaders }).catch(() => []),
+    authDal.getActiveSessionsForUser(user.id),
+    authDal.getUserPasskeys(user.id),
   ]);
+
+  let sessionsList: SessionData[] = sessionsResult.ok
+    ? (sessionsResult.value as unknown as SessionData[])
+    : [];
+
+  if (sessionsList.length === 0) {
+    try {
+      const apiSessions = await auth.api.listSessions({ headers: reqHeaders });
+      if (Array.isArray(apiSessions) && apiSessions.length > 0) {
+        sessionsList = apiSessions as unknown as SessionData[];
+      }
+    } catch {
+      // Ignored: fallback to verified current session
+    }
+  }
+
+  const currentSessionData: SessionData = {
+    id: currentSession.id,
+    token: currentSession.token,
+    createdAt: currentSession.createdAt,
+    expiresAt: currentSession.expiresAt,
+    ipAddress: currentSession.ipAddress,
+    userAgent: currentSession.userAgent,
+    userId: user.id,
+  };
+
+  if (sessionsList.length === 0) {
+    sessionsList = [currentSessionData];
+  } else if (!sessionsList.some((s) => s.token === currentToken)) {
+    sessionsList.unshift(currentSessionData);
+  }
+
+  let passkeysList: PasskeyItem[] = passkeysResult.ok
+    ? (passkeysResult.value as unknown as PasskeyItem[])
+    : [];
+
+  if (passkeysList.length === 0) {
+    try {
+      const apiPasskeys = await auth.api.listPasskeys({ headers: reqHeaders });
+      if (Array.isArray(apiPasskeys) && apiPasskeys.length > 0) {
+        passkeysList = apiPasskeys as unknown as PasskeyItem[];
+      }
+    } catch {
+      // Passkey table might not have credentials
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -70,11 +118,11 @@ async function SettingsContent() {
       )}
       <AccountSettingsCard user={user} />
       <SessionManagementCard
-        initialSessions={(sessions || []) as unknown as SessionData[]}
+        initialSessions={sessionsList}
         currentSessionToken={currentToken}
       />
       <PasskeyManagementCard
-        initialPasskeys={(passkeys || []) as unknown as PasskeyItem[]}
+        initialPasskeys={passkeysList}
       />
       {aiUsageResult.ok ? (
         <AiUsageProgress

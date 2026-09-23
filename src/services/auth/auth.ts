@@ -31,10 +31,15 @@ export const auth = betterAuth({
       origin: process.env.BETTER_AUTH_URL || "http://localhost:3000",
     }),
   ],
+  session: {
+    freshAge: 0,
+  },
   advanced: {
     database: { generateId: "uuid" },
   },
   trustedOrigins: [
+    ...(process.env.BETTER_AUTH_URL ? [process.env.BETTER_AUTH_URL] : []),
+    ...(process.env.NEXT_PUBLIC_APP_DOMAIN ? [`https://${process.env.NEXT_PUBLIC_APP_DOMAIN}`] : []),
     "http://localhost:3000",
     "http://localhost:3001",
     "http://localhost:3002",
