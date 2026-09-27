@@ -14,14 +14,9 @@ import posthog from "posthog-js";
  * - formSecondaryButtonClass: secondary outline action (no fill, sized to match primary)
  * - formGhostButtonClass: ghost/text-only action (no fill, no border)
  */
-export const formPrimaryButtonClass =
+const formPrimaryButtonClass =
   "inline-flex items-center justify-center font-medium text-xs sm:text-sm px-6 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition shadow-xs disabled:opacity-50 cursor-pointer";
 
-export const formSecondaryButtonClass =
-  "inline-flex items-center justify-center font-medium text-xs sm:text-sm px-6 py-2.5 rounded-lg border border-slate-300 dark:border-zinc-800 bg-transparent hover:bg-slate-100 dark:hover:bg-zinc-800/60 text-slate-700 dark:text-zinc-300 transition disabled:opacity-50 cursor-pointer";
-
-export const formGhostButtonClass =
-  "inline-flex items-center justify-center font-medium text-xs sm:text-sm px-6 py-2.5 rounded-lg bg-transparent hover:bg-slate-100 dark:hover:bg-zinc-800/50 text-slate-600 dark:text-zinc-400 hover:text-foreground transition disabled:opacity-50 cursor-pointer";
 
 const lineInputClass =
   "w-full bg-transparent border-0 border-b border-slate-300 dark:border-zinc-800 text-gray-900 dark:text-slate-100 text-base sm:text-sm font-sans rounded-none px-0 py-2 sm:py-2.5 placeholder:text-gray-400 dark:placeholder:text-zinc-600 focus:outline-none focus:border-b-2 focus:border-blue-600 dark:focus:border-blue-500 focus:ring-0 transition-colors";

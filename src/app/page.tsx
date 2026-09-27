@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { requireSession } from "@/lib/auth-guard";
+import { isAdmin } from "@/services/auth/admin";
 import { Navbar } from "@/components/layout/Navbar";
 import { Logo } from "@/components/Logo";
 import { getTranslations } from "next-intl/server";
@@ -8,8 +9,15 @@ import { DashboardFooter } from "@/components/layout/DashboardFooter";
 
 async function LandingNavbar() {
   const sessionResult = await requireSession();
-  const userEmail = sessionResult.ok ? sessionResult.value?.user?.email : null;
-  return <Navbar userEmail={userEmail} />;
+  const user = sessionResult.ok ? sessionResult.value?.user : null;
+  return (
+    <Navbar
+      userId={user?.id}
+      userEmail={user?.email}
+      userName={user?.name}
+      isAdmin={isAdmin(user)}
+    />
+  );
 }
 
 async function LandingCTA() {

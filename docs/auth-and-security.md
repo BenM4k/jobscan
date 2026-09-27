@@ -34,12 +34,12 @@ Jobpilot uses **better-auth** for session handling, authentication plugins, and 
 
 ---
 
-## 3. Admin Access Stopgap
+## 3. Role-Based Administration & Access Control
 
-- **Verification Helper:** `isAdmin(user)` located in `src/services/auth/admin.ts`.
-- **Mechanism:** Checks if the authenticated `user.id` exists in the comma-separated `ADMIN_USER_IDS` environment variable.
-- **Scope:** Protects sensitive administrative features such as feature flag toggles and per-user override assignments at `/dashboard/admin`.
-- *Note:* This is an explicit temporary stopgap pending a full database-backed role-based access control (RBAC) system.
+- **Better-Auth Admin Plugin:** Enabled via `admin()` plugin in `src/services/auth/auth.ts` and `adminClient()` in `src/services/auth/auth-client.ts`.
+- **Database Schema:** `user` table includes `role` (`'user'` | `'admin'`), `banned`, `ban_reason`, and `ban_expires`. The `session` table includes `impersonated_by`.
+- **Verification Helper:** `isAdmin(user)` located in `src/services/auth/admin.ts` checks `user.role === "admin"`.
+- **Scope:** Protects the administration console (`/dashboard/admin`) at the layout level (`layout.tsx`), user management, manual credit grants, account bans, job source telemetry, financial credit ledgers, and feature flag management.
 
 ---
 

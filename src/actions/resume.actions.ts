@@ -3,6 +3,7 @@
 import { requireSession } from "@/lib/auth-guard";
 import * as resumeDal from "@/dal/resume.dal";
 import { revalidatePath } from "next/cache";
+import { embedResume } from "@/services/ai/embed";
 import {
   createMasterResumeSchema,
   updateMasterResumeSchema,
@@ -107,6 +108,11 @@ export async function createMasterResumeAction(data: {
     return { success: false, error: res.error.message };
   }
 
+  // Generate vector embeddings in background
+  embedResume(res.value.id, res.value.userId, res.value.content, res.value.version).catch((e) =>
+    console.warn("Resume embedding failed (create action):", e)
+  );
+
   revalidatePath("/dashboard/resumes");
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/profile");
@@ -145,6 +151,13 @@ export async function updateMasterResumeAction(data: {
 
   if (!res.ok) {
     return { success: false, error: res.error.message };
+  }
+
+  // Re-embed if resume content changed
+  if (parsed.data.content) {
+    embedResume(res.value.id, res.value.userId, res.value.content, res.value.version).catch((e) =>
+      console.warn("Resume embedding failed (update action):", e)
+    );
   }
 
   revalidatePath("/dashboard/resumes");
@@ -203,6 +216,14 @@ export async function promoteTailoredResumeAction(
   if (!res.ok) {
     return { success: false, error: res.error.message };
   }
+
+  // Generate vector embeddings for newly promoted resume
+  embedResume(
+    res.value.newMasterResume.id,
+    res.value.newMasterResume.userId,
+    res.value.newMasterResume.content,
+    res.value.newMasterResume.version
+  ).catch((e) => console.warn("Resume embedding failed (promote action):", e));
 
   revalidatePath("/dashboard/resumes");
   revalidatePath("/dashboard");

@@ -10,6 +10,7 @@ import {
 import { timestamps } from "./common";
 import { user } from "./auth";
 import { job } from "./job";
+// fallow-ignore-next-line circular-dependency
 import { masterResume } from "./resume";
 
 // ─────────────────────────────────────────────────────────────

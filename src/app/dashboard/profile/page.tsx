@@ -6,7 +6,7 @@ import { requireSession } from "@/lib/auth-guard";
 import { redirect } from "next/navigation";
 import { ProfileForm } from "@/components/ProfileForm";
 import * as resumeDal from "@/dal/resume.dal";
-import { parseResumeContent } from "@/dal/profile.dal";
+import { parseResumeContent } from "@/lib/resume-format";
 import { ProfileSkeleton } from "@/components/profile/ProfileSkeleton";
 
 function ProfileErrorState({

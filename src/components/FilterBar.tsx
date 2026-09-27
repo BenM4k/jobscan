@@ -9,7 +9,6 @@ import { Search, X, RotateCcw, Loader2 } from "lucide-react";
 import {
   SOURCE_OPTIONS,
   STATUS_OPTIONS,
-  type Source,
   type SourceOption,
   type StatusOption,
 } from "./filters/filter-options";
@@ -17,7 +16,6 @@ import { FilterSelect } from "./filters/FilterSelect";
 import { useFilterTransition } from "./filters/FilterTransitionContext";
 
 export { FilterBarSkeleton } from "./filters/FilterBarSkeleton";
-export type { Source, SourceOption, StatusOption };
 
 export function FilterBar() {
   const t = useTranslations("dashboard");

@@ -137,6 +137,20 @@ export async function initiateCreditPurchase(
     return err(updateRefRes.error);
   }
 
+  // Fallback timer for local dev/testing with mock provider when Inngest is not running
+  if (
+    initiateRes.providerReference.startsWith("mock_") &&
+    process.env.DISABLE_MOCK_PAYMENT_TIMER !== "true"
+  ) {
+    setTimeout(async () => {
+      try {
+        await confirmCreditPurchase(initiateRes.providerReference);
+      } catch (err) {
+        console.error("[MockProvider] Async purchase confirmation error:", err);
+      }
+    }, 3000);
+  }
+
   return ok({
     purchaseId: purchase.id,
     providerReference: initiateRes.providerReference,
@@ -235,6 +249,20 @@ export async function initiateSubscription(
   );
   if (!updateRefRes.ok) {
     return err(updateRefRes.error);
+  }
+
+  // Fallback timer for local dev/testing with mock provider when Inngest is not running
+  if (
+    initiateRes.providerReference.startsWith("mock_") &&
+    process.env.DISABLE_MOCK_PAYMENT_TIMER !== "true"
+  ) {
+    setTimeout(async () => {
+      try {
+        await confirmSubscription(initiateRes.providerReference);
+      } catch (err) {
+        console.error("[MockProvider] Async subscription confirmation error:", err);
+      }
+    }, 3000);
   }
 
   return ok({

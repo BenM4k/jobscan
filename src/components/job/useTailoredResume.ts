@@ -5,11 +5,8 @@ import { JobSelect } from "@/dal/jobs.dal";
 import { toast } from "sonner";
 import posthog from "posthog-js";
 import { downloadTextAsPdf } from "@/lib/pdf-export";
-import { parseTailoredResume, ParsedTailoredResume } from "@/lib/tailored-resume-parser";
+import { parseTailoredResume } from "@/lib/tailored-resume-parser";
 import { useAsyncJobWithRetry } from "@/hooks/useAsyncJobWithRetry";
-
-export type { ParsedTailoredResume };
-export { parseTailoredResume };
 
 interface UseTailoredResumeOptions {
   job: JobSelect;

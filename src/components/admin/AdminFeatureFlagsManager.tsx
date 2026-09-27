@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   XCircle,
   Sparkles,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -38,6 +39,7 @@ export function AdminFeatureFlagsManager({
 
   // User search state
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<
     { id: string; email: string; name: string | null }[]
   >([]);
@@ -46,7 +48,7 @@ export function AdminFeatureFlagsManager({
     email: string;
   } | null>(null);
   const [selectedFlagKey, setSelectedFlagKey] = useState(
-    initialFlags[0]?.key || "hybrid-scoring-v1"
+    initialFlags[0]?.key || "hybrid-scoring-v1",
   );
   const [overrideValue, setOverrideValue] = useState(true);
 
@@ -55,8 +57,8 @@ export function AdminFeatureFlagsManager({
     const nextVal = !currentGlobal;
     setFlags((prev) =>
       prev.map((f) =>
-        f.key === flagKey ? { ...f, enabledGlobally: nextVal } : f
-      )
+        f.key === flagKey ? { ...f, enabledGlobally: nextVal } : f,
+      ),
     );
 
     startTransition(async () => {
@@ -66,29 +68,41 @@ export function AdminFeatureFlagsManager({
         // Revert
         setFlags((prev) =>
           prev.map((f) =>
-            f.key === flagKey ? { ...f, enabledGlobally: currentGlobal } : f
-          )
+            f.key === flagKey ? { ...f, enabledGlobally: currentGlobal } : f,
+          ),
         );
       } else {
-        toast.success(`Global flag "${flagKey}" set to ${nextVal ? "ON" : "OFF"}`);
+        toast.success(
+          `Global flag "${flagKey}" set to ${nextVal ? "ON" : "OFF"}`,
+        );
       }
     });
   };
 
-  // Search users
-  const handleSearchUsers = async (q: string) => {
-    setSearchQuery(q);
-    if (!q.trim() || q.trim().length < 2) {
-      setSearchResults([]);
+  // Search users triggered by button or Enter key
+  const handleSearchUsers = async () => {
+    const query = (selectedUser ? selectedUser.email : searchQuery).trim();
+    if (!query) {
+      toast.error("Please enter an email to search");
       return;
     }
 
-    startTransition(async () => {
-      const res = await searchUsersAction(q);
+    setIsSearching(true);
+    try {
+      const res = await searchUsersAction(query);
       if (res.success && res.users) {
         setSearchResults(res.users);
+        if (res.users.length === 0) {
+          toast.info("No users found matching that email");
+        }
+      } else {
+        toast.error(res.error || "Failed to search users");
       }
-    });
+    } catch {
+      toast.error("An unexpected error occurred while searching");
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   // Add or update per-user override
@@ -102,7 +116,7 @@ export function AdminFeatureFlagsManager({
       const res = await setUserFlagOverrideAction(
         selectedUser.id,
         selectedFlagKey,
-        overrideValue
+        overrideValue,
       );
       if (!res.success) {
         toast.error(res.error || "Failed to set user override");
@@ -110,13 +124,13 @@ export function AdminFeatureFlagsManager({
         toast.success(
           `Set override for ${selectedUser.email}: ${selectedFlagKey} = ${
             overrideValue ? "ENABLED" : "DISABLED"
-          }`
+          }`,
         );
         // Update local list
         setOverrides((prev) => {
           const filtered = prev.filter(
             (o) =>
-              !(o.userId === selectedUser.id && o.flagKey === selectedFlagKey)
+              !(o.userId === selectedUser.id && o.flagKey === selectedFlagKey),
           );
           return [
             {
@@ -140,7 +154,11 @@ export function AdminFeatureFlagsManager({
   };
 
   // Remove per-user override
-  const handleRemoveOverride = (userId: string, flagKey: string, email: string) => {
+  const handleRemoveOverride = (
+    userId: string,
+    flagKey: string,
+    email: string,
+  ) => {
     startTransition(async () => {
       const res = await removeUserFlagOverrideAction(userId, flagKey);
       if (!res.success) {
@@ -148,7 +166,7 @@ export function AdminFeatureFlagsManager({
       } else {
         toast.success(`Removed override for ${email} on "${flagKey}"`);
         setOverrides((prev) =>
-          prev.filter((o) => !(o.userId === userId && o.flagKey === flagKey))
+          prev.filter((o) => !(o.userId === userId && o.flagKey === flagKey)),
         );
       }
     });
@@ -165,7 +183,8 @@ export function AdminFeatureFlagsManager({
               <span>Global Feature Flags Rollout</span>
             </h2>
             <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
-              Toggle global production availability. Individual user overrides take precedence over global toggles.
+              Toggle global production availability. Individual user overrides
+              take precedence over global toggles.
             </p>
           </div>
         </div>
@@ -233,7 +252,8 @@ export function AdminFeatureFlagsManager({
             <span>Assign User Feature Override</span>
           </h2>
           <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
-            Search users by email and assign beta access or kill-switch overrides. Automatically invalidates Redis caches.
+            Search users by email and assign beta access or kill-switch
+            overrides. Automatically invalidates Redis caches.
           </p>
         </div>
 
@@ -243,18 +263,40 @@ export function AdminFeatureFlagsManager({
             <label className="text-xs font-semibold text-gray-700 dark:text-zinc-300">
               User Search (by email)
             </label>
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
-              <input
-                type="text"
-                value={selectedUser ? selectedUser.email : searchQuery}
-                onChange={(e) => {
-                  setSelectedUser(null);
-                  handleSearchUsers(e.target.value);
-                }}
-                placeholder="e.g. user@example.com"
-                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-900 text-gray-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-              />
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
+                <input
+                  type="text"
+                  value={selectedUser ? selectedUser.email : searchQuery}
+                  onChange={(e) => {
+                    setSelectedUser(null);
+                    setSearchQuery(e.target.value);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleSearchUsers();
+                    }
+                  }}
+                  placeholder="e.g. user@example.com"
+                  className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-900 text-gray-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={isSearching || (!searchQuery.trim() && !selectedUser)}
+                onClick={() => handleSearchUsers()}
+                className="h-8.5 px-3 text-xs shrink-0 cursor-pointer"
+              >
+                {isSearching ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  "Search"
+                )}
+              </Button>
             </div>
 
             {/* Search Dropdown Results */}
@@ -266,6 +308,7 @@ export function AdminFeatureFlagsManager({
                     type="button"
                     onClick={() => {
                       setSelectedUser({ id: u.id, email: u.email });
+                      setSearchQuery(u.email);
                       setSearchResults([]);
                     }}
                     className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 dark:hover:bg-zinc-800 transition cursor-pointer flex flex-col"
@@ -274,7 +317,9 @@ export function AdminFeatureFlagsManager({
                       {u.email}
                     </span>
                     {u.name && (
-                      <span className="text-[10px] text-gray-400">{u.name}</span>
+                      <span className="text-[10px] text-gray-400">
+                        {u.name}
+                      </span>
                     )}
                   </button>
                 ))}
@@ -337,14 +382,16 @@ export function AdminFeatureFlagsManager({
               <span>Active Per-User Overrides ({overrides.length})</span>
             </h2>
             <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
-              Explicit user overrides queried via database SQL join with user emails.
+              Explicit user overrides queried via database SQL join with user
+              emails.
             </p>
           </div>
         </div>
 
         {overrides.length === 0 ? (
           <div className="text-center py-8 text-xs text-gray-500 dark:text-zinc-400">
-            No per-user overrides currently active. All users follow global default states.
+            No per-user overrides currently active. All users follow global
+            default states.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -359,7 +406,10 @@ export function AdminFeatureFlagsManager({
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/60">
                 {overrides.map((item) => (
-                  <tr key={`${item.userId}-${item.flagKey}`} className="hover:bg-slate-50/50 dark:hover:bg-zinc-900/50">
+                  <tr
+                    key={`${item.userId}-${item.flagKey}`}
+                    className="hover:bg-slate-50/50 dark:hover:bg-zinc-900/50"
+                  >
                     <td className="py-3 font-medium text-gray-900 dark:text-zinc-200">
                       {item.userEmail}
                     </td>
@@ -388,7 +438,7 @@ export function AdminFeatureFlagsManager({
                           handleRemoveOverride(
                             item.userId,
                             item.flagKey,
-                            item.userEmail
+                            item.userEmail,
                           )
                         }
                         disabled={isPending}

@@ -202,5 +202,3 @@ export function CreditPurchaseSection({
   );
 }
 
-export { CreditPurchaseSection as CreditPurchaseCard };
-

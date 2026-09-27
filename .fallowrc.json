@@ -1,0 +1,254 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  "entry": [
+    "src/app/**/*.{ts,tsx}",
+    "src/actions/**/*.{ts,tsx}",
+    "src/inngest/**/*.{ts,tsx}",
+    "src/test/**/*.{ts,tsx}",
+    "scripts/**/*.{ts,js}"
+  ],
+  "duplicates": {
+    "minOccurrences": 3
+  },
+  "rules": {
+    "duplicate-export": "off"
+  },
+  "ignoreExports": [
+    {
+      "file": "src/lib/ai.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/ai/gemini-profile-formatter.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/dal/jobs/types.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/dal/jobs/queries.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/dal/jobs/mutations.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/dal/pipeline.dal.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/dal/circuit-breaker.dal.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/dal/flags.dal.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/dal/idempotency.dal.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/dal/interview.dal.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/dal/ops.dal.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/dal/resume.dal.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/dal/tailoring.dal.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/dal/billing.dal.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/adapters/types.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/adapters/index.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/adapters/factory.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/adapters/ashby.adapter.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/adapters/congojob.adapter.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/adapters/emploicd.adapter.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/adapters/fecrdc.adapter.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/adapters/greenhouse.adapter.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/adapters/lever.adapter.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/adapters/remoteok.adapter.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/adapters/unjobs.adapter.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/admin/admin.service.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/ai/rate-limit.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/ai/tracker.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/ai/with-cost-tracking.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/auth/auth-client.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/billing/billing.service.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/crawler/crawler-utils.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/crawler/run.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/crawler/sources/ashby.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/crawler/sources/congojob.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/crawler/sources/emploicd.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/crawler/sources/fecrdc.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/crawler/sources/greenhouse.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/crawler/sources/lever.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/crawler/sources/remoteok.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/crawler/sources/unjobs.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/dashboard.service.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/db/schema/legacy.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/dedup/find-duplicate.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/dedup/normalize-text.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/flags/index.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/interview.service.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/job.service.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/profile.service.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/scoring/score-job.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/services/skills.service.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/components/ui/calendar.tsx",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/components/ui/dialog.tsx",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/components/ui/dropdown-menu.tsx",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/components/ui/popover.tsx",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/lib/circuit-breaker.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/lib/posthog-config.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/app/layout.tsx",
+      "exports": ["instant"]
+    },
+    {
+      "file": "src/app/dashboard/layout.tsx",
+      "exports": ["instant"]
+    }
+  ]
+}

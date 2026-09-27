@@ -53,13 +53,12 @@ async function runFeatureFlagsUnitTests() {
   await invalidateFeatureFlagCache("hybrid-scoring-v1", "usr-123");
   console.log("✓ invalidateFeatureFlagCache executes safely without throwing");
 
-  // 5. Admin access stopgap check
-  process.env.ADMIN_USER_IDS = "admin-1, admin-2,admin-3";
-  assert(isAdmin({ id: "admin-1" }) === true, "admin-1 should be admin");
-  assert(isAdmin("admin-2") === true, "admin-2 should be admin");
-  assert(isAdmin({ id: "regular-user" }) === false, "regular-user should NOT be admin");
+  // 5. Admin role check
+  assert(isAdmin({ id: "admin-1", role: "admin" }) === true, "user with role=admin should be admin");
+  assert(isAdmin({ id: "regular-user", role: "user" }) === false, "regular-user should NOT be admin");
+  assert(isAdmin({ id: "no-role" }) === false, "user without role should NOT be admin");
   assert(isAdmin(null) === false, "null user should NOT be admin");
-  console.log("✓ Admin stopgap access verified via ADMIN_USER_IDS env var check");
+  console.log("✓ Admin role check verified via user.role === 'admin'");
 
   // 6. Regression test: cached user evaluation followed by a global state change
   // Verifies that a user evaluation deriving from global state does not remain stale

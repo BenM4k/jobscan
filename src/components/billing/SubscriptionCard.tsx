@@ -238,5 +238,3 @@ export function SubscriptionSection({
   );
 }
 
-export { SubscriptionSection as SubscriptionCard };
-

@@ -10,8 +10,7 @@ import {
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 import { eq, and, desc, sql } from "drizzle-orm";
-import { generateEmbedding } from "@/services/ai/embed";
-import { normalizeSkillName } from "@/services/skills/normalize";
+import { normalizeSkillName } from "@/lib/skills";
 import { parseResumeContent } from "@/lib/resume-format";
 
 export type MasterResumeSelect = typeof masterResume.$inferSelect;
@@ -114,17 +113,6 @@ export async function createMasterResume(
       await syncResumeSkills(created.id, effectiveSkills);
     }
 
-    // Generate embedding asynchronously — never block the response on this
-    const expectedVersion = created.version;
-    generateEmbedding(created.content)
-      .then((embRes) => {
-        if (!embRes.ok) {
-          console.warn("Resume embedding generation failed (create):", embRes.error.message);
-          return;
-        }
-        return setResumeEmbedding(created.id, created.userId, embRes.value, expectedVersion);
-      })
-      .catch((e) => console.warn("Resume embedding write failed (create):", e));
 
     return ok(created);
   } catch (error) {
@@ -188,19 +176,6 @@ export async function updateMasterResume(
       await syncResumeSkills(updated.id, effectiveSkills);
     }
 
-    // Re-embed only if resume content changed
-    if (data.content) {
-      const expectedVersion = updated.version;
-      generateEmbedding(updated.content)
-        .then((embRes) => {
-          if (!embRes.ok) {
-            console.warn("Resume embedding generation failed (update):", embRes.error.message);
-            return;
-          }
-          return setResumeEmbedding(updated.id, updated.userId, embRes.value, expectedVersion);
-        })
-        .catch((e) => console.warn("Resume embedding write failed (update):", e));
-    }
 
     return ok(updated);
   } catch (error) {
@@ -420,22 +395,6 @@ export async function promoteTailoredResumeToMaster(
       return err(new AppError("DB_ERROR", "Failed to create promoted master resume"));
     }
 
-    // 3. Generate embedding asynchronously (fire-and-forget)
-    const expectedVersion = result.newMasterResume.version;
-    generateEmbedding(result.newMasterResume.content)
-      .then((embRes) => {
-        if (!embRes.ok) {
-          console.warn("Resume embedding generation failed (promote):", embRes.error.message);
-          return;
-        }
-        return setResumeEmbedding(
-          result.newMasterResume.id,
-          result.newMasterResume.userId,
-          embRes.value,
-          expectedVersion
-        );
-      })
-      .catch((e) => console.warn("Resume embedding write failed (promote):", e));
 
     return ok(result);
   } catch (error) {

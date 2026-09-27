@@ -5,24 +5,11 @@ import { toast } from "sonner";
 
 export type AsyncJobStatus = "idle" | "running" | "retrying" | "success" | "error";
 
-export interface RetryInfo {
-  attempt: number;
-  maxRetries: number;
-  countdown: number;
-  message: string;
-}
-
 export interface UseAsyncJobWithRetryOptions {
   jobName: string;
   maxRetries?: number;
   defaultDelaySeconds?: number;
   enableToasts?: boolean;
-}
-
-export interface RateLimitedPayload {
-  code?: string;
-  retryAfterSeconds?: number;
-  error?: string;
 }
 
 /** Runs an asynchronous job with retry timing, progress messages, and cancellation. */

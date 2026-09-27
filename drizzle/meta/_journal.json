@@ -162,6 +162,13 @@
       "when": 1790164215007,
       "tag": "0022_military_the_watchers",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1790502918240,
+      "tag": "0023_vengeful_glorian",
+      "breakpoints": true
     }
   ]
 }
