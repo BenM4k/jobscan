@@ -144,7 +144,13 @@ export async function initiateCreditPurchase(
   ) {
     setTimeout(async () => {
       try {
-        await confirmCreditPurchase(initiateRes.providerReference);
+        const confirmRes = await confirmCreditPurchase(initiateRes.providerReference);
+        if (!confirmRes.ok) {
+          console.error(
+            `[MockProvider] Async purchase confirmation failed for ${initiateRes.providerReference}:`,
+            confirmRes.error.message
+          );
+        }
       } catch (err) {
         console.error("[MockProvider] Async purchase confirmation error:", err);
       }
@@ -258,7 +264,13 @@ export async function initiateSubscription(
   ) {
     setTimeout(async () => {
       try {
-        await confirmSubscription(initiateRes.providerReference);
+        const confirmRes = await confirmSubscription(initiateRes.providerReference);
+        if (!confirmRes.ok) {
+          console.error(
+            `[MockProvider] Async subscription confirmation failed for ${initiateRes.providerReference}:`,
+            confirmRes.error.message
+          );
+        }
       } catch (err) {
         console.error("[MockProvider] Async subscription confirmation error:", err);
       }

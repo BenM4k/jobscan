@@ -3,7 +3,8 @@
 import { requireSession } from "@/lib/auth-guard";
 import * as resumeDal from "@/dal/resume.dal";
 import { revalidatePath } from "next/cache";
-import { embedResume } from "@/services/ai/embed";
+import { inngest } from "@/inngest/client";
+import { resumeUpdatedEvent } from "@/inngest/events";
 import {
   createMasterResumeSchema,
   updateMasterResumeSchema,
@@ -108,10 +109,17 @@ export async function createMasterResumeAction(data: {
     return { success: false, error: res.error.message };
   }
 
-  // Generate vector embeddings in background
-  embedResume(res.value.id, res.value.userId, res.value.content, res.value.version).catch((e) =>
-    console.warn("Resume embedding failed (create action):", e)
-  );
+  // Generate vector embeddings via Inngest background event
+  inngest
+    .send(
+      resumeUpdatedEvent.create({
+        resumeId: res.value.id,
+        userId: res.value.userId,
+        content: res.value.content,
+        expectedVersion: res.value.version,
+      })
+    )
+    .catch((e) => console.warn("Failed to dispatch resume.updated event (create action):", e));
 
   revalidatePath("/dashboard/resumes");
   revalidatePath("/dashboard");
@@ -153,11 +161,18 @@ export async function updateMasterResumeAction(data: {
     return { success: false, error: res.error.message };
   }
 
-  // Re-embed if resume content changed
+  // Re-embed via Inngest background event if resume content changed
   if (parsed.data.content) {
-    embedResume(res.value.id, res.value.userId, res.value.content, res.value.version).catch((e) =>
-      console.warn("Resume embedding failed (update action):", e)
-    );
+    inngest
+      .send(
+        resumeUpdatedEvent.create({
+          resumeId: res.value.id,
+          userId: res.value.userId,
+          content: res.value.content,
+          expectedVersion: res.value.version,
+        })
+      )
+      .catch((e) => console.warn("Failed to dispatch resume.updated event (update action):", e));
   }
 
   revalidatePath("/dashboard/resumes");
@@ -217,13 +232,17 @@ export async function promoteTailoredResumeAction(
     return { success: false, error: res.error.message };
   }
 
-  // Generate vector embeddings for newly promoted resume
-  embedResume(
-    res.value.newMasterResume.id,
-    res.value.newMasterResume.userId,
-    res.value.newMasterResume.content,
-    res.value.newMasterResume.version
-  ).catch((e) => console.warn("Resume embedding failed (promote action):", e));
+  // Generate vector embeddings for newly promoted resume via Inngest background event
+  inngest
+    .send(
+      resumeUpdatedEvent.create({
+        resumeId: res.value.newMasterResume.id,
+        userId: res.value.newMasterResume.userId,
+        content: res.value.newMasterResume.content,
+        expectedVersion: res.value.newMasterResume.version,
+      })
+    )
+    .catch((e) => console.warn("Failed to dispatch resume.updated event (promote action):", e));
 
   revalidatePath("/dashboard/resumes");
   revalidatePath("/dashboard");

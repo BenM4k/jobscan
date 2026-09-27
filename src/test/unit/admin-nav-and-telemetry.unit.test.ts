@@ -1,4 +1,5 @@
 import { isAdmin } from "@/services/auth/admin";
+import { isNavActive } from "@/lib/nav";
 
 function assert(condition: unknown, msg: string): asserts condition {
   if (!condition) {
@@ -22,13 +23,6 @@ function calculatePagination(page: number, limit: number, totalCount: number) {
     hasPrev,
     hasNext,
   };
-}
-
-function isNavActive(linkHref: string, currentPathname: string): boolean {
-  if (linkHref === "/dashboard") {
-    return currentPathname === "/dashboard";
-  }
-  return currentPathname === linkHref || currentPathname.startsWith(linkHref + "/");
 }
 
 async function runTests() {

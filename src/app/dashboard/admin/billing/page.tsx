@@ -105,7 +105,11 @@ async function LedgerContent({
         </div>
         <div className="flex items-center gap-2">
           {page > 1 ? (
-            <Link href={`/dashboard/admin/billing?page=${page - 1}`}>
+            <Link
+              href={`/dashboard/admin/billing?page=${page - 1}${
+                params.userId ? `&userId=${encodeURIComponent(params.userId)}` : ""
+              }`}
+            >
               <Button size="sm" variant="outline" className="h-8 px-2 text-xs">
                 <ChevronLeft className="w-4 h-4 mr-1" />
                 Previous
@@ -123,7 +127,11 @@ async function LedgerContent({
           </span>
 
           {page < data.totalPages ? (
-            <Link href={`/dashboard/admin/billing?page=${page + 1}`}>
+            <Link
+              href={`/dashboard/admin/billing?page=${page + 1}${
+                params.userId ? `&userId=${encodeURIComponent(params.userId)}` : ""
+              }`}
+            >
               <Button size="sm" variant="outline" className="h-8 px-2 text-xs">
                 Next
                 <ChevronRight className="w-4 h-4 ml-1" />

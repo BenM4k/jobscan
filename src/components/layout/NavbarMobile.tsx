@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { PreferencesWidget } from "@/components/PreferencesWidget";
 import { useSignOut } from "@/hooks/useSignOut";
 import { NavLinkItem } from "@/components/layout/NavLinks";
+import { isNavActive } from "@/lib/nav";
 
 interface NavbarMobileProps {
   navLinks: NavLinkItem[];
@@ -72,10 +73,7 @@ export function NavbarMobile({
 
               <div className="flex flex-col space-y-1">
                 {navLinks.map((link) => {
-                  const isActive =
-                    link.href === "/dashboard"
-                      ? pathname === "/dashboard"
-                      : pathname === link.href || pathname?.startsWith(link.href + "/");
+                  const isActive = isNavActive(link.href, pathname);
                   return (
                     <Link
                       key={link.href}
@@ -124,10 +122,7 @@ export function NavbarMobile({
                       ]
                     : []),
                 ].map((item) => {
-                  const isActive =
-                    item.href === "/dashboard"
-                      ? pathname === "/dashboard"
-                      : pathname === item.href || pathname?.startsWith(item.href + "/");
+                  const isActive = isNavActive(item.href, pathname);
                   return (
                     <Link
                       key={item.href}

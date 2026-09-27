@@ -276,15 +276,21 @@ export async function updateUserBanInDb(
   banExpires?: Date | null
 ): Promise<Result<void, AppError>> {
   try {
-    await db
-      .update(userTable)
-      .set({
-        banned,
-        banReason: banned ? banReason ?? "Banned by administrator" : null,
-        banExpires: banned ? banExpires ?? null : null,
-        updatedAt: new Date(),
-      })
-      .where(eq(userTable.id, userId));
+    await db.transaction(async (tx) => {
+      await tx
+        .update(userTable)
+        .set({
+          banned,
+          banReason: banned ? banReason ?? "Banned by administrator" : null,
+          banExpires: banned ? banExpires ?? null : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(userTable.id, userId));
+
+      if (banned) {
+        await tx.delete(sessionTable).where(eq(sessionTable.userId, userId));
+      }
+    });
 
     return ok(undefined);
   } catch (error) {

@@ -38,6 +38,8 @@ async function runInngestUnitTests() {
     assert(Boolean(scheduledDigestCron), "scheduledDigestCron function must exist");
     assert(Boolean(sendDigestEmail), "sendDigestEmail function must exist");
     assert(Boolean(scoreJobOnCreation), "scoreJobOnCreation function must exist");
+    const { embedResumeOnUpdate } = await import("@/inngest/functions");
+    assert(Boolean(embedResumeOnUpdate), "embedResumeOnUpdate function must exist");
 
     assert(ALL_JOB_SOURCES.length === 8, `Expected 8 sources in ALL_JOB_SOURCES, got ${ALL_JOB_SOURCES.length}`);
     console.log("   ✅ All 8 sources configured for ingestAllSources:", ALL_JOB_SOURCES.join(", "));
@@ -52,6 +54,7 @@ async function runInngestUnitTests() {
       jobFetchRequestedEvent,
       digestEmailScheduledEvent,
       jobCreatedEvent,
+      resumeUpdatedEvent,
     } = await import("@/inngest/events");
 
     // Test valid event creation
@@ -76,6 +79,15 @@ async function runInngestUnitTests() {
       provider: "claude",
     });
     assert(createEvent.name === "job.created", "Event name must match");
+
+    const resumeEvent = resumeUpdatedEvent.create({
+      resumeId: "resume-123",
+      userId: "user-456",
+      content: "Sample resume text",
+      expectedVersion: 1,
+    });
+    assert(resumeEvent.name === "resume.updated", "Event name must match");
+    assert(resumeEvent.data.resumeId === "resume-123", "Resume ID must match");
 
     console.log("   ✅ Typed event creators validated successfully.");
   }
