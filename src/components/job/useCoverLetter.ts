@@ -13,7 +13,7 @@ interface UseCoverLetterProps {
   selectedResumeId?: string;
 }
 
-export interface GenerateCoverLetterOptions {
+interface GenerateCoverLetterOptions {
   regenerate?: boolean;
   instructions?: string;
   tone?: string;

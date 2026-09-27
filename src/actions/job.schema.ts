@@ -20,13 +20,13 @@ export const tailoredResumeActionSchema = z.object({
 /**
  * Shared field-level validation for custom cover letter prompt fields.
  */
-export const coverLetterInstructionsSchema = z
+const coverLetterInstructionsSchema = z
   .string()
   .trim()
   .max(1000, "Instructions must be at most 1000 characters")
   .optional();
 
-export const coverLetterToneSchema = z
+const coverLetterToneSchema = z
   .string()
   .trim()
   .max(50, "Tone must be at most 50 characters")

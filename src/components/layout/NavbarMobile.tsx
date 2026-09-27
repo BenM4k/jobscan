@@ -7,15 +7,22 @@ import { useTranslations } from "next-intl";
 import { PreferencesWidget } from "@/components/PreferencesWidget";
 import { useSignOut } from "@/hooks/useSignOut";
 import { NavLinkItem } from "@/components/layout/NavLinks";
+import { isNavActive } from "@/lib/nav";
 
 interface NavbarMobileProps {
   navLinks: NavLinkItem[];
   userEmail?: string | null;
   creditBalance?: number;
+  isAdmin?: boolean;
 }
 
 /** Renders the mobile dashboard menu, credit balance, and account controls. */
-export function NavbarMobile({ navLinks, userEmail, creditBalance = 0 }: NavbarMobileProps) {
+export function NavbarMobile({
+  navLinks,
+  userEmail,
+  creditBalance = 0,
+  isAdmin = false,
+}: NavbarMobileProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const t = useTranslations("nav");
@@ -66,7 +73,7 @@ export function NavbarMobile({ navLinks, userEmail, creditBalance = 0 }: NavbarM
 
               <div className="flex flex-col space-y-1">
                 {navLinks.map((link) => {
-                  const isActive = pathname === link.href;
+                  const isActive = isNavActive(link.href, pathname);
                   return (
                     <Link
                       key={link.href}
@@ -85,47 +92,69 @@ export function NavbarMobile({ navLinks, userEmail, creditBalance = 0 }: NavbarM
                   );
                 })}
 
-                <Link
-                  href="/dashboard/billing"
-                  onClick={closeMenu}
-                  aria-current={
-                    pathname === "/dashboard/billing" ? "page" : undefined
-                  }
-                  className={`px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-between transition ${
-                    pathname === "/dashboard/billing"
-                      ? "bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800"
-                      : "text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-zinc-800"
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <span aria-hidden="true">💳</span>
-                    <span>{t("billing")}</span>
-                  </span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/60">
-                    {creditBalance} credits
-                  </span>
-                </Link>
-
-                <Link
-                  href="/dashboard/settings"
-                  onClick={closeMenu}
-                  aria-current={
-                    pathname === "/dashboard/settings" ? "page" : undefined
-                  }
-                  className={`px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-between transition ${
-                    pathname === "/dashboard/settings"
-                      ? "bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800"
-                      : "text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-zinc-800"
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <span aria-hidden="true">⚙️</span>
-                    <span>{t("settings")}</span>
-                  </span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/60">
-                    Flags
-                  </span>
-                </Link>
+                {[
+                  {
+                    href: "/dashboard/settings",
+                    label: t("settings"),
+                    icon: "⚙️",
+                    badge: "Flags",
+                  },
+                  {
+                    href: "/dashboard/billing",
+                    label: t("billing"),
+                    icon: "💳",
+                    badge: `${creditBalance} credits`,
+                  },
+                  {
+                    href: "/dashboard/profile",
+                    label: t("profile"),
+                    icon: "👤",
+                  },
+                  ...(isAdmin
+                    ? [
+                        {
+                          href: "/dashboard/admin",
+                          label: t("admin"),
+                          icon: "🛡️",
+                          badge: "Console",
+                          highlight: true,
+                        },
+                      ]
+                    : []),
+                ].map((item) => {
+                  const isActive = isNavActive(item.href, pathname);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={closeMenu}
+                      aria-current={isActive ? "page" : undefined}
+                      className={`px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-between transition ${
+                        isActive
+                          ? "bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800"
+                          : item.highlight
+                            ? "text-blue-600 dark:text-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-950/30"
+                            : "text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-zinc-800"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span aria-hidden="true">{item.icon}</span>
+                        <span>{item.label}</span>
+                      </span>
+                      {item.badge && (
+                        <span
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                            item.highlight
+                              ? "bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300"
+                              : "bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/60"
+                          }`}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
               </div>
 
               <button

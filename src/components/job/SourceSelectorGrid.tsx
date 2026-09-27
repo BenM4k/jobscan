@@ -12,14 +12,14 @@ export type FetchSource =
   | "emploi_cd"
   | "unjobs";
 
-export interface FetchSourceOption {
+interface FetchSourceOption {
   id: FetchSource;
   title: string;
   icon: string;
   type: "KEYWORD FILTER" | "COMPANY BOARD" | "LOCAL SCRAPER";
 }
 
-export const FETCH_SOURCES: FetchSourceOption[] = [
+const FETCH_SOURCES: FetchSourceOption[] = [
   { id: "remoteok", title: "RemoteOK", icon: "🌐", type: "KEYWORD FILTER" },
   { id: "drc", title: "DRC All", icon: "🗺️", type: "KEYWORD FILTER" },
   { id: "congojob", title: "CongoJob", icon: "🇨🇩", type: "LOCAL SCRAPER" },

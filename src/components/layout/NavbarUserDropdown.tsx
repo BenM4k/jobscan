@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Settings, User, LogOut, ChevronDown, FileText, Coins } from "lucide-react";
+import { Settings, User, LogOut, ChevronDown, Coins, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -19,12 +19,14 @@ import { useSignOut } from "@/hooks/useSignOut";
 interface NavbarUserDropdownProps {
   userEmail?: string | null;
   userName?: string | null;
+  isAdmin?: boolean;
 }
 
 /** Renders the desktop account menu with billing, settings, and sign-out actions. */
 export function NavbarUserDropdown({
   userEmail,
   userName,
+  isAdmin = false,
 }: NavbarUserDropdownProps) {
   const t = useTranslations("nav");
   const handleSignOut = useSignOut();
@@ -89,22 +91,6 @@ export function NavbarUserDropdown({
 
           <DropdownMenuGroup className="space-y-0.5">
             <DropdownMenuItem
-              render={<Link href="/dashboard/resumes" />}
-              className="cursor-pointer px-3 py-2.5"
-            >
-              <FileText className="size-4 text-muted-foreground" />
-              <span>{t("resumes")}</span>
-            </DropdownMenuItem>
-
-            <DropdownMenuItem
-              render={<Link href="/dashboard/profile" />}
-              className="cursor-pointer px-3 py-2.5"
-            >
-              <User className="size-4 text-muted-foreground" />
-              <span>{t("profile")}</span>
-            </DropdownMenuItem>
-
-            <DropdownMenuItem
               render={<Link href="/dashboard/settings" />}
               className="cursor-pointer px-3 py-2.5"
             >
@@ -119,7 +105,30 @@ export function NavbarUserDropdown({
               <Coins className="size-4 text-muted-foreground" />
               <span>{t("billing")}</span>
             </DropdownMenuItem>
+
+            <DropdownMenuItem
+              render={<Link href="/dashboard/profile" />}
+              className="cursor-pointer px-3 py-2.5"
+            >
+              <User className="size-4 text-muted-foreground" />
+              <span>{t("profile")}</span>
+            </DropdownMenuItem>
           </DropdownMenuGroup>
+
+          {isAdmin && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup className="space-y-0.5">
+                <DropdownMenuItem
+                  render={<Link href="/dashboard/admin" />}
+                  className="cursor-pointer px-3 py-2.5 text-blue-600 dark:text-blue-400 font-medium focus:text-blue-600 dark:focus:text-blue-400"
+                >
+                  <Shield className="size-4 text-blue-600 dark:text-blue-400" />
+                  <span>{t("admin")}</span>
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </>
+          )}
 
           <DropdownMenuSeparator />
 

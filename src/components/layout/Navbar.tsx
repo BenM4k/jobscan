@@ -14,10 +14,16 @@ interface NavbarProps {
   userId?: string;
   userEmail?: string | null;
   userName?: string | null;
+  isAdmin?: boolean;
 }
 
 /** Loads account navigation data and renders the responsive dashboard navbar. */
-export async function Navbar({ userId, userEmail, userName }: NavbarProps) {
+export async function Navbar({
+  userId,
+  userEmail,
+  userName,
+  isAdmin = false,
+}: NavbarProps) {
   const t = await getTranslations("nav");
 
   const balanceRes = userId ? await getCreditBalance(userId) : null;
@@ -27,7 +33,6 @@ export async function Navbar({ userId, userEmail, userName }: NavbarProps) {
     { href: "/dashboard", label: t("pipeline"), icon: "📊" },
     { href: "/dashboard/resumes", label: t("resumes"), icon: "📄" },
     { href: "/dashboard/add-job", label: t("addJob"), icon: "➕" },
-    { href: "/dashboard/profile", label: t("profile"), icon: "👤" },
   ];
 
   return (
@@ -58,7 +63,11 @@ export async function Navbar({ userId, userEmail, userName }: NavbarProps) {
 
           <PreferencesWidget />
 
-          <NavbarUserDropdown userEmail={userEmail} userName={userName} />
+          <NavbarUserDropdown
+            userEmail={userEmail}
+            userName={userName}
+            isAdmin={isAdmin}
+          />
         </div>
 
         {/* Mobile Header Right: Unified Widget + Hamburger & Mobile Drawer */}
@@ -66,6 +75,7 @@ export async function Navbar({ userId, userEmail, userName }: NavbarProps) {
           navLinks={navLinks}
           userEmail={userEmail}
           creditBalance={creditBalance}
+          isAdmin={isAdmin}
         />
       </div>
     </nav>

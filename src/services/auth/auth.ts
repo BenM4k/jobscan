@@ -2,6 +2,7 @@ import "server-only";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { passkey } from "@better-auth/passkey";
+import { admin } from "better-auth/plugins";
 import { db } from "@/services/db";
 import * as schema from "@/services/db/schema";
 import { Resend } from "resend";
@@ -30,6 +31,7 @@ export const auth = betterAuth({
       rpName: "Jobpilot",
       origin: process.env.BETTER_AUTH_URL || "http://localhost:3000",
     }),
+    admin(),
   ],
   session: {
     freshAge: 0,

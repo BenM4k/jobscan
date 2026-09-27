@@ -10,10 +10,7 @@ import type { EducationItem, ExperienceItem } from "@/lib/ai";
 
 export type ProfileInsert = typeof profile.$inferInsert;
 export type ProfileSelect = typeof profile.$inferSelect;
-
-import { parseResumeContent, type ParsedResumeSections } from "@/lib/resume-format";
-export { parseResumeContent, type ParsedResumeSections };
-
+import { parseResumeContent } from "@/lib/resume-format";
 
 export async function getProfile(
   userId: string

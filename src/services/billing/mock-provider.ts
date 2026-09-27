@@ -35,18 +35,6 @@ export class MockMobileMoneyProvider implements PaymentProvider {
       )
       .catch(() => {});
 
-    // Fallback timer for local dev/testing without Inngest running
-    if (process.env.DISABLE_MOCK_PAYMENT_TIMER !== "true") {
-      setTimeout(async () => {
-        try {
-          const { confirmCreditPurchase } = await import("./billing.service");
-          await confirmCreditPurchase(providerReference);
-        } catch (err) {
-          console.error("[MockProvider] Async purchase confirmation error:", err);
-        }
-      }, 3000);
-    }
-
     return {
       providerReference,
       status: "pending",
@@ -69,18 +57,6 @@ export class MockMobileMoneyProvider implements PaymentProvider {
         })
       )
       .catch(() => {});
-
-    // Fallback timer for local dev/testing without Inngest running
-    if (process.env.DISABLE_MOCK_PAYMENT_TIMER !== "true") {
-      setTimeout(async () => {
-        try {
-          const { confirmSubscription } = await import("./billing.service");
-          await confirmSubscription(providerReference);
-        } catch (err) {
-          console.error("[MockProvider] Async subscription confirmation error:", err);
-        }
-      }, 3000);
-    }
 
     return {
       providerReference,

@@ -88,7 +88,14 @@ src/
       add-job/              # Manual job addition
       billing/              # Credits & subscription billing hub
       settings/             # Account preferences & user feature flags
-      admin/                # Admin feature flag rollout console
+      admin/                # Platform administration console
+        layout.tsx          # Server-side admin role guard & sub-navigation tabs
+        page.tsx            # Overview metrics dashboard
+        users/              # User management (roles, bans, credits)
+        billing/            # Financial credit audit ledger
+        sources/            # Job source adapters & circuit breakers
+        ai-usage/           # AI telemetry & token cost tracking
+        flags/              # Feature flags rollout console
     api/
       auth/[...all]/        # better-auth route handler
       inngest/              # Inngest background function serve endpoint
@@ -100,10 +107,13 @@ src/
     job/                    # JobScoreSection, MatchExplanation, SkillGapBreakdown, JobCard
     billing/                # CreditBalanceIndicator, CreditPurchaseCard, SubscriptionCard, InsufficientCreditsDialog
     settings/               # Settings & feature flag cards
-    admin/                  # Admin feature flag manager
+    admin/                  # AdminNav, AdminStatCard, AdminUsersTable, AdminUserRow, AiUsageTable, GrantCreditsDialog, BanUserDialog, AdminFeatureFlagsManager
 
   actions/                  # Server actions (validation + auth boundary → service layer)
+    admin.actions.ts        # Admin feature flags actions
+    admin-management.actions.ts # Admin user role, ban, and credit grant actions
   services/                 # Service layer (business logic, orchestration, external integrations)
+    admin/                  # Admin business logic & metrics orchestration
     billing/                # Payment provider abstraction, mock mobile money, credit & subscription business logic
     adapters/               # ATS on-demand adapters (Ashby, Greenhouse, Lever, RemoteOK)
     crawler/sources/        # Regional & scraper sources (CongoJob, Emploi.cd, FECRDC, UNJobs, ReliefWeb)
@@ -113,10 +123,10 @@ src/
     flags/                  # Feature flags service with 60s Redis caching
     reliability/            # Adapter circuit breaker with exponential backoff
     cache/                  # Redis client (sole importer of @upstash/redis)
-    auth/                   # better-auth configuration & admin check
+    auth/                   # better-auth configuration & admin role verification
     db/schema/              # Modular Drizzle schemas (pipeline, resume, scoring, ops, auth, billing)
 
-  dal/                      # Data Access Layer (the ONLY layer calling Drizzle directly: jobs, billing, growth, etc.)
+  dal/                      # Data Access Layer (the ONLY layer calling Drizzle directly: jobs, billing, growth, admin, etc.)
   inngest/                  # Inngest client, typed event schemas, and background functions
   lib/                      # Shared utilities, SimHash, Result (ok-err), error types, Zod schemas
   test/                     # Standalone test suites (src/test/unit/, src/test/integration/)

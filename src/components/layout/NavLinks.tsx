@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { isNavActive } from "@/lib/nav";
 
 export interface NavLinkItem {
   href: string;
@@ -23,7 +24,7 @@ export function NavLinks({ links }: NavLinksProps) {
       className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/70 p-1 rounded-xl border border-slate-300 dark:border-slate-700/60"
     >
       {links.map((link) => {
-        const isActive = pathname === link.href;
+        const isActive = isNavActive(link.href, pathname);
         return (
           <Link
             key={link.href}

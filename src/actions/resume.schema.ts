@@ -1,12 +1,12 @@
 import { z } from "zod";
 
-export const resumeSkillItemSchema = z
+const resumeSkillItemSchema = z
   .string()
   .trim()
   .min(1, "Skill name cannot be empty")
   .max(100, "Skill name must be at most 100 characters");
 
-export const resumeSkillsSchema = z
+const resumeSkillsSchema = z
   .array(resumeSkillItemSchema)
   .max(100, "Cannot specify more than 100 skills")
   .optional();

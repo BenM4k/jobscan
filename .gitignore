@@ -46,4 +46,6 @@ next-env.d.ts
 /.fallow
 /.impeccable
 /.agents
+/.antigravity
 skills-lock.json
+tasks.md

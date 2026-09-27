@@ -6,47 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { formatResumeToMarkdown } from "@/lib/resume-format";
 
-const updateProfileSchema = z.object({
-  resumeText: z.string().min(10, "Resume text must be at least 10 characters"),
-  skills: z.array(z.string()).optional(),
-  aiProvider: z.enum(["claude", "gemini", "openai", "gateway"]).optional(),
-});
 
-export async function saveProfileTextAction(formData: FormData) {
-  const sessionResult = await requireSession();
-  if (!sessionResult.ok || !sessionResult.value) return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
-
-  const resumeText = (formData.get("resumeText") as string) || "";
-  const skillsRaw = (formData.get("skills") as string) || "";
-  const aiProvider = (formData.get("aiProvider") as string) || "gemini";
-
-  const skills = skillsRaw
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  const parsed = updateProfileSchema.safeParse({ resumeText, skills, aiProvider });
-  if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message || "Invalid input" };
-  }
-
-  const userId = sessionResult.value.user.id;
-
-  // Automatically format profile text with Gemini to extract short summary and work experience
-  const reformatResult = await profileService.reformatProfileWithGemini(userId, parsed.data.resumeText);
-  if (!reformatResult.ok) {
-    // Fallback to updating details directly if Gemini is unavailable
-    const result = await profileService.updateProfileDetails(userId, parsed.data);
-    if (!result.ok) {
-      return { success: false, error: result.error.message };
-    }
-    revalidatePath("/dashboard/profile");
-    return { success: true, data: result.value };
-  }
-
-  revalidatePath("/dashboard/profile");
-  return { success: true, data: reformatResult.value };
-}
 
 const educationItemSchema = z.object({
   institution: z.string(),
@@ -138,52 +98,7 @@ export async function saveMasterResumeAction(data: {
   return { success: true, data: result.value };
 }
 
-export async function uploadResumeFileAction(formData: FormData) {
-  const sessionResult = await requireSession();
-  if (!sessionResult.ok || !sessionResult.value) return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
 
-  const file = formData.get("file") as File | null;
-  if (!file) {
-    return { success: false, error: "No file provided" };
-  }
-
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const parseResult = await profileService.parseResumeFile(buffer, file.type);
-  if (!parseResult.ok) {
-    return { success: false, error: parseResult.error.message };
-  }
-
-  const userId = sessionResult.value.user.id;
-
-  // Automatically use Gemini to reformat resume and extract profile skills data
-  const reformatResult = await profileService.reformatProfileWithGemini(userId, parseResult.value);
-  if (!reformatResult.ok) {
-    // Fallback: save raw text if Gemini formatting fails
-    const fallbackResult = await profileService.updateProfileDetails(userId, {
-      resumeText: parseResult.value,
-    });
-    if (!fallbackResult.ok) return { success: false, error: fallbackResult.error.message };
-    revalidatePath("/dashboard/profile");
-    return { success: true, data: fallbackResult.value };
-  }
-
-  revalidatePath("/dashboard/profile");
-  return { success: true, data: reformatResult.value };
-}
-
-export async function reformatProfileWithGeminiAction() {
-  const sessionResult = await requireSession();
-  if (!sessionResult.ok || !sessionResult.value) return { success: false, error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message };
-
-  const userId = sessionResult.value.user.id;
-  const result = await profileService.reformatProfileWithGemini(userId);
-  if (!result.ok) {
-    return { success: false, error: result.error.message };
-  }
-
-  revalidatePath("/dashboard/profile");
-  return { success: true, data: result.value };
-}
 
 export async function deleteResumeAction() {
   const sessionResult = await requireSession();

@@ -106,8 +106,7 @@ Feature flags enable controlled rollout and runtime experiments with per-user ov
   2. Query per-user override in `feature_flag_assignment` via `flagsDal.ts`.
   3. Fall back to global flag state in `feature_flag.enabledGlobally`.
 - **Fail Closed:** Unknown flag keys or database/Redis connection errors always return `false`. They never throw and never return `true`.
-- **Immediate Invalidation:** Updating or deleting a per-user override immediately deletes that user's Redis cache key (`cacheDel`). Toggling a global flag immediately deletes the anonymous/default cache entry.
-- **Admin Management:** Accessible at `/dashboard/admin` with global toggles, user email search, and per-user override controls. Admin access is verified via `isAdmin(user)` checking the `ADMIN_USER_IDS` environment variable.
+- **Admin Management:** Accessible at `/dashboard/admin` (and `/dashboard/admin/flags`) with global toggles, user email search, and per-user override controls. Admin access is verified via `isAdmin(user)` checking `user.role === "admin"`.
 - **Key Flags:**
   - `"hybrid-scoring-v1"`: Gates whether sparse `bm25Rank` is computed in `scoreJobForResume()`. When disabled, scoring falls back to semantic-only vector ranking.
 

@@ -3,6 +3,8 @@
 import { requireSession } from "@/lib/auth-guard";
 import * as resumeDal from "@/dal/resume.dal";
 import { revalidatePath } from "next/cache";
+import { inngest } from "@/inngest/client";
+import { resumeUpdatedEvent } from "@/inngest/events";
 import {
   createMasterResumeSchema,
   updateMasterResumeSchema,
@@ -107,6 +109,18 @@ export async function createMasterResumeAction(data: {
     return { success: false, error: res.error.message };
   }
 
+  // Generate vector embeddings via Inngest background event
+  inngest
+    .send(
+      resumeUpdatedEvent.create({
+        resumeId: res.value.id,
+        userId: res.value.userId,
+        content: res.value.content,
+        expectedVersion: res.value.version,
+      })
+    )
+    .catch((e) => console.warn("Failed to dispatch resume.updated event (create action):", e));
+
   revalidatePath("/dashboard/resumes");
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/profile");
@@ -145,6 +159,20 @@ export async function updateMasterResumeAction(data: {
 
   if (!res.ok) {
     return { success: false, error: res.error.message };
+  }
+
+  // Re-embed via Inngest background event if resume content changed
+  if (parsed.data.content) {
+    inngest
+      .send(
+        resumeUpdatedEvent.create({
+          resumeId: res.value.id,
+          userId: res.value.userId,
+          content: res.value.content,
+          expectedVersion: res.value.version,
+        })
+      )
+      .catch((e) => console.warn("Failed to dispatch resume.updated event (update action):", e));
   }
 
   revalidatePath("/dashboard/resumes");
@@ -203,6 +231,18 @@ export async function promoteTailoredResumeAction(
   if (!res.ok) {
     return { success: false, error: res.error.message };
   }
+
+  // Generate vector embeddings for newly promoted resume via Inngest background event
+  inngest
+    .send(
+      resumeUpdatedEvent.create({
+        resumeId: res.value.newMasterResume.id,
+        userId: res.value.newMasterResume.userId,
+        content: res.value.newMasterResume.content,
+        expectedVersion: res.value.newMasterResume.version,
+      })
+    )
+    .catch((e) => console.warn("Failed to dispatch resume.updated event (promote action):", e));
 
   revalidatePath("/dashboard/resumes");
   revalidatePath("/dashboard");

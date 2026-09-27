@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth-guard";
+import { isAdmin } from "@/services/auth/admin";
 import { Navbar, NavbarSkeleton } from "@/components/layout/Navbar";
 import { DashboardFooter } from "@/components/layout/DashboardFooter";
 
@@ -19,6 +20,7 @@ async function DashboardNavbar() {
       userId={session.user.id}
       userEmail={session.user.email}
       userName={session.user.name}
+      isAdmin={isAdmin(session.user)}
     />
   );
 }
