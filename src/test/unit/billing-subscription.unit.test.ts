@@ -1,9 +1,11 @@
 import "dotenv/config";
 import { db } from "@/services/db";
-import { creditPack, subscriptionPlan, creditCost } from "@/services/db/schema/billing";
+import { creditCost } from "@/services/db/schema/billing";
+import { user } from "@/services/db/schema/auth";
 import { seedBillingDefaultsIfEmpty } from "@/dal/billing-seed.dal";
 import * as billingDal from "@/dal/billing.dal";
 import * as billingService from "@/services/billing/billing.service";
+import { eq } from "drizzle-orm";
 
 function assert(condition: boolean, msg: string): asserts condition {
   if (!condition) {
@@ -39,7 +41,6 @@ async function runSubscriptionTests() {
   // 2. Test initiating subscription with plan key 'pro'
   const testUserId = crypto.randomUUID();
   // Insert a test user for foreign key integrity
-  const { user } = await import("@/services/db/schema/auth");
   await db.insert(user).values({
     id: testUserId,
     name: "Test Subscriber",
@@ -71,7 +72,7 @@ async function runSubscriptionTests() {
     console.log("Subscription and credit packs unit tests passed successfully! 🚀");
   } finally {
     // Cleanup test user (cascades to subscription)
-    await db.delete(user).where(require("drizzle-orm").eq(user.id, testUserId));
+    await db.delete(user).where(eq(user.id, testUserId));
   }
 
   process.exit(0);

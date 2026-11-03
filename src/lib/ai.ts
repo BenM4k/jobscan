@@ -96,26 +96,93 @@ export const JobScoreSchema = z.object({
 
 export type JobScoreData = z.infer<typeof JobScoreSchema>;
 
+/**
+ * Structured output for ATS-optimized resume tailoring.
+ * Field order matters: the model fills `keywordAnalysis` first, which acts as a
+ * planning step that drives keyword placement in every later section.
+ */
 export const TailoredResumeSchema = z.object({
+  keywordAnalysis: z
+    .object({
+      targetTitle: z
+        .string()
+        .describe("Exact job title as written in the job posting"),
+      priorityKeywords: z
+        .array(z.string())
+        .describe(
+          "10-25 highest-value ATS keywords copied verbatim from the posting (hard skills, tools, methodologies, certifications, domain terms), most important first",
+        ),
+      matchedKeywords: z
+        .array(z.string())
+        .describe(
+          "Subset of priorityKeywords the candidate genuinely demonstrates; each must appear verbatim in the tailored resume",
+        ),
+      unsupportedKeywords: z
+        .array(z.string())
+        .describe(
+          "Subset of priorityKeywords with no evidence in the resume; these must never be claimed",
+        ),
+    })
+    .describe("Planning step: keyword extraction and evidence mapping"),
+  header: z.object({
+    fullName: z
+      .string()
+      .describe("Candidate full name exactly as in the resume, or empty string"),
+    location: z
+      .string()
+      .optional()
+      .describe("Candidate city/country exactly as in the resume"),
+    links: z
+      .array(z.string())
+      .describe("Profile URLs exactly as in the resume (LinkedIn, GitHub, portfolio)"),
+  }),
+  headline: z
+    .string()
+    .describe("One-line professional headline aligned with the target title"),
   summary: z
     .string()
-    .describe("Tailored professional summary emphasizing relevance to the job"),
+    .describe("3-4 sentence keyword-rich professional summary for this posting"),
   skills: z
-    .array(z.string())
-    .describe("Re-prioritized skills relevant to the job requirements"),
+    .array(
+      z.object({
+        category: z.string().describe("Skill group name relevant to the role"),
+        items: z
+          .array(z.string())
+          .describe("Skills in this group, posting keywords first"),
+      }),
+    )
+    .describe("2-5 skill groups ordered by relevance to the posting"),
   experience: z
     .array(
       z.object({
         company: z.string(),
-        title: z.string(),
+        title: z.string().describe("Exact job title from the resume"),
+        location: z.string().optional(),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
         bullets: z
           .array(z.string())
           .describe(
-            "Reordered or rephrased bullets emphasizing relevance without fabrication",
+            "Rewritten achievement bullets: action verb + task with posting keywords + tools + result; no fabrication",
           ),
       }),
     )
-    .describe("Tailored work experience list"),
+    .describe("Every role from the resume, reverse-chronological"),
+  education: z.array(EducationItemSchema).describe("Education exactly as in the resume"),
+  certifications: z
+    .array(z.string())
+    .describe("Certifications exactly as in the resume, most relevant first"),
+  projects: z
+    .array(
+      z.object({
+        name: z.string(),
+        bullets: z.array(z.string()),
+      }),
+    )
+    .describe("Relevant projects from the resume only; empty if none"),
+  languages: z
+    .array(z.string())
+    .describe("Spoken languages with proficiency exactly as in the resume"),
 });
 
 export type TailoredResumeData = z.infer<typeof TailoredResumeSchema>;
