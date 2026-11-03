@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { JobSelect } from "@/dal/jobs.dal";
 import { toast } from "sonner";
 import posthog from "posthog-js";
@@ -22,6 +23,7 @@ interface GenerateCoverLetterOptions {
 
 /** Manages cover-letter generation, persistence, clipboard state, and credit errors. */
 export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCoverLetterProps) {
+  const router = useRouter();
   const [coverLetter, setCoverLetter] = useState(job.coverLetterDraft || "");
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -61,6 +63,24 @@ export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCover
     };
   }, []);
 
+  const [prevDraft, setPrevDraft] = useState(job.coverLetterDraft);
+  if (job.coverLetterDraft !== prevDraft) {
+    setPrevDraft(job.coverLetterDraft);
+    if (!isEditing) {
+      setCoverLetter(job.coverLetterDraft || "");
+    }
+  }
+
+  const handleStartEditing = () => {
+    setCoverLetter(job.coverLetterDraft || "");
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setCoverLetter(job.coverLetterDraft || "");
+    setIsEditing(false);
+  };
+
   const handleGenerateStream = async (options?: GenerateCoverLetterOptions) => {
     const isOptionsObj =
       options && typeof options === "object" && !("nativeEvent" in options);
@@ -87,7 +107,6 @@ export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCover
     const idempotencyKey = pendingIdempotencyKeyRef.current;
 
     const result = await retryRunner.execute(async () => {
-      setCoverLetter("");
       abortControllerRef.current?.abort();
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
@@ -133,6 +152,7 @@ export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCover
         throw new Error("No response body received from server");
       }
 
+      setCoverLetter("");
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let accumulated = "";
@@ -153,6 +173,7 @@ export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCover
       pendingResumeIdRef.current = undefined;
       posthog.capture("cover_letter_generated");
       onJobUpdated({ ...job, coverLetterDraft: result });
+      router.refresh();
     }
   };
 
@@ -179,6 +200,7 @@ export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCover
       const { data } = await res.json();
       posthog.capture("cover_letter_saved");
       onJobUpdated(data);
+      setIsEditing(false);
       toast.success("Cover letter saved");
     } catch (err) {
       console.error(err);
@@ -227,6 +249,8 @@ export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCover
     isSaving,
     isEditing,
     setIsEditing,
+    handleStartEditing,
+    handleCancelEdit,
     isCopied,
     hasCoverLetter: Boolean(job.coverLetterDraft),
     handleGenerateStream,

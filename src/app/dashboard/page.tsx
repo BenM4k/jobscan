@@ -6,7 +6,7 @@ import { JobStatus } from "@/services/db/schema";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { JobListSkeleton } from "@/components/job/JobListSkeleton";
 import { ScrollToTopButton } from "@/components/job/ScrollToTopButton";
-import { getDashboardFeedData } from "@/services/dashboard.service";
+import { getCachedDashboardFeed } from "@/lib/cached-data";
 
 import { requireSession } from "@/lib/auth-guard";
 
@@ -30,7 +30,7 @@ async function DashboardFeed({
   const sourceFilter = source === "all" ? undefined : source;
   const queryFilter = q || undefined;
 
-  const { jobs, totalJobs } = await getDashboardFeedData({
+  const { jobs, totalJobs } = await getCachedDashboardFeed({
     statusFilter,
     sourceFilter,
     startDate: startDate || undefined,

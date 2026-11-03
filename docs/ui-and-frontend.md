@@ -53,3 +53,14 @@ Long-running AI streaming and polling actions use the `useAsyncJobWithRetry` hoo
 - **Inline Editing:** Users can edit AI-tailored resume bullet points and sections directly in the UI.
 - **Persistence:** Modifications persist via `PUT /api/jobs/[id]/tailor-resume` calling `jobService.updateTailoredResume` before exiting edit mode, adhering to the standard route handler → service → DAL layering.
 - **Single-Save Ingestion:** `jobsDal.updateJobTailoredResume` accepts an optional `language` parameter and writes it atomically to `tailored_resume` in a single query, eliminating redundant lookups.
+
+---
+
+## 6. Cache Components & Tag-Based Revalidation
+
+Next.js 16.3+ Cache Components are enabled (`cacheComponents: true` in `next.config.ts`):
+
+- **Data-Level Caching (`"use cache"`):** Server data-fetching functions in `src/lib/cached-data.ts` are declared with `"use cache"` and register semantic cache tags via `cacheTag(tag)` (`next/cache`).
+- **Tag Constants & Entity Tags (`src/lib/cache-tags.ts`):** Canonical tags follow the `<domain>:<scope>` format (`dashboard:feed`, `profile:data`, `resumes:list`, `billing:data`, `settings:data`, `admin:overview`, `admin:users`). Granular helpers `jobTag(jobId)` (`job:<jobId>`) and `resumeTag(resumeId)` (`resume:<resumeId>`) enable single-item caching and invalidation.
+- **Targeted Revalidation (`revalidateTags`):** Server actions and API routes import `revalidateTags` or `revalidateTag` from `@/lib/cache-tags` (configured with the `"max"` cache life profile). Mutations bust domain-specific and entity-specific tags instead of broad URL paths (`revalidatePath`).
+- **Request Data Separation:** Functions reading request-time cookies or headers (`requireSession()`) are decoupled from `"use cache"` functions; user IDs are passed as explicit arguments to cached fetchers.

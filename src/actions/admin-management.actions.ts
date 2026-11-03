@@ -7,7 +7,7 @@ import {
   changeUserBanStatus,
   grantCreditsToUser,
 } from "@/services/admin/admin.service";
-import { revalidatePath } from "next/cache";
+import { ADMIN_MUTATION_TAGS, BILLING_TAG, NAVBAR_TAG, revalidateTags } from "@/lib/cache-tags";
 import { z } from "zod";
 
 const changeRoleSchema = z.object({
@@ -63,8 +63,7 @@ export async function changeUserRoleAction(
     return { ok: false, error: res.error.message };
   }
 
-  revalidatePath("/dashboard/admin");
-  revalidatePath("/dashboard/admin/users");
+  revalidateTags([...ADMIN_MUTATION_TAGS, NAVBAR_TAG]);
   return { ok: true, value: res.value };
 }
 
@@ -102,8 +101,7 @@ export async function changeUserBanAction(
     return { ok: false, error: res.error.message };
   }
 
-  revalidatePath("/dashboard/admin");
-  revalidatePath("/dashboard/admin/users");
+  revalidateTags([...ADMIN_MUTATION_TAGS, NAVBAR_TAG]);
   return { ok: true, value: res.value };
 }
 
@@ -140,7 +138,6 @@ export async function adminGrantCreditsAction(
     return { ok: false, error: res.error.message };
   }
 
-  revalidatePath("/dashboard/admin");
-  revalidatePath("/dashboard/admin/users");
+  revalidateTags([...ADMIN_MUTATION_TAGS, BILLING_TAG, NAVBAR_TAG]);
   return { ok: true, value: res.value };
 }

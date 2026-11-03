@@ -155,3 +155,20 @@ Whenever code changes alter or extend the structural boundaries of the applicati
 - **Files to Update:**
   - [`AGENTS.md`](./AGENTS.md) (update project structure tree, locked-in principles, or tech stack).
   - The corresponding deep-dive guide in [`docs/`](./docs/).
+
+---
+
+## 8. Cache Components & Revalidation Tag Hierarchy
+
+Jobpilot uses Next.js Cache Components for optimal static shell delivery and granular on-demand invalidation:
+
+- **Centralized Tags (`src/lib/cache-tags.ts`):** Coarse semantic tags prevent path enumeration fragility.
+  - `dashboard:feed`: Aggregated job postings and user status filter feeds.
+  - `profile:data`: Master resume and resume skills.
+  - `resumes:list`: User's multi-persona resume list.
+  - `billing:data`: Credit balance, subscriptions, packs, and ledger history.
+  - `settings:data`: Feature flag overrides and email digest preferences.
+  - `admin:overview` & `admin:users`: Administrative metrics and user directory.
+- **Granular Entity Tags (`jobTag(jobId)`, `resumeTag(resumeId)`):** Specific individual opportunities and personas use format `job:<jobId>` and `resume:<resumeId>` to permit targeted single-item invalidations without busting entire collections.
+- **Cached Data Fetching (`src/lib/cached-data.ts`):** Top-level `"use cache"` directive encapsulating async DAL / service reads, invoking `cacheTag(...)` (e.g. `getCachedJobById` tagged with `jobTag(jobId)`).
+- **Atomic Invalidation:** Server actions and API routes use `revalidateTags(...)` to expire caches with `"max"` profile upon data modification without resorting to `revalidatePath`.

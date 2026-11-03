@@ -136,3 +136,14 @@ In `createMasterResumeAction` and `promoteTailoredResumeAction`:
   - Sets `subscription.status = "past_due"`.
   - Reverts `hybrid_scoring` feature flag to default.
   - Reverts `digestEmailFrequency` to `"weekly"`.
+
+---
+
+## 7. Catalog Seeding & Database Provisioning
+
+Default credit costs, starter credit packs, and the Jobpilot Pro subscription plan are managed via [`src/dal/billing-seed.dal.ts`](../src/dal/billing-seed.dal.ts):
+
+- **Automated Self-Healing:** The billing data fetcher `getCachedBillingData(userId)` in `src/lib/cached-data.ts` checks if credit packs or subscription plans are empty in the active database; if so, it invokes `seedBillingDefaultsIfEmpty()` automatically.
+- **CLI & NPM Seed Command:** Run `pnpm seed:billing` to explicitly seed and verify credit costs, starter credit packs, and subscription plans on any database link configured in `DATABASE_URL`.
+- **Production Payment Permission:** When using the mock mobile money provider in production mode (`NODE_ENV=production`), ensure `ALLOW_MOCK_PAYMENTS="true"` is configured in `.env`.
+

@@ -10,6 +10,7 @@ import { getPipelineEntryById } from "@/dal/pipeline.dal";
 import { spendCredits, grantCredits } from "@/services/billing/billing.service";
 import { ok, err } from "@/lib/result";
 import { AppError } from "@/lib/errors";
+import { BILLING_TAG, NAVBAR_TAG, revalidateTags } from "@/lib/cache-tags";
 
 const interviewActionSchema = z.object({
   jobId: z.string().uuid("Invalid job ID"),
@@ -78,6 +79,7 @@ export async function generateInterviewQuestionsAction(data: {
       if (!genRes.ok) {
         if (spendRes.value.cost > 0) {
           await grantCredits(userId, spendRes.value.cost, "refund", parsed.data.pipelineEntryId);
+          revalidateTags([BILLING_TAG, NAVBAR_TAG]);
         }
         return genRes;
       }
@@ -108,6 +110,8 @@ export async function generateInterviewQuestionsAction(data: {
     }
     return { success: false, error: result.error.message };
   }
+
+  revalidateTags([BILLING_TAG, NAVBAR_TAG]);
 
   return {
     success: true,

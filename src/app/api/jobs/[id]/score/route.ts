@@ -5,6 +5,7 @@ import { requireSession } from "@/lib/auth-guard";
 import { runWithIdempotency } from "@/services/idempotency.service";
 import { checkAiRateLimit } from "@/services/rate-limit";
 import { ok } from "@/lib/result";
+import { DASHBOARD_FEED_TAG, jobTag, revalidateTags } from "@/lib/cache-tags";
 
 export async function POST(
   _req: NextRequest,
@@ -156,6 +157,8 @@ export async function POST(
         { status: 500 }
       );
     }
+
+    revalidateTags([DASHBOARD_FEED_TAG, jobTag(id)]);
 
     return NextResponse.json({
       success: true,

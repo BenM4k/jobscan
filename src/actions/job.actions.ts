@@ -7,6 +7,7 @@ import { z } from "zod";
 import { runWithIdempotency } from "@/services/idempotency.service";
 import { checkAiRateLimit } from "@/services/rate-limit";
 import { ok, err } from "@/lib/result";
+import { DASHBOARD_FEED_TAG, BILLING_TAG, NAVBAR_TAG, jobTag, revalidateTags } from "@/lib/cache-tags";
 
 import {
   ALL_JOB_SOURCES,
@@ -121,6 +122,7 @@ export async function transitionJobStatusAction(
     return { success: false, error: result.error.message };
   }
 
+  revalidateTags([DASHBOARD_FEED_TAG, jobTag(parsed.data.jobId)]);
   return { success: true, data: result.value };
 }
 
@@ -189,6 +191,8 @@ export async function scoreJobAction(
   if (!result.ok) {
     return { success: false, error: result.error.message };
   }
+
+  revalidateTags([DASHBOARD_FEED_TAG, jobTag(parsed.data.jobId)]);
 
   return {
     success: true,
@@ -313,6 +317,8 @@ export async function generateTailoredResumeAction(
     }
     return { success: false, error: result.error.message };
   }
+
+  revalidateTags([DASHBOARD_FEED_TAG, jobTag(parsed.data.jobId), BILLING_TAG, NAVBAR_TAG]);
 
   return {
     success: true,
@@ -447,6 +453,8 @@ export async function generateTailoredCoverLetterAction(
     return { success: false, error: result.error.message };
   }
 
+  revalidateTags([DASHBOARD_FEED_TAG, jobTag(parsed.data.jobId), BILLING_TAG, NAVBAR_TAG]);
+
   return {
     success: true,
     data: result.value.data,
@@ -564,6 +572,7 @@ export async function addManualJobAction(formData: FormData) {
     return { success: false, error: result.error.message };
   }
 
+  revalidateTags(DASHBOARD_FEED_TAG);
   return { success: true, data: result.value };
 }
 
@@ -581,6 +590,7 @@ export async function deleteJobAction(jobId: string) {
     return { success: false, error: result.error.message };
   }
 
+  revalidateTags([DASHBOARD_FEED_TAG, jobTag(jobId)]);
   return { success: true };
 }
 
@@ -606,6 +616,7 @@ export async function restoreJobAction(jobData: JobSelect) {
     return { success: false, error: result.error.message };
   }
 
+  revalidateTags([DASHBOARD_FEED_TAG, jobTag(jobData.id)]);
   return { success: true, data: result.value };
 }
 

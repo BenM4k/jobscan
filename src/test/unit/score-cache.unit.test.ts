@@ -71,8 +71,6 @@ async function runScoreCacheUnitTests() {
     scoreReasoning: "Matches requirements well.",
     jobSkills: ["TypeScript", "Next.js"],
     resumeSkills: ["TypeScript", "React"],
-    coverLetterDraft: "Dear Hiring Manager...",
-    tailoredResume: "Senior Full Stack Engineer...",
     matchedSkills: ["TypeScript"],
     missingSkills: ["Next.js"],
   };

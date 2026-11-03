@@ -6,6 +6,13 @@ import { checkAiRateLimit } from "@/services/rate-limit";
 import * as jobService from "@/services/job.service";
 import * as jobsDal from "@/dal/jobs.dal";
 import { ok, err } from "@/lib/result";
+import {
+  DASHBOARD_FEED_TAG,
+  BILLING_TAG,
+  NAVBAR_TAG,
+  jobTag,
+  revalidateTags,
+} from "@/lib/cache-tags";
 
 /** Generates and persists a tailored resume after authentication and credit checks. */
 export async function POST(
@@ -159,6 +166,13 @@ export async function POST(
       );
     }
 
+    revalidateTags([
+      DASHBOARD_FEED_TAG,
+      jobTag(id),
+      BILLING_TAG,
+      NAVBAR_TAG,
+    ]);
+
     return NextResponse.json({
       success: true,
       data: result.value.data.job,
@@ -222,6 +236,8 @@ export async function PUT(
         { status: 500 },
       );
     }
+
+    revalidateTags(jobTag(id));
 
     return NextResponse.json({ success: true, data: updateRes.value });
   } catch (error) {

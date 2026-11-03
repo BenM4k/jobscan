@@ -2,7 +2,7 @@
 
 import { requireSession } from "@/lib/auth-guard";
 import * as resumeDal from "@/dal/resume.dal";
-import { revalidatePath } from "next/cache";
+import { RESUME_MUTATION_TAGS, resumeTag, revalidateTags } from "@/lib/cache-tags";
 import { inngest } from "@/inngest/client";
 import { resumeUpdatedEvent } from "@/inngest/events";
 import {
@@ -38,10 +38,7 @@ export async function setActiveResumeAction(resumeId: string) {
     return { success: false, error: res.error.message };
   }
 
-  revalidatePath("/dashboard/resumes");
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/profile");
-  revalidatePath("/dashboard/jobs");
+  revalidateTags([...RESUME_MUTATION_TAGS, resumeTag(resumeId)]);
   return { success: true, data: true };
 }
 
@@ -121,10 +118,7 @@ export async function createMasterResumeAction(data: {
     )
     .catch((e) => console.warn("Failed to dispatch resume.updated event (create action):", e));
 
-  revalidatePath("/dashboard/resumes");
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/profile");
-  revalidatePath("/dashboard/jobs");
+  revalidateTags([...RESUME_MUTATION_TAGS, resumeTag(res.value.id)]);
   return { success: true, data: res.value };
 }
 
@@ -175,10 +169,7 @@ export async function updateMasterResumeAction(data: {
       .catch((e) => console.warn("Failed to dispatch resume.updated event (update action):", e));
   }
 
-  revalidatePath("/dashboard/resumes");
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/profile");
-  revalidatePath("/dashboard/jobs");
+  revalidateTags([...RESUME_MUTATION_TAGS, resumeTag(parsed.data.id)]);
   return { success: true, data: res.value };
 }
 
@@ -244,10 +235,7 @@ export async function promoteTailoredResumeAction(
     )
     .catch((e) => console.warn("Failed to dispatch resume.updated event (promote action):", e));
 
-  revalidatePath("/dashboard/resumes");
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/profile");
-  revalidatePath("/dashboard/jobs");
+  revalidateTags([...RESUME_MUTATION_TAGS, resumeTag(res.value.newMasterResume.id)]);
 
   return {
     success: true,
@@ -276,10 +264,7 @@ export async function revertActiveResumeAction(previousActiveId: string) {
     return { success: false, error: res.error.message };
   }
 
-  revalidatePath("/dashboard/resumes");
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/profile");
-  revalidatePath("/dashboard/jobs");
+  revalidateTags([...RESUME_MUTATION_TAGS, resumeTag(parsed.data.previousActiveId)]);
   return { success: true, data: true };
 }
 
@@ -302,9 +287,6 @@ export async function deleteMasterResumeAction(resumeId: string): Promise<
     return { success: false, error: res.error.message };
   }
 
-  revalidatePath("/dashboard/resumes");
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/profile");
-  revalidatePath("/dashboard/jobs");
+  revalidateTags([...RESUME_MUTATION_TAGS, resumeTag(parsed.data.resumeId)]);
   return { success: true, data: res.value };
 }

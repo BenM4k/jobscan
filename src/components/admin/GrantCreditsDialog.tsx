@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +25,7 @@ export function GrantCreditsDialog({
   isOpen,
   onClose,
 }: GrantCreditsDialogProps) {
+  const router = useRouter();
   const [amount, setAmount] = useState<number>(10);
   const [reason, setReason] = useState<string>("");
   const [isPending, startTransition] = useTransition();
@@ -43,6 +45,7 @@ export function GrantCreditsDialog({
         toast.success(`Granted ${amount} credits to ${user.name || user.email}`);
         onClose();
         setReason("");
+        router.refresh();
       } else {
         toast.error(res.error || "Failed to grant credits");
       }

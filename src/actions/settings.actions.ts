@@ -4,7 +4,7 @@ import { requireSession } from "@/lib/auth-guard";
 import { setUserFeatureFlagOverride } from "@/services/flags";
 import * as growthDal from "@/dal/growth.dal";
 import { z } from "zod";
-import { revalidatePath } from "next/cache";
+import { SETTINGS_TAG, revalidateTags } from "@/lib/cache-tags";
 
 const flagOverrideSchema = z.object({
   flagKey: z.string().min(1),
@@ -37,7 +37,7 @@ export async function setFeatureFlagOverrideAction(
   );
 
   if (res.success) {
-    revalidatePath("/dashboard/settings");
+    revalidateTags(SETTINGS_TAG);
   }
 
   return res;
@@ -69,6 +69,6 @@ export async function updateDigestPreferencesAction(
     return { success: false, error: res.error.message };
   }
 
-  revalidatePath("/dashboard/settings");
+  revalidateTags(SETTINGS_TAG);
   return { success: true };
 }

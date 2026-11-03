@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { getAdminUsers } from "@/services/admin/admin.service";
+import { getCachedAdminUsers } from "@/lib/cached-data";
 import { AdminUsersTable } from "@/components/admin/AdminUsersTable";
 
 interface UsersPageProps {
@@ -29,7 +29,7 @@ async function UsersContent({
   const search = params.search || "";
   const role = params.role || "";
 
-  const usersRes = await getAdminUsers({
+  const usersRes = await getCachedAdminUsers({
     page,
     limit: 20,
     search: search || undefined,

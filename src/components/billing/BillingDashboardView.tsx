@@ -32,7 +32,33 @@ export function BillingDashboardView({
 }: BillingDashboardViewProps) {
   const t = useTranslations("billing");
   const router = useRouter();
-  const handleRefresh = () => {
+  const [balance, setBalance] = React.useState(initialBalance);
+  const [prevInitialBalance, setPrevInitialBalance] = React.useState(initialBalance);
+
+  if (initialBalance !== prevInitialBalance) {
+    setPrevInitialBalance(initialBalance);
+    setBalance(initialBalance);
+  }
+
+  const [subscription, setSubscription] = React.useState(initialSubscription);
+  const [prevInitialSubscription, setPrevInitialSubscription] = React.useState(initialSubscription);
+
+  if (initialSubscription !== prevInitialSubscription) {
+    setPrevInitialSubscription(initialSubscription);
+    setSubscription(initialSubscription);
+  }
+
+  const handleRefresh = (newBalance?: number) => {
+    if (typeof newBalance === "number") {
+      setBalance(newBalance);
+    }
+    router.refresh();
+  };
+
+  const handleSubscriptionUpdated = (newSub?: SubscriptionSelect | null) => {
+    if (newSub !== undefined) {
+      setSubscription(newSub);
+    }
     router.refresh();
   };
 
@@ -63,7 +89,7 @@ export function BillingDashboardView({
               {t("balance")}
             </div>
             <div className="text-xl sm:text-2xl font-bold text-foreground">
-              {initialBalance}{" "}
+              {balance}{" "}
               <span className="text-xs font-normal text-muted-foreground">
                 {t("credits").toLowerCase()}
               </span>
@@ -76,8 +102,8 @@ export function BillingDashboardView({
       <div className="space-y-12 sm:space-y-14 divide-y divide-border/60">
         <SubscriptionSection
           plan={plans[0]}
-          subscription={initialSubscription}
-          onSubscriptionUpdated={handleRefresh}
+          subscription={subscription}
+          onSubscriptionUpdated={handleSubscriptionUpdated}
         />
 
         <div className="pt-12 sm:pt-14">

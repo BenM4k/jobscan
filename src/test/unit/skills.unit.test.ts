@@ -177,8 +177,6 @@ async function runSkillsUnitTests() {
     const minimalPayload = {
       fitScore: 75,
       explanation: "Candidate meets core requirements but lacks domain expertise.",
-      coverLetterDraft: "Dear Hiring Team...",
-      tailoredResume: "Professional experience...",
     };
     const parsedMinimal = scoreResultSchema.safeParse(minimalPayload);
     assert(parsedMinimal.success, `Minimal scoreResultSchema validation failed: ${parsedMinimal.error?.message}`);
@@ -191,8 +189,6 @@ async function runSkillsUnitTests() {
     // Missing explanation test: explanation is required for "Why this matched"
     const missingExplanationPayload = {
       fitScore: 75,
-      coverLetterDraft: "Dear Hiring Team...",
-      tailoredResume: "Professional experience...",
     };
     const parsedInvalid = scoreResultSchema.safeParse(missingExplanationPayload);
     assert(!parsedInvalid.success, "scoreResultSchema should require explanation");
