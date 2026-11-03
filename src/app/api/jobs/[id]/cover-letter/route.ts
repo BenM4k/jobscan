@@ -12,7 +12,10 @@ import { uuidKeySchema } from "@/services/idempotency.service";
 import {
   buildCoverLetterInstructions,
   buildCoverLetterPrompt,
+  formatJobLocation,
+  resolveOutputLanguage,
 } from "@/services/tailoring.service";
+import { stripRedactionPlaceholders } from "@/services/tailoring/sanitize";
 import { coverLetterPromptFieldsSchema } from "@/actions/job.schema";
 import {
   jobTag,
@@ -271,11 +274,10 @@ export async function POST(
       isRegeneration,
       instructions: customInstructions,
       tone,
+      outputLanguage: resolveOutputLanguage(job.language, activeResume.language),
     });
 
-    const location =
-      [job.city, job.countryCode || job.country].filter(Boolean).join(", ") ||
-      "Unspecified";
+    const location = formatJobLocation(job);
 
     const prompt = buildCoverLetterPrompt({
       candidateSkills: resumeSkills,
@@ -284,6 +286,8 @@ export async function POST(
       company: job.company,
       location,
       jobDescription: job.description,
+      matchedSkills: job.matchedSkills,
+      missingSkills: job.missingSkills,
       isRegeneration,
       previousCoverLetter,
       instructions: customInstructions,
@@ -335,8 +339,8 @@ export async function POST(
       model,
       instructions,
       prompt,
-      temperature: isRegeneration ? 0.6 : 0.4,
-      timeout: 30_000,
+      // Model-default temperature: Gemini 3 degrades (generic/looping output) when lowered.
+      timeout: 60_000,
       telemetry: { isEnabled: false },
       onError: async ({ error }) => {
         await safeRefund();
@@ -351,7 +355,7 @@ export async function POST(
       onFinish: async ({ text }) => {
         try {
           if (text && text.trim().length > 0) {
-            const newText = text.trim();
+            const newText = stripRedactionPlaceholders(text);
             const diffFromPrevious = previousCoverLetter
               ? {
                   isRegeneration: true,
