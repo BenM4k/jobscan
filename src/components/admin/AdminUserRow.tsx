@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { AdminUserListItem } from "@/dal/admin.dal";
 import { Button } from "@/components/ui/button";
 import { changeUserRoleAction } from "@/actions/admin-management.actions";
@@ -21,6 +22,7 @@ interface AdminUserRowProps {
 }
 
 export function AdminUserRow({ user }: AdminUserRowProps) {
+  const router = useRouter();
   const [isCreditDialogOpen, setIsCreditDialogOpen] = useState(false);
   const [isBanDialogOpen, setIsBanDialogOpen] = useState(false);
   const [isRolePending, startRoleTransition] = useTransition();
@@ -31,6 +33,7 @@ export function AdminUserRow({ user }: AdminUserRowProps) {
       const res = await changeUserRoleAction(user.id, nextRole);
       if (res.ok) {
         toast.success(`Updated ${user.name || user.email} role to ${nextRole}`);
+        router.refresh();
       } else {
         toast.error(res.error || "Failed to update role");
       }

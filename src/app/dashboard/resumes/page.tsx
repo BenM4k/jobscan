@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth-guard";
-import * as resumeDal from "@/dal/resume.dal";
+import { getCachedMasterResumes } from "@/lib/cached-data";
 import { ResumesManager } from "@/components/resumes/ResumesManager";
 import { FileText } from "lucide-react";
 import { getTranslations } from "next-intl/server";
@@ -23,7 +23,7 @@ async function ResumesContent() {
   }
 
   const userId = sessionResult.value.user.id;
-  const res = await resumeDal.getMasterResumes(userId);
+  const res = await getCachedMasterResumes(userId);
   const resumes = res.ok ? res.value : [];
 
   const versionKey = resumes

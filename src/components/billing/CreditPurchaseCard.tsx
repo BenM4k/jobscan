@@ -13,7 +13,7 @@ import { Coins, Loader2, CheckCircle2, Phone } from "lucide-react";
 
 interface CreditPurchaseSectionProps {
   packs: CreditPackSelect[];
-  onBalanceUpdated?: () => void;
+  onBalanceUpdated?: (newBalance?: number) => void;
 }
 
 /** Lets a user select a credit pack and tracks its mobile-money purchase status. */
@@ -25,6 +25,7 @@ export function CreditPurchaseSection({
   const [selectedPackId, setSelectedPackId] = useState<string>(
     packs[1]?.id || packs[0]?.id || ""
   );
+  const effectivePackId = selectedPackId || packs[1]?.id || packs[0]?.id || "";
   const [phoneNumber, setPhoneNumber] = useState("");
   const [isInitiating, setIsInitiating] = useState(false);
   const [pollingRef, setPollingRef] = useState<string | null>(null);
@@ -32,7 +33,7 @@ export function CreditPurchaseSection({
     "idle" | "pending" | "confirmed" | "failed"
   >("idle");
 
-  const selectedPack = packs.find((p) => p.id === selectedPackId);
+  const selectedPack = packs.find((p) => p.id === effectivePackId);
   const selectedPackRef = useRef(selectedPack);
   useEffect(() => {
     selectedPackRef.current = selectedPack;
@@ -54,7 +55,7 @@ export function CreditPurchaseSection({
           setPollingRef(null);
           toast.success(t("purchaseConfirmed", { amount }));
           idempotencyKeyRef.current = crypto.randomUUID(); // Fresh key for next purchase
-          onBalanceUpdated?.();
+          onBalanceUpdated?.(res.data.balance);
         } else if (res.data.status === "failed") {
           setPurchaseStatus("idle");
           setPollingRef(null);
@@ -68,6 +69,10 @@ export function CreditPurchaseSection({
   }, [pollingRef, purchaseStatus, onBalanceUpdated, t]);
 
   const handlePurchase = async () => {
+    if (!effectivePackId) {
+      toast.error(t("initiateError"));
+      return;
+    }
     if (!phoneNumber.trim()) {
       toast.error(t("phoneRequired"));
       return;
@@ -76,7 +81,7 @@ export function CreditPurchaseSection({
     try {
       setIsInitiating(true);
       const res = await initiateCreditPurchaseAction({
-        creditPackId: selectedPackId,
+        creditPackId: effectivePackId,
         phoneNumber: phoneNumber.trim(),
         idempotencyKey: idempotencyKeyRef.current,
       });
@@ -119,7 +124,7 @@ export function CreditPurchaseSection({
       {/* Packs Selection (Clean Flat Options with generous spacing) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
         {packs.map((pack) => {
-          const isSelected = selectedPackId === pack.id;
+          const isSelected = effectivePackId === pack.id;
           const priceFormatted = (pack.priceCents / 100).toFixed(2);
           return (
             <button
@@ -164,6 +169,12 @@ export function CreditPurchaseSection({
             placeholder={t("phoneNumberPlaceholder")}
             value={phoneNumber}
             onChange={(e) => setPhoneNumber(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handlePurchase();
+              }
+            }}
             disabled={purchaseStatus === "pending"}
             className="w-full px-3.5 h-10 rounded-lg border border-input bg-transparent text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
           />
@@ -184,7 +195,7 @@ export function CreditPurchaseSection({
           <Button
             variant="secondary"
             onClick={handlePurchase}
-            disabled={isInitiating || !phoneNumber}
+            disabled={isInitiating || !phoneNumber.trim() || !effectivePackId}
             className="h-10 px-6 rounded-lg text-sm font-medium border border-border/80 bg-secondary/80 hover:bg-secondary text-secondary-foreground transition-colors shadow-2xs"
           >
             {isInitiating ? (

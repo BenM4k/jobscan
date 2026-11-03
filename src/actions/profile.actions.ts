@@ -2,7 +2,7 @@
 
 import { requireSession } from "@/lib/auth-guard";
 import * as profileService from "@/services/profile.service";
-import { revalidatePath } from "next/cache";
+import { RESUME_MUTATION_TAGS, PROFILE_TAG, revalidateTags } from "@/lib/cache-tags";
 import { z } from "zod";
 import { formatResumeToMarkdown } from "@/lib/resume-format";
 
@@ -91,10 +91,7 @@ export async function saveMasterResumeAction(data: {
     return { success: false, error: result.error.message };
   }
 
-  revalidatePath("/dashboard/profile");
-  revalidatePath("/dashboard/resumes");
-  revalidatePath("/dashboard/jobs");
-  revalidatePath("/dashboard");
+  revalidateTags(RESUME_MUTATION_TAGS);
   return { success: true, data: result.value };
 }
 
@@ -114,6 +111,6 @@ export async function deleteResumeAction() {
     return { success: false, error: result.error.message };
   }
 
-  revalidatePath("/dashboard/profile");
+  revalidateTags(PROFILE_TAG);
   return { success: true, data: result.value };
 }

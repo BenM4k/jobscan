@@ -478,7 +478,7 @@ export async function updateJobScoreAndCoverLetter(
   id: string,
   fitScore: number,
   scoreReasoning: string,
-  coverLetterDraft: string,
+  coverLetterDraft?: string,
   tailoredResumeText?: string,
   matchedSkills?: string[],
   missingSkills?: string[],

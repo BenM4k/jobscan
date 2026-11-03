@@ -1,6 +1,5 @@
 import { Suspense } from "react";
-import * as jobsDal from "@/dal/jobs.dal";
-import * as resumeDal from "@/dal/resume.dal";
+import { getCachedJobById, getCachedMasterResumes } from "@/lib/cached-data";
 import { requireSession } from "@/lib/auth-guard";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -27,8 +26,8 @@ async function JobDetailContent({
   const userId = sessionResult.value.user.id;
 
   const [jobResult, resumesResult] = await Promise.all([
-    jobsDal.getJobById(jobId, userId),
-    resumeDal.getMasterResumes(userId),
+    getCachedJobById(jobId, userId),
+    getCachedMasterResumes(userId),
   ]);
 
   if (!jobResult.ok || !jobResult.value) {

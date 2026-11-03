@@ -6,6 +6,7 @@ import { upsertUserPreferences } from "@/dal/growth.dal";
 import { ok, err, type Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 import { getPaymentProvider } from "./provider-factory";
+import { BILLING_TAG, NAVBAR_TAG, revalidateTags } from "@/lib/cache-tags";
 
 export interface InitiateCreditPurchaseResult {
   purchaseId: string;
@@ -198,6 +199,8 @@ export async function confirmCreditPurchase(
     return err(confirmRes.error);
   }
 
+  revalidateTags([BILLING_TAG, NAVBAR_TAG]);
+
   const currentBalance = await billingDal.getCreditBalance(purchase.userId);
   return ok({
     alreadyConfirmed: confirmRes.value.alreadyConfirmed,
@@ -294,6 +297,8 @@ export async function confirmSubscription(
   const confirmRes =
     await billingDal.confirmSubscriptionAtomic(providerReference);
   if (!confirmRes.ok) return err(confirmRes.error);
+
+  revalidateTags([BILLING_TAG, NAVBAR_TAG]);
 
   const { subscription, alreadyConfirmed } = confirmRes.value;
 

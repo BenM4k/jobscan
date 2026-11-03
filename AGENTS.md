@@ -156,6 +156,7 @@ The following core rules govern all feature implementation in Jobpilot:
 8. **Redis Client Encapsulation:** `@upstash/redis` is strictly encapsulated in `src/services/cache/redis-client.ts`. All other modules import high-level helpers (`cacheGet`, `cacheSet`, `cacheRemember`, `cacheDel`) from `@/services/cache/redis-client`.
 9. **Mandatory shadcn/ui Primitives:** Always compose official shadcn components in `components/ui/`. Handwritten dropdowns, popovers, or modal sheets using raw `useState` and manual coordinate math are strictly prohibited.
 10. **Secret Hygiene:** Never write or output API keys or tokens. Reference environment variables strictly by name in server-only modules.
+11. **Cache Components & Tag-Based Revalidation:** Data fetching utilizes `"use cache"` and `cacheTag()` (centralized via `src/lib/cached-data.ts` and `src/lib/cache-tags.ts`). Mutations in server actions invalidate targeted domains using `revalidateTags()` or `revalidateTag(tag, "max")`. `revalidatePath()` is superseded by semantic tag-based cache revalidation.
 
 ---
 

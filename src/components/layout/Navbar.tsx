@@ -9,12 +9,15 @@ import { NavbarUserDropdown } from "@/components/layout/NavbarUserDropdown";
 import { NavbarTelemetry } from "@/components/layout/NavbarTelemetry";
 import { CreditBalanceIndicator } from "@/components/billing/CreditBalanceIndicator";
 import { getCreditBalance } from "@/dal/billing.dal";
+import { cacheTag } from "next/cache";
+import { NAVBAR_TAG, BILLING_TAG } from "@/lib/cache-tags";
 
 interface NavbarProps {
   userId?: string;
   userEmail?: string | null;
   userName?: string | null;
   isAdmin?: boolean;
+  locale?: string;
 }
 
 /** Loads account navigation data and renders the responsive dashboard navbar. */
@@ -23,8 +26,15 @@ export async function Navbar({
   userEmail,
   userName,
   isAdmin = false,
+  locale = "en",
 }: NavbarProps) {
-  const t = await getTranslations("nav");
+  "use cache";
+  cacheTag(NAVBAR_TAG);
+  if (userId) {
+    cacheTag(BILLING_TAG);
+  }
+
+  const t = await getTranslations({ locale, namespace: "nav" });
 
   const balanceRes = userId ? await getCreditBalance(userId) : null;
   const creditBalance = balanceRes?.ok ? balanceRes.value : 0;

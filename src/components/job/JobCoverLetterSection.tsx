@@ -10,6 +10,7 @@ import {
   Edit3,
   Save,
   Check,
+  X,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCoverLetter } from "./useCoverLetter";
@@ -44,7 +45,8 @@ export function JobCoverLetterSection({
     setCoverLetter,
     isSaving,
     isEditing,
-    setIsEditing,
+    handleStartEditing,
+    handleCancelEdit,
     isCopied,
     hasCoverLetter,
     handleGenerateStream,
@@ -164,8 +166,9 @@ export function JobCoverLetterSection({
               onClick={() => {
                 if (isEditing) {
                   handleSave();
+                } else {
+                  handleStartEditing();
                 }
-                setIsEditing(!isEditing);
               }}
               disabled={isSaving || isStreaming}
               className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer disabled:opacity-50 font-sans"
@@ -183,6 +186,18 @@ export function JobCoverLetterSection({
                   : t("editDraft")}
               </span>
             </button>
+
+            {isEditing && (
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                disabled={isSaving || isStreaming}
+                className="text-sm font-medium text-muted-foreground hover:text-foreground dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer disabled:opacity-50 font-sans"
+              >
+                <X className="size-3.5 shrink-0" />
+                <span>{tCommon("cancel")}</span>
+              </button>
+            )}
 
             <button
               type="button"

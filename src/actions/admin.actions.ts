@@ -9,7 +9,7 @@ import {
   getAdminFeatureFlagAssignments,
   type FeatureFlagAssignmentWithUser,
 } from "@/services/flags";
-import { revalidatePath } from "next/cache";
+import { SETTINGS_TAG, ADMIN_OVERVIEW_TAG, revalidateTags } from "@/lib/cache-tags";
 import { z } from "zod";
 
 const searchUsersSchema = z.object({
@@ -86,8 +86,7 @@ export async function setUserFlagOverrideAction(
   );
 
   if (res.success) {
-    revalidatePath("/dashboard/settings");
-    revalidatePath("/dashboard/admin");
+    revalidateTags([SETTINGS_TAG, ADMIN_OVERVIEW_TAG]);
   }
 
   return res;
@@ -122,8 +121,7 @@ export async function removeUserFlagOverrideAction(
   );
 
   if (res.success) {
-    revalidatePath("/dashboard/settings");
-    revalidatePath("/dashboard/admin");
+    revalidateTags([SETTINGS_TAG, ADMIN_OVERVIEW_TAG]);
   }
 
   return res;
@@ -154,8 +152,7 @@ export async function setGlobalFlagAction(
   const res = await setGlobalFlagState(parsed.data.flagKey, parsed.data.enabled);
 
   if (res.success) {
-    revalidatePath("/dashboard/settings");
-    revalidatePath("/dashboard/admin");
+    revalidateTags([SETTINGS_TAG, ADMIN_OVERVIEW_TAG]);
   }
 
   return res;

@@ -11,6 +11,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
+    "seed:billing": "NODE_OPTIONS='--conditions=react-server' tsx scripts/seed-billing.ts",
     "crawl": "NODE_OPTIONS='--conditions=react-server' tsx scripts/crawl.ts",
     "backfill:embeddings": "NODE_OPTIONS='--conditions=react-server' tsx scripts/backfill-embeddings.ts",
     "verify:hnsw": "NODE_OPTIONS='--conditions=react-server' tsx scripts/verify-hnsw.ts",

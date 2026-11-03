@@ -6,7 +6,7 @@ import * as billingDal from "@/dal/billing.dal";
 import { seedBillingDefaultsIfEmpty } from "@/dal/billing-seed.dal";
 import * as billingService from "@/services/billing/billing.service";
 import { getPaymentProvider } from "@/services/billing/provider-factory";
-import { revalidatePath } from "next/cache";
+import { BILLING_TAG, NAVBAR_TAG, revalidateTags } from "@/lib/cache-tags";
 
 const initiatePurchaseSchema = z.object({
   creditPackId: z.string().uuid("Invalid credit pack ID"),
@@ -77,6 +77,8 @@ export async function initiateCreditPurchaseAction(input: {
     return { success: false, error: parsed.error.issues[0]?.message || "Invalid input" };
   }
 
+  await seedBillingDefaultsIfEmpty();
+
   const userId = session.value.user.id;
   const res = await billingService.initiateCreditPurchase(
     userId,
@@ -89,7 +91,7 @@ export async function initiateCreditPurchaseAction(input: {
     return { success: false, error: res.error.message };
   }
 
-  revalidatePath("/dashboard/billing");
+  revalidateTags([BILLING_TAG, NAVBAR_TAG]);
   return { success: true, data: res.value };
 }
 
@@ -122,8 +124,46 @@ export async function checkPurchaseStatusAction(providerReference: string) {
     return { success: false, error: "Payment reference not found or access denied" };
   }
 
+  // Auto-confirm mock provider payments if elapsed >= 2000ms
+  if (parsed.data.providerReference.startsWith("mock_")) {
+    if (isPurchaseOwner && purchaseRes.value && purchaseRes.value.status === "pending") {
+      const elapsed = Date.now() - new Date(purchaseRes.value.createdAt).getTime();
+      if (elapsed >= 2000) {
+        await billingService.confirmCreditPurchase(parsed.data.providerReference);
+      }
+    } else if (isSubOwner && subRes.value && subRes.value.status === "past_due") {
+      const elapsed = Date.now() - new Date(subRes.value.createdAt).getTime();
+      if (elapsed >= 2000) {
+        await billingService.confirmSubscription(parsed.data.providerReference);
+      }
+    }
+  }
+
   const provider = getPaymentProvider();
   const status = await provider.checkPurchaseStatus(parsed.data.providerReference);
+
+  if (status === "confirmed") {
+    if (isPurchaseOwner && purchaseRes.value && purchaseRes.value.status !== "confirmed") {
+      await billingService.confirmCreditPurchase(parsed.data.providerReference);
+    } else if (isSubOwner && subRes.value && subRes.value.status !== "active") {
+      await billingService.confirmSubscription(parsed.data.providerReference);
+    }
+
+    revalidateTags([BILLING_TAG, NAVBAR_TAG]);
+
+    const [balanceRes, latestSubRes] = await Promise.all([
+      billingDal.getCreditBalance(userId),
+      billingDal.getUserSubscription(userId),
+    ]);
+    return {
+      success: true,
+      data: {
+        status: "confirmed" as const,
+        balance: balanceRes.ok ? balanceRes.value : undefined,
+        subscription: latestSubRes.ok ? latestSubRes.value : undefined,
+      },
+    };
+  }
 
   return { success: true, data: { status } };
 }
@@ -144,6 +184,8 @@ export async function initiateSubscriptionAction(input: {
     return { success: false, error: parsed.error.issues[0]?.message || "Invalid input" };
   }
 
+  await seedBillingDefaultsIfEmpty();
+
   const userId = session.value.user.id;
   const res = await billingService.initiateSubscription(
     userId,
@@ -156,7 +198,7 @@ export async function initiateSubscriptionAction(input: {
     return { success: false, error: res.error.message };
   }
 
-  revalidatePath("/dashboard/billing");
+  revalidateTags([BILLING_TAG, NAVBAR_TAG]);
   return { success: true, data: res.value };
 }
 
@@ -174,7 +216,7 @@ export async function cancelSubscriptionAction() {
     return { success: false, error: res.error.message };
   }
 
-  revalidatePath("/dashboard/billing");
+  revalidateTags([BILLING_TAG, NAVBAR_TAG]);
   return { success: true, data: res.value };
 }
 

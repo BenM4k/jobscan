@@ -3,9 +3,7 @@ import { headers } from "next/headers";
 import { requireSession } from "@/lib/auth-guard";
 import { redirect } from "next/navigation";
 import { auth } from "@/services/auth/auth";
-import { getUserFeatureFlags } from "@/services/flags";
-import { getUserAiUsage } from "@/services/ai/usage.service";
-import * as growthDal from "@/dal/growth.dal";
+import { getCachedUserFlags, getCachedUserPreferences, getCachedAiUsage } from "@/lib/cached-data";
 import * as authDal from "@/dal/auth.dal";
 import { AccountSettingsCard } from "@/components/settings/AccountSettingsCard";
 import { SessionManagementCard } from "@/components/settings/SessionManagementCard";
@@ -37,9 +35,9 @@ async function SettingsContent() {
 
   // Fetch user flags, preferences, AI usage, sessions, and passkeys concurrently on server
   const [flags, prefResult, aiUsageResult, sessionsResult, passkeysResult] = await Promise.all([
-    getUserFeatureFlags(user.id),
-    growthDal.getUserPreferences(user.id),
-    getUserAiUsage(user.id),
+    getCachedUserFlags(user.id),
+    getCachedUserPreferences(user.id),
+    getCachedAiUsage(user.id),
     authDal.getActiveSessionsForUser(user.id),
     authDal.getUserPasskeys(user.id),
   ]);

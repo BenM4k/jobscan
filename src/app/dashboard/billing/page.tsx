@@ -1,7 +1,7 @@
 import React, { Suspense } from "react";
 import { requireSession } from "@/lib/auth-guard";
 import { redirect } from "next/navigation";
-import * as billingDal from "@/dal/billing.dal";
+import { getCachedBillingData } from "@/lib/cached-data";
 import { BillingDashboardView } from "@/components/billing/BillingDashboardView";
 import { BillingSkeleton } from "@/components/billing/BillingSkeleton";
 
@@ -20,29 +20,15 @@ async function BillingContent() {
 
   const userId = session.value.user.id;
 
-  const [balanceRes, subRes, packsRes, plansRes, ledgerRes] = await Promise.all(
-    [
-      billingDal.getCreditBalance(userId),
-      billingDal.getUserSubscription(userId),
-      billingDal.getCreditPacks(true),
-      billingDal.getSubscriptionPlans(true),
-      billingDal.getCreditLedger(userId, 50),
-    ],
-  );
-
-  const balance = balanceRes.ok ? balanceRes.value : 0;
-  const subscription = subRes.ok ? subRes.value : null;
-  const packs = packsRes.ok ? packsRes.value : [];
-  const plans = plansRes.ok ? plansRes.value : [];
-  const ledger = ledgerRes.ok ? ledgerRes.value : [];
+  const data = await getCachedBillingData(userId);
 
   return (
     <BillingDashboardView
-      initialBalance={balance}
-      initialSubscription={subscription}
-      packs={packs}
-      plans={plans}
-      initialLedger={ledger}
+      initialBalance={data.balance}
+      initialSubscription={data.subscription}
+      packs={data.packs}
+      plans={data.plans}
+      initialLedger={data.ledger}
     />
   );
 }

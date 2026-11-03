@@ -1,13 +1,13 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { AlertCircle } from "lucide-react";
-import { getUserAiUsage } from "@/services/ai/usage.service";
 import { requireSession } from "@/lib/auth-guard";
 import { redirect } from "next/navigation";
 import { ProfileForm } from "@/components/ProfileForm";
-import * as resumeDal from "@/dal/resume.dal";
 import { parseResumeContent } from "@/lib/resume-format";
+import { getCachedActiveResume, getCachedResumeSkills, getCachedAiUsage } from "@/lib/cached-data";
 import { ProfileSkeleton } from "@/components/profile/ProfileSkeleton";
+
 
 function ProfileErrorState({
   title,
@@ -57,8 +57,8 @@ async function ProfileFormContent() {
   const userId = sessionResult.value.user.id;
 
   const [activeResumeResult, aiUsageResult] = await Promise.all([
-    resumeDal.getActiveMasterResume(userId),
-    getUserAiUsage(userId),
+    getCachedActiveResume(userId),
+    getCachedAiUsage(userId),
   ]);
 
   if (!activeResumeResult.ok) {
@@ -76,7 +76,7 @@ async function ProfileFormContent() {
 
   let skills: string[] = [];
   if (activeResume) {
-    const skillsRes = await resumeDal.getResumeSkills(activeResume.id);
+    const skillsRes = await getCachedResumeSkills(activeResume.id);
     if (!skillsRes.ok) {
       return (
         <ProfileErrorState

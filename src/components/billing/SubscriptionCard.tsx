@@ -15,7 +15,7 @@ import { Crown, Check, Loader2, Phone, Sparkles } from "lucide-react";
 interface SubscriptionSectionProps {
   plan?: SubscriptionPlanSelect | null;
   subscription?: SubscriptionSelect | null;
-  onSubscriptionUpdated?: () => void;
+  onSubscriptionUpdated?: (newSub?: SubscriptionSelect | null) => void;
 }
 
 /** Displays subscription plans and manages subscription purchase or cancellation. */
@@ -55,7 +55,7 @@ export function SubscriptionSection({
           setPollingRef(null);
           toast.success(t("subActivated"));
           idempotencyKeyRef.current = crypto.randomUUID();
-          onSubscriptionUpdated?.();
+          onSubscriptionUpdated?.(res.data.subscription);
         } else if (res.data.status === "failed") {
           setSubStatus("failed");
           setPollingRef(null);
@@ -69,7 +69,7 @@ export function SubscriptionSection({
   }, [pollingRef, subStatus, onSubscriptionUpdated, t]);
 
   const handleSubscribe = async () => {
-    if (!plan) return;
+    const planId = plan?.id || "pro";
     if (!phoneNumber.trim()) {
       toast.error(t("phoneRequired"));
       return;
@@ -78,7 +78,7 @@ export function SubscriptionSection({
     try {
       setIsInitiating(true);
       const res = await initiateSubscriptionAction({
-        planId: plan.id,
+        planId,
         phoneNumber: phoneNumber.trim(),
         idempotencyKey: idempotencyKeyRef.current,
       });
@@ -217,12 +217,18 @@ export function SubscriptionSection({
               placeholder={t("phoneNumberPlaceholder")}
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleSubscribe();
+                }
+              }}
               className="w-full pl-10 pr-3.5 h-10 rounded-lg border border-input bg-transparent text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
             />
           </div>
           <Button
             onClick={handleSubscribe}
-            disabled={isInitiating || !phoneNumber}
+            disabled={isInitiating || !phoneNumber.trim()}
             className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold h-10 px-6 rounded-lg shrink-0 shadow-xs transition-colors"
           >
             {isInitiating ? (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { JobSelect } from "@/dal/jobs.dal";
 import { toast } from "sonner";
 import posthog from "posthog-js";
@@ -16,9 +17,28 @@ interface UseTailoredResumeOptions {
 
 /** Manages tailored-resume generation, persistence, clipboard state, and credit errors. */
 export function useTailoredResume({ job, onJobUpdated, selectedResumeId }: UseTailoredResumeOptions) {
+  const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editedResume, setEditedResume] = useState(job.tailoredResume || "");
+  const [prevResume, setPrevResume] = useState(job.tailoredResume);
+
+  if (job.tailoredResume !== prevResume) {
+    setPrevResume(job.tailoredResume);
+    if (!isEditing) {
+      setEditedResume(job.tailoredResume || "");
+    }
+  }
+
+  const handleStartEditing = () => {
+    setEditedResume(job.tailoredResume || "");
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setEditedResume(job.tailoredResume || "");
+    setIsEditing(false);
+  };
   const [isCopied, setIsCopied] = useState(false);
   const [isInsufficientCreditsOpen, setIsInsufficientCreditsOpen] = useState(false);
   const [insufficientCreditsData, setInsufficientCreditsData] = useState<{
@@ -95,6 +115,7 @@ export function useTailoredResume({ job, onJobUpdated, selectedResumeId }: UseTa
       posthog.capture("tailored_resume_generated");
       setEditedResume(result.tailoredResume);
       onJobUpdated(result.data);
+      router.refresh();
     }
   };
 
@@ -115,6 +136,7 @@ export function useTailoredResume({ job, onJobUpdated, selectedResumeId }: UseTa
       const { data } = await res.json();
       posthog.capture("tailored_resume_saved");
       onJobUpdated(data);
+      setIsEditing(false);
       toast.success("Tailored resume saved");
     } catch (err) {
       console.error(err);
@@ -163,6 +185,8 @@ export function useTailoredResume({ job, onJobUpdated, selectedResumeId }: UseTa
     isSaving,
     isEditing,
     setIsEditing,
+    handleStartEditing,
+    handleCancelEdit,
     editedResume,
     setEditedResume,
     isCopied,

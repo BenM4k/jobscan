@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { getAdminOverview } from "@/services/admin/admin.service";
+import { getCachedAdminOverview } from "@/lib/cached-data";
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import {
   Users,
@@ -27,7 +27,7 @@ function OverviewSkeleton() {
 }
 
 async function OverviewContent() {
-  const statsRes = await getAdminOverview();
+  const statsRes = await getCachedAdminOverview();
   const stats = statsRes.ok
     ? statsRes.value
     : {

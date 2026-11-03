@@ -14,6 +14,12 @@ import {
   buildCoverLetterPrompt,
 } from "@/services/tailoring.service";
 import { coverLetterPromptFieldsSchema } from "@/actions/job.schema";
+import {
+  jobTag,
+  BILLING_TAG,
+  NAVBAR_TAG,
+  revalidateTags,
+} from "@/lib/cache-tags";
 
 /** Streams a newly generated cover letter after authentication and credit checks. */
 export async function POST(
@@ -318,6 +324,7 @@ export async function POST(
         isRefunded = true;
         try {
           await grantCredits(userId, creditCost, "refund", id);
+          revalidateTags([BILLING_TAG, NAVBAR_TAG]);
         } catch (refundErr) {
           console.error("Failed to refund credits for cover letter:", refundErr);
         }
@@ -363,6 +370,8 @@ export async function POST(
               activeResume.id,
               diffFromPrevious
             );
+
+            revalidateTags([jobTag(job.id), BILLING_TAG, NAVBAR_TAG]);
 
             await opsDal.logAiCall({
               userId,
@@ -463,6 +472,8 @@ export async function PUT(
         { status: 500 },
       );
     }
+
+    revalidateTags(jobTag(id));
 
     return NextResponse.json({ success: true, data: updateRes.value });
   } catch (error) {
