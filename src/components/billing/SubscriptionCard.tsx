@@ -89,6 +89,11 @@ export function SubscriptionSection({
         return;
       }
 
+      if (res.data.checkoutUrl) {
+        window.location.href = res.data.checkoutUrl;
+        return;
+      }
+
       setSubStatus("pending");
       setPollingRef(res.data.providerReference);
     } catch {

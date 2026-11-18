@@ -18,6 +18,8 @@ import { mockPaymentInitiatedEvent } from "@/inngest/events";
  * after a 3-second delay mimicking an asynchronous payment webhook callback.
  */
 export class MockMobileMoneyProvider implements PaymentProvider {
+  readonly name = "mock_mobile_money";
+
   /** Starts a simulated credit purchase and schedules asynchronous confirmation. */
   async initiateCreditPurchase(
     params: InitiateCreditPurchaseParams

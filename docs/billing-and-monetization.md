@@ -60,13 +60,25 @@ export interface PaymentProvider {
 }
 ```
 
+### SasPayProvider
+
+[`SasPayProvider`](../src/services/billing/saspay/saspay-provider.ts) integrates with the official [SasPay REST API v1](https://api.saspay.me/api/v1) for African mobile money networks (Airtel Money, Vodacom M-Pesa, Orange Money in DRC; MTN, MoMo, Wave in West & Central Africa) and card payments:
+- **Base URL:** `https://api.saspay.me/api/v1` (configured via `SASPAY_BASE_URL`).
+- **Authentication:** `Authorization: Bearer $SASPAY_API_KEY` (`sk_test_...` in dev, `sk_live_...` in prod). Server-only.
+- **Amounts:** Strictly formatted as 2-decimal strings (`(cents / 100).toFixed(2)`), never floating-point numbers.
+- **Idempotency:** Generates unique client UUID `Idempotency-Key` headers on `POST /payments/softpay/`, `POST /payouts/initialize/`, and `POST /payments/{id}/retry/`.
+- **Softpay & Hosted Checkout:** If `checkout_url` is returned (e.g. Wave, Orange Money, Djamo, cards), the client UI immediately redirects to the hosted payment page.
+- **Verification Gate:** `checkPurchaseStatus` queries `GET /payments/{payment_id}/verify/` and only resolves `"confirmed"` when status is strictly `"SUCCESS"`.
+- **Webhooks:** Inbound webhook route at `/api/webhooks/saspay` verifies `X-Webhook-Signature` (HMAC SHA-256) and `X-Webhook-Timestamp` (< 300s window) on the raw payload stream using constant-time comparison before confirming transactions atomically and idempotently.
+- **Config Verification:** Health check script `scripts/verify-saspay-config.ts` validates API credentials and rate limits.
+
 ### MockMobileMoneyProvider
 
 In development and initial rollout, [`MockMobileMoneyProvider`](../src/services/billing/mock-provider.ts) provides a drop-in implementation:
 - Returns `status: "pending"` with a mock reference (`mock_cc_*` or `mock_sub_*`).
 - Emits an Inngest event (`mock.payment.initiated`) and runs a background fallback timer that triggers the internal atomic confirmation handler after 3 seconds.
 - `checkPurchaseStatus` reads directly from the database table (never in-memory).
-- The provider factory [`getPaymentProvider()`](../src/services/billing/provider-factory.ts) reads `PAYMENT_PROVIDER=mock`, allowing replacement with a real payment gateway by changing the environment variable and implementing `PaymentProvider`.
+- The provider factory [`getPaymentProvider()`](../src/services/billing/provider-factory.ts) reads `PAYMENT_PROVIDER` (`"saspay"` or `"mock"`).
 
 ---
 

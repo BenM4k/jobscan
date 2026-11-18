@@ -12,12 +12,14 @@ export interface InitiateCreditPurchaseResult {
   purchaseId: string;
   providerReference: string;
   status: "pending" | "confirmed" | "failed";
+  checkoutUrl?: string;
 }
 
 export interface InitiateSubscriptionResult {
   userId: string;
   providerReference: string;
   status: "pending" | "confirmed" | "failed";
+  checkoutUrl?: string;
 }
 
 /**
@@ -75,6 +77,13 @@ export async function initiateCreditPurchase(
   creditPackId: string,
   phoneNumber: string,
   idempotencyKey: string,
+  customerDetails?: {
+    userEmail?: string;
+    userName?: string;
+    country?: string;
+    network?: string;
+    returnUrl?: string;
+  }
 ): Promise<Result<InitiateCreditPurchaseResult, AppError>> {
   const packRes = await billingDal.getCreditPackById(creditPackId);
   if (!packRes.ok || !packRes.value) {
@@ -97,7 +106,7 @@ export async function initiateCreditPurchase(
   const purchaseRes = await billingDal.createCreditPurchase({
     userId,
     creditPackId: pack.id,
-    provider: "mock_mobile_money",
+    provider: provider.name,
     idempotencyKey,
   });
 
@@ -123,12 +132,28 @@ export async function initiateCreditPurchase(
   }
 
   // Initiate transaction with payment provider
-  const initiateRes = await provider.initiateCreditPurchase({
-    userId,
-    creditPackId: pack.id,
-    amountCents: pack.priceCents,
-    phoneNumber,
-  });
+  let initiateRes;
+  try {
+    initiateRes = await provider.initiateCreditPurchase({
+      userId,
+      creditPackId: pack.id,
+      amountCents: pack.priceCents,
+      phoneNumber,
+      userEmail: customerDetails?.userEmail,
+      userName: customerDetails?.userName,
+      country: customerDetails?.country,
+      network: customerDetails?.network,
+      returnUrl: customerDetails?.returnUrl,
+    });
+  } catch (providerError) {
+    console.error(`[Billing Service] Provider payment initiation failed for user ${userId}:`, providerError);
+    const message =
+      providerError instanceof AppError
+        ? providerError.message
+        : "Payment provider error. Please check your phone number or try again.";
+    const code = providerError instanceof AppError ? providerError.code : "EXTERNAL_API_ERROR";
+    return err(new AppError(code, message, providerError));
+  }
 
   const updateRefRes = await billingDal.updateCreditPurchaseReference(
     purchase.id,
@@ -162,6 +187,7 @@ export async function initiateCreditPurchase(
     purchaseId: purchase.id,
     providerReference: initiateRes.providerReference,
     status: initiateRes.status,
+    checkoutUrl: initiateRes.checkoutUrl,
   });
 }
 
@@ -216,6 +242,13 @@ export async function initiateSubscription(
   planId: string,
   phoneNumber: string,
   idempotencyKey: string,
+  customerDetails?: {
+    userEmail?: string;
+    userName?: string;
+    country?: string;
+    network?: string;
+    returnUrl?: string;
+  }
 ): Promise<Result<InitiateSubscriptionResult, AppError>> {
   const plansRes = await billingDal.getSubscriptionPlans(true);
   if (!plansRes.ok) return err(plansRes.error);
@@ -231,7 +264,7 @@ export async function initiateSubscription(
   const subRes = await billingDal.createOrUpdateSubscription({
     userId,
     planId: plan.id,
-    provider: "mock_mobile_money",
+    provider: provider.name,
     idempotencyKey,
   });
 
@@ -245,12 +278,28 @@ export async function initiateSubscription(
     });
   }
 
-  const initiateRes = await provider.initiateSubscription({
-    userId,
-    planId: plan.id,
-    amountCents: plan.priceCentsMonthly,
-    phoneNumber,
-  });
+  let initiateRes;
+  try {
+    initiateRes = await provider.initiateSubscription({
+      userId,
+      planId: plan.id,
+      amountCents: plan.priceCentsMonthly,
+      phoneNumber,
+      userEmail: customerDetails?.userEmail,
+      userName: customerDetails?.userName,
+      country: customerDetails?.country,
+      network: customerDetails?.network,
+      returnUrl: customerDetails?.returnUrl,
+    });
+  } catch (providerError) {
+    console.error(`[Billing Service] Provider subscription initiation failed for user ${userId}:`, providerError);
+    const message =
+      providerError instanceof AppError
+        ? providerError.message
+        : "Payment provider error. Please check your phone number or try again.";
+    const code = providerError instanceof AppError ? providerError.code : "EXTERNAL_API_ERROR";
+    return err(new AppError(code, message, providerError));
+  }
 
   const updateRefRes = await billingDal.updateSubscriptionReference(
     userId,
@@ -284,6 +333,7 @@ export async function initiateSubscription(
     userId,
     providerReference: initiateRes.providerReference,
     status: initiateRes.status,
+    checkoutUrl: initiateRes.checkoutUrl,
   });
 }
 

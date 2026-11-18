@@ -92,6 +92,11 @@ export function CreditPurchaseSection({
         return;
       }
 
+      if (res.data.checkoutUrl) {
+        window.location.href = res.data.checkoutUrl;
+        return;
+      }
+
       setPurchaseStatus("pending");
       setPollingRef(res.data.providerReference);
     } catch {
