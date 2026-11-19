@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useId } from "react";
 import { useRouter } from "next/navigation";
 import {
   Dialog,
@@ -39,6 +39,8 @@ export function GiftSubscriptionDialog({
   onClose,
 }: GiftSubscriptionDialogProps) {
   const router = useRouter();
+  const durationInputId = useId();
+  const reasonInputId = useId();
   const [durationDays, setDurationDays] = useState<number>(30);
   const [reason, setReason] = useState<string>("");
   const [isPending, startTransition] = useTransition();
@@ -49,6 +51,10 @@ export function GiftSubscriptionDialog({
     e.preventDefault();
     if (!durationDays || durationDays < 1 || durationDays > 730) {
       toast.error("Please enter a valid duration between 1 and 730 days");
+      return;
+    }
+    if (reason.trim().length > 255) {
+      toast.error("Reason / admin memo must be 255 characters or fewer");
       return;
     }
 
@@ -125,10 +131,14 @@ export function GiftSubscriptionDialog({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-slate-700 dark:text-zinc-300">
+            <label
+              htmlFor={durationInputId}
+              className="text-xs font-medium text-slate-700 dark:text-zinc-300"
+            >
               Custom Days (1 - 730)
             </label>
             <input
+              id={durationInputId}
               type="number"
               min={1}
               max={730}
@@ -140,11 +150,16 @@ export function GiftSubscriptionDialog({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-slate-700 dark:text-zinc-300">
+            <label
+              htmlFor={reasonInputId}
+              className="text-xs font-medium text-slate-700 dark:text-zinc-300"
+            >
               Reason / Admin Memo (Optional)
             </label>
             <input
+              id={reasonInputId}
               type="text"
+              maxLength={255}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="e.g. VIP promotion, community reward, support resolution"

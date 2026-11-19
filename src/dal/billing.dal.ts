@@ -643,6 +643,7 @@ export async function createOrUpdateSubscription(data: {
 
 /**
  * Atomically marks subscription active with 1 month period.
+ * If user currently has an active gifted subscription, extends from currentPeriodEnd.
  */
 export async function confirmSubscriptionAtomic(
   providerSubscriptionId: string
@@ -662,18 +663,41 @@ export async function confirmSubscriptionAtomic(
         return err(new AppError("NOT_FOUND", "Subscription record not found"));
       }
 
-      if (sub.status === "active" && sub.currentPeriodEnd > new Date()) {
+      const now = new Date();
+      const isCurrentlyActive = sub.status === "active" && sub.currentPeriodEnd > now;
+      const isGiftActive = sub.provider === "admin_gift";
+
+      // If active from a previous paid confirmation, avoid double-confirmation.
+      // But if active from an admin gift, grant the purchased 30-day period.
+      if (isCurrentlyActive && !isGiftActive) {
         return ok({ subscription: sub, alreadyConfirmed: true });
       }
 
-      const nextPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      // Preserve active period (e.g. gifted or unexpired time) by extending from currentPeriodEnd
+      const baseTime = isCurrentlyActive ? sub.currentPeriodEnd.getTime() : now.getTime();
+      const nextPeriodEnd = new Date(baseTime + 30 * 24 * 60 * 60 * 1000);
+
+      const existingRefs = sub.providerSubscriptionId
+        ? sub.providerSubscriptionId.split(",").map((r) => r.trim()).filter(Boolean)
+        : [];
+      if (!existingRefs.includes(providerSubscriptionId)) {
+        existingRefs.push(providerSubscriptionId);
+      }
+
+      const resolvedProvider = providerSubscriptionId.startsWith("mock_")
+        ? "mock"
+        : sub.provider !== "admin_gift"
+        ? sub.provider
+        : "saspay";
+
       const [updated] = await tx
         .update(subscription)
         .set({
           status: "active",
           currentPeriodEnd: nextPeriodEnd,
-          providerSubscriptionId,
-          updatedAt: new Date(),
+          provider: resolvedProvider,
+          providerSubscriptionId: existingRefs.join(","),
+          updatedAt: now,
         })
         .where(eq(subscription.userId, sub.userId))
         .returning();
@@ -691,6 +715,7 @@ export async function confirmSubscriptionAtomic(
  * Atomically grants or extends an active subscription for a user (Admin Gift).
  * If user already has an active subscription, extends currentPeriodEnd by durationDays.
  * If user has no active subscription, activates plan until (now + durationDays).
+ * Serializes concurrent operations using a transactional advisory lock on userId.
  */
 export async function giftSubscriptionAtomic(params: {
   userId: string;
@@ -698,6 +723,7 @@ export async function giftSubscriptionAtomic(params: {
   durationDays: number;
   adminUserId: string;
   reason?: string;
+  idempotencyKey?: string;
 }): Promise<
   Result<
     { subscription: SubscriptionSelect; previousStatus: string | null; newPeriodEnd: Date },
@@ -706,6 +732,11 @@ export async function giftSubscriptionAtomic(params: {
 > {
   try {
     return await db.transaction(async (tx) => {
+      // Serialize concurrent gifts for the same user
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext('subscription_' || ${params.userId}))`
+      );
+
       const [existing] = await tx
         .select()
         .from(subscription)
@@ -719,6 +750,15 @@ export async function giftSubscriptionAtomic(params: {
       let previousStatus: string | null = null;
 
       if (existing) {
+        // Idempotent retry: return existing state without re-extending
+        if (params.idempotencyKey && existing.idempotencyKey === params.idempotencyKey) {
+          return ok({
+            subscription: existing,
+            previousStatus: existing.status,
+            newPeriodEnd: existing.currentPeriodEnd,
+          });
+        }
+
         previousStatus = existing.status;
         const isCurrentlyActive =
           existing.status === "active" && existing.currentPeriodEnd > now;
@@ -738,7 +778,15 @@ export async function giftSubscriptionAtomic(params: {
               .map((r) => r.trim())
               .filter(Boolean)
           : [];
-        existingRefs.push(giftRef);
+        if (!existingRefs.includes(giftRef)) {
+          existingRefs.push(giftRef);
+        }
+
+        // Keep paid provider if active; otherwise mark as admin_gift
+        const resolvedProvider =
+          isCurrentlyActive && existing.provider && existing.provider !== "admin_gift"
+            ? existing.provider
+            : "admin_gift";
 
         const [updated] = await tx
           .update(subscription)
@@ -746,8 +794,9 @@ export async function giftSubscriptionAtomic(params: {
             planId: params.planId,
             status: "active",
             currentPeriodEnd: newPeriodEnd,
-            provider: "admin_gift",
+            provider: resolvedProvider,
             providerSubscriptionId: existingRefs.join(","),
+            idempotencyKey: params.idempotencyKey || existing.idempotencyKey,
             updatedAt: now,
           })
           .where(eq(subscription.userId, params.userId))
@@ -769,6 +818,7 @@ export async function giftSubscriptionAtomic(params: {
           currentPeriodEnd: newPeriodEnd,
           provider: "admin_gift",
           providerSubscriptionId: giftRef,
+          idempotencyKey: params.idempotencyKey || null,
           updatedAt: now,
         })
         .returning();

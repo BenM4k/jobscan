@@ -80,15 +80,24 @@ async function runAdminGiftSubTests() {
 
     // 2. Test Admin Gifting Subscription (New Sub)
     console.log("- Testing giftSubscriptionToUser (fresh 30-day gift)...");
+    const beforeGift1 = Date.now();
     const gift1 = await adminService.giftSubscriptionToUser(
       adminUserId,
       targetUserId,
       30,
       "Promotion welcome gift"
     );
+    const afterGift1 = Date.now();
     assert(gift1.ok, `giftSubscriptionToUser should succeed: ${gift1.ok ? "" : gift1.error.message}`);
     assert(gift1.value.targetUserId === targetUserId, "Target user ID should match");
     assert(gift1.value.planName === "Jobpilot Pro", "Plan should be Jobpilot Pro");
+
+    const expected30DaysMs = 30 * 24 * 60 * 60 * 1000;
+    assert(
+      gift1.value.newPeriodEnd.getTime() >= beforeGift1 + expected30DaysMs &&
+        gift1.value.newPeriodEnd.getTime() <= afterGift1 + expected30DaysMs,
+      "gift1 newPeriodEnd should fall within bounds plus 30 days"
+    );
 
     const sub1 = await billingDal.getUserSubscription(targetUserId);
     assert(sub1.ok && Boolean(sub1.value), "Subscription record must exist in DB");
@@ -120,6 +129,33 @@ async function runAdminGiftSubTests() {
     assert(
       Math.abs(extendedPeriodEnd - expectedExtendedEndApprox) < 1000,
       "Period end should be extended by exactly 60 days"
+    );
+
+    // 4. Test Idempotency Key Handling
+    console.log("- Testing giftSubscriptionToUser idempotency retry...");
+    const idemKey = `test_idem_${Date.now()}`;
+    const giftWithKey = await adminService.giftSubscriptionToUser(
+      adminUserId,
+      targetUserId,
+      15,
+      "Idempotent gift",
+      idemKey
+    );
+    assert(giftWithKey.ok, "Initial idempotent gift should succeed");
+    const periodAfterFirstIdem = giftWithKey.value.newPeriodEnd.getTime();
+
+    // Retry with same idempotency key - should NOT extend period again
+    const giftRetry = await adminService.giftSubscriptionToUser(
+      adminUserId,
+      targetUserId,
+      15,
+      "Idempotent gift retry",
+      idemKey
+    );
+    assert(giftRetry.ok, "Idempotent retry should succeed");
+    assert(
+      giftRetry.value.newPeriodEnd.getTime() === periodAfterFirstIdem,
+      "Idempotent retry must not add additional days"
     );
 
     // Test duration validation

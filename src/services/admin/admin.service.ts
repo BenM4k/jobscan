@@ -142,7 +142,8 @@ export async function giftSubscriptionToUser(
   adminUserId: string,
   targetUserId: string,
   durationDays: number = 30,
-  reason?: string
+  reason?: string,
+  idempotencyKey?: string
 ): Promise<
   Result<{ targetUserId: string; newPeriodEnd: Date; planName: string }, AppError>
 > {
@@ -169,6 +170,7 @@ export async function giftSubscriptionToUser(
     durationDays,
     adminUserId,
     reason,
+    idempotencyKey,
   });
 
   if (!giftRes.ok) {
@@ -176,16 +178,40 @@ export async function giftSubscriptionToUser(
   }
 
   // 1. Grant hybrid scoring feature flag override
-  await setUserFeatureFlagOverride(
+  const flagRes = await setUserFeatureFlagOverride(
     targetUserId,
     FEATURE_FLAGS.HYBRID_SCORING,
     true
   );
+  if (!flagRes.success) {
+    console.error(
+      `[Admin] Failed to set hybrid scoring flag for ${targetUserId}:`,
+      flagRes.error
+    );
+    return err(
+      new AppError(
+        "INTERNAL_ERROR",
+        `Subscription granted but failed to activate Pro features: ${flagRes.error || "Unknown error"}`
+      )
+    );
+  }
 
   // 2. Grant daily digest email frequency
-  await upsertUserPreferences(targetUserId, {
+  const prefRes = await upsertUserPreferences(targetUserId, {
     digestEmailFrequency: "daily",
   });
+  if (!prefRes.ok) {
+    console.error(
+      `[Admin] Failed to update user preferences for ${targetUserId}:`,
+      prefRes.error
+    );
+    return err(
+      new AppError(
+        "INTERNAL_ERROR",
+        `Subscription granted but failed to update preferences: ${prefRes.error.message}`
+      )
+    );
+  }
 
   console.log(
     `[Admin] Admin ${adminUserId} gifted a ${durationDays}-day ${plan.name} subscription to user ${targetUserId}. Reason: ${reason || "none"}`

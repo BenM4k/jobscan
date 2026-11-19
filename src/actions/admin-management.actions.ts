@@ -31,7 +31,11 @@ const grantCreditsSchema = z.object({
 const giftSubscriptionSchema = z.object({
   targetUserId: z.string().uuid(),
   durationDays: z.number().int().min(1).max(730).default(30),
-  reason: z.string().max(255).optional(),
+  reason: z
+    .string()
+    .max(255, "Reason / admin memo must be 255 characters or fewer")
+    .optional(),
+  idempotencyKey: z.string().optional(),
 });
 
 export type AdminActionResult<T = undefined> =
@@ -156,7 +160,8 @@ export async function adminGrantCreditsAction(
 export async function adminGiftSubscriptionAction(
   targetUserId: string,
   durationDays: number = 30,
-  reason?: string
+  reason?: string,
+  idempotencyKey?: string
 ): Promise<
   AdminActionResult<{ targetUserId: string; newPeriodEnd: Date; planName: string }>
 > {
@@ -170,16 +175,27 @@ export async function adminGiftSubscriptionAction(
     return { ok: false, error: "Forbidden: Admin privileges required" };
   }
 
-  const parsed = giftSubscriptionSchema.safeParse({ targetUserId, durationDays, reason });
+  const parsed = giftSubscriptionSchema.safeParse({
+    targetUserId,
+    durationDays,
+    reason,
+    idempotencyKey,
+  });
   if (!parsed.success) {
-    return { ok: false, error: "Invalid subscription gift parameters (1 - 730 days)" };
+    return {
+      ok: false,
+      error:
+        parsed.error.issues[0]?.message ||
+        "Invalid subscription gift parameters (1 - 730 days)",
+    };
   }
 
   const res = await giftSubscriptionToUser(
     currentUser.id,
     parsed.data.targetUserId,
     parsed.data.durationDays,
-    parsed.data.reason
+    parsed.data.reason,
+    parsed.data.idempotencyKey
   );
 
   if (!res.ok) {
