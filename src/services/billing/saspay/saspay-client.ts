@@ -120,6 +120,13 @@ export class SasPayClient {
   }
 
   /**
+   * Returns the resolved base URL (useful for configuration verification).
+   */
+  public getBaseUrl(): string {
+    return this.baseUrl;
+  }
+
+  /**
    * Internal HTTP execution engine handling envelope and error mapping.
    */
   private async request<T>(

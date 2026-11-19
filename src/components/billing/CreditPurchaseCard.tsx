@@ -88,6 +88,9 @@ export function CreditPurchaseSection({
 
       if (!res.success || !res.data) {
         toast.error(res.error || t("initiateError"));
+        if (res.error?.toLowerCase().includes("failed")) {
+          idempotencyKeyRef.current = crypto.randomUUID();
+        }
         setIsInitiating(false);
         return;
       }
@@ -97,8 +100,12 @@ export function CreditPurchaseSection({
         return;
       }
 
-      setPurchaseStatus("pending");
-      setPollingRef(res.data.providerReference);
+      if (res.data.providerReference) {
+        setPurchaseStatus("pending");
+        setPollingRef(res.data.providerReference);
+      } else {
+        toast.error(res.error || t("initiateError"));
+      }
     } catch {
       toast.error(t("unexpectedError"));
     } finally {

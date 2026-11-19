@@ -10,6 +10,23 @@ import { AppError } from "@/lib/errors";
 import { SasPayClient, formatDecimalAmount } from "./saspay-client";
 import { resolveNetworkFromPhone } from "./network-helper";
 
+export const USD_TO_CFA_RATE = 600; // Peg for converting catalog USD prices to XOF/XAF
+
+/**
+ * Calculates decimal string amount for payment based on catalog USD cents and resolved currency.
+ * Preserves exact amount for USD, and converts catalog USD prices for XOF/XAF.
+ */
+export function calculatePaymentAmount(amountCents: number, currency: string): string {
+  if (currency === "USD") {
+    return formatDecimalAmount(amountCents);
+  }
+  if (currency === "XOF" || currency === "XAF") {
+    const cfaAmount = Math.round((amountCents / 100) * USD_TO_CFA_RATE);
+    return `${cfaAmount}.00`;
+  }
+  return formatDecimalAmount(amountCents);
+}
+
 /**
  * SasPayProvider integrates with the official SasPay REST API v1 for
  * African mobile money networks and card payments.
@@ -29,18 +46,18 @@ export class SasPayProvider implements PaymentProvider {
     params: InitiateCreditPurchaseParams
   ): Promise<PaymentInitiateResult> {
     try {
-      const amountStr = formatDecimalAmount(params.amountCents);
       const resolved = resolveNetworkFromPhone(
         params.phoneNumber,
         params.country,
         params.network
       );
+      const amountStr = calculatePaymentAmount(params.amountCents, resolved.currency);
 
       const nameParts = (params.userName || "Jobpilot User").trim().split(/\s+/);
       const firstName = nameParts[0] || "Jobpilot";
       const lastName = nameParts.slice(1).join(" ") || "User";
 
-      const idempotencyKey = crypto.randomUUID();
+      const idempotencyKey = params.idempotencyKey || crypto.randomUUID();
 
       const response = await this.client.softpay(
         {
@@ -85,18 +102,18 @@ export class SasPayProvider implements PaymentProvider {
     params: InitiateSubscriptionParams
   ): Promise<PaymentInitiateResult> {
     try {
-      const amountStr = formatDecimalAmount(params.amountCents);
       const resolved = resolveNetworkFromPhone(
         params.phoneNumber,
         params.country,
         params.network
       );
+      const amountStr = calculatePaymentAmount(params.amountCents, resolved.currency);
 
       const nameParts = (params.userName || "Jobpilot User").trim().split(/\s+/);
       const firstName = nameParts[0] || "Jobpilot";
       const lastName = nameParts.slice(1).join(" ") || "User";
 
-      const idempotencyKey = crypto.randomUUID();
+      const idempotencyKey = params.idempotencyKey || crypto.randomUUID();
 
       const response = await this.client.softpay(
         {

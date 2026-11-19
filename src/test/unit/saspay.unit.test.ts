@@ -10,7 +10,10 @@ import {
   resolveNetworkFromPhone,
   normalizePhoneNumber,
 } from "../../services/billing/saspay/network-helper";
-import { SasPayProvider } from "../../services/billing/saspay/saspay-provider";
+import {
+  SasPayProvider,
+  calculatePaymentAmount,
+} from "../../services/billing/saspay/saspay-provider";
 
 function assert(condition: boolean, msg: string): asserts condition {
   if (!condition) {
@@ -21,13 +24,19 @@ function assert(condition: boolean, msg: string): asserts condition {
 async function runSasPayTests() {
   console.log("Running SasPay integration unit tests...");
 
-  // 1. Amount Decimal String Formatting
-  console.log("- Testing decimal amount formatting...");
+  // 1. Amount Decimal String Formatting & Currency Calculation
+  console.log("- Testing decimal amount formatting & currency calculation...");
   assert(formatDecimalAmount(2500) === "25.00", "2500 cents should format as '25.00'");
   assert(formatDecimalAmount(1500) === "15.00", "1500 cents should format as '15.00'");
   assert(formatDecimalAmount(500) === "5.00", "500 cents should format as '5.00'");
   assert(formatDecimalAmount(0) === "0.00", "0 cents should format as '0.00'");
   assert(formatDecimalAmount(99) === "0.99", "99 cents should format as '0.99'");
+
+  // Currency-aware calculation:
+  assert(calculatePaymentAmount(500, "USD") === "5.00", "USD payments should preserve exact decimal amount");
+  assert(calculatePaymentAmount(1500, "USD") === "15.00", "USD payments should preserve exact decimal amount");
+  assert(calculatePaymentAmount(500, "XOF") === "3000.00", "5 USD in XOF should convert to 3000.00");
+  assert(calculatePaymentAmount(1500, "XAF") === "9000.00", "15 USD in XAF should convert to 9000.00");
 
   let threwOnFloat = false;
   try {
@@ -96,6 +105,11 @@ async function runSasPayTests() {
   assert(normalizePhoneNumber("081 234 5678") === "+243812345678", "DRC local 081 should normalize to +243");
   assert(normalizePhoneNumber("+243 97 123 4567") === "+243971234567", "Spaces must be stripped");
 
+  // Local normalization with preferred country:
+  assert(normalizePhoneNumber("097123456", "BJ") === "+22997123456", "Local number with BJ should normalize with +229");
+  assert(normalizePhoneNumber("067123456", "CM") === "+23767123456", "Local number with CM should normalize with +237");
+  assert(normalizePhoneNumber("070123456", "CI") === "+22570123456", "Local number with CI should normalize with +225");
+
   const drcVodacom = resolveNetworkFromPhone("+243811234567");
   assert(drcVodacom.country === "CD" && drcVodacom.network === "vodacom_cd", "081 should resolve to vodacom_cd");
 
@@ -111,6 +125,21 @@ async function runSasPayTests() {
   const ciOrange = resolveNetworkFromPhone("+22507000000");
   assert(ciOrange.country === "CI" && ciOrange.network === "orange_ci", "22507 should resolve to orange_ci");
 
+  // Country overrides:
+  const cmOverride = resolveNetworkFromPhone("067123456", "CM", "mtn_cm");
+  assert(cmOverride.country === "CM" && cmOverride.currency === "XAF", "CM override must resolve to XAF currency");
+
+  const cdOverride = resolveNetworkFromPhone("081123456", "CD", "vodacom_cd");
+  assert(cdOverride.country === "CD" && cdOverride.currency === "USD", "CD override must resolve to USD currency");
+
+  let threwOnUnsupportedCountry = false;
+  try {
+    resolveNetworkFromPhone("0123456", "XX", "unsupported");
+  } catch (err) {
+    threwOnUnsupportedCountry = err instanceof AppError && err.code === "VALIDATION_ERROR";
+  }
+  assert(threwOnUnsupportedCountry, "Unsupported country override must throw VALIDATION_ERROR");
+
   // 4. SasPayClient API Key Validation
   console.log("- Testing SasPayClient initialization validation...");
   let threwOnInvalidKey = false;
@@ -125,6 +154,7 @@ async function runSasPayTests() {
 
   const validTestClient = new SasPayClient({ apiKey: "sk_test_fake_sandbox_key_123" });
   assert(validTestClient instanceof SasPayClient, "SasPayClient should instantiate with valid test key");
+  assert(validTestClient.getBaseUrl().includes("sandbox"), "Test key should resolve to sandbox base URL");
 
   // 5. SasPayProvider status checking logic
   console.log("- Testing SasPayProvider checkPurchaseStatus mapping...");

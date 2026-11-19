@@ -3,6 +3,7 @@ export interface InitiateCreditPurchaseParams {
   creditPackId: string;
   amountCents: number;
   phoneNumber: string; // mobile money payments are phone-number-keyed
+  idempotencyKey?: string;
   userEmail?: string;
   userName?: string;
   country?: string;
@@ -15,6 +16,7 @@ export interface InitiateSubscriptionParams {
   planId: string;
   amountCents: number;
   phoneNumber: string;
+  idempotencyKey?: string;
   userEmail?: string;
   userName?: string;
   country?: string;

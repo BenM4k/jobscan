@@ -1,3 +1,5 @@
+import { AppError } from "@/lib/errors";
+
 /**
  * Utility functions for resolving mobile money network and country from phone numbers.
  */
@@ -9,13 +11,46 @@ export interface NetworkResolution {
   formattedPhone: string;
 }
 
+export const COUNTRY_CURRENCY_MAP: Record<string, string> = {
+  CD: "USD",
+  CM: "XAF",
+  BJ: "XOF",
+  CI: "XOF",
+  SN: "XOF",
+  TG: "XOF",
+  BF: "XOF",
+};
+
+export const COUNTRY_DIAL_PREFIXES: Record<string, string> = {
+  CD: "+243",
+  BJ: "+229",
+  CI: "+225",
+  CM: "+237",
+  SN: "+221",
+  TG: "+228",
+  BF: "+226",
+};
+
 /**
  * Normalizes phone number: strips spaces, dashes, and ensures international format with '+'.
+ * Uses preferredCountry to normalize local numbers for non-DRC countries if specified;
+ * falls back to DRC local normalization when no country is provided.
  */
-export function normalizePhoneNumber(rawPhone: string): string {
+export function normalizePhoneNumber(
+  rawPhone: string,
+  preferredCountry?: string
+): string {
   const digits = rawPhone.replace(/[^\d+]/g, "");
   if (digits.startsWith("+")) return digits;
   if (digits.startsWith("00")) return `+${digits.slice(2)}`;
+
+  if (preferredCountry) {
+    const prefix = COUNTRY_DIAL_PREFIXES[preferredCountry];
+    if (prefix && digits.startsWith("0")) {
+      return `${prefix}${digits.slice(1)}`;
+    }
+  }
+
   // DRC local format (e.g. 081..., 082..., 097... -> +243...)
   if (digits.startsWith("0") && digits.length === 10) {
     return `+243${digits.slice(1)}`;
@@ -33,16 +68,25 @@ export function resolveNetworkFromPhone(
   preferredCountry?: string,
   preferredNetwork?: string
 ): NetworkResolution {
-  const phone = normalizePhoneNumber(rawPhone);
+  const phone = normalizePhoneNumber(rawPhone, preferredCountry);
 
-  if (preferredCountry && preferredNetwork) {
-    const currency = preferredCountry === "CD" ? "USD" : "XOF";
-    return {
-      country: preferredCountry,
-      network: preferredNetwork,
-      currency,
-      formattedPhone: phone,
-    };
+  if (preferredCountry) {
+    const currency = COUNTRY_CURRENCY_MAP[preferredCountry];
+    if (!currency) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        `Unsupported country override: ${preferredCountry}`
+      );
+    }
+
+    if (preferredNetwork) {
+      return {
+        country: preferredCountry,
+        network: preferredNetwork,
+        currency,
+        formattedPhone: phone,
+      };
+    }
   }
 
   // Democratic Republic of Congo (+243)

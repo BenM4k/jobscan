@@ -93,8 +93,28 @@ export async function POST(req: NextRequest) {
       // Check if reference belongs to a credit purchase
       const purchaseRes =
         await billingDal.getCreditPurchaseByReference(paymentId);
-      if (purchaseRes.ok && purchaseRes.value) {
-        await billingService.confirmCreditPurchase(paymentId);
+      if (!purchaseRes.ok) {
+        console.error(
+          `[SasPay Webhook] DB error querying purchase for ${paymentId}:`,
+          purchaseRes.error
+        );
+        return NextResponse.json(
+          { error: "Database error during purchase lookup" },
+          { status: 500 }
+        );
+      }
+      if (purchaseRes.value) {
+        const confirmRes = await billingService.confirmCreditPurchase(paymentId);
+        if (!confirmRes.ok) {
+          console.error(
+            `[SasPay Webhook] Failed to confirm purchase for ${paymentId}:`,
+            confirmRes.error
+          );
+          return NextResponse.json(
+            { error: "Failed to confirm purchase" },
+            { status: 500 }
+          );
+        }
         return NextResponse.json(
           { received: true, confirmed: "credit_purchase" },
           { status: 200 }
@@ -104,8 +124,28 @@ export async function POST(req: NextRequest) {
       // Check if reference belongs to a subscription
       const subRes =
         await billingDal.getSubscriptionByProviderReference(paymentId);
-      if (subRes.ok && subRes.value) {
-        await billingService.confirmSubscription(paymentId);
+      if (!subRes.ok) {
+        console.error(
+          `[SasPay Webhook] DB error querying subscription for ${paymentId}:`,
+          subRes.error
+        );
+        return NextResponse.json(
+          { error: "Database error during subscription lookup" },
+          { status: 500 }
+        );
+      }
+      if (subRes.value) {
+        const confirmRes = await billingService.confirmSubscription(paymentId);
+        if (!confirmRes.ok) {
+          console.error(
+            `[SasPay Webhook] Failed to confirm subscription for ${paymentId}:`,
+            confirmRes.error
+          );
+          return NextResponse.json(
+            { error: "Failed to confirm subscription" },
+            { status: 500 }
+          );
+        }
         return NextResponse.json(
           { received: true, confirmed: "subscription" },
           { status: 200 }
@@ -117,8 +157,28 @@ export async function POST(req: NextRequest) {
         const altPurchase = await billingDal.getCreditPurchaseByReference(
           payload.data.reference
         );
-        if (altPurchase.ok && altPurchase.value) {
-          await billingService.confirmCreditPurchase(payload.data.reference);
+        if (!altPurchase.ok) {
+          console.error(
+            `[SasPay Webhook] DB error querying alt purchase for ${payload.data.reference}:`,
+            altPurchase.error
+          );
+          return NextResponse.json(
+            { error: "Database error during alt purchase lookup" },
+            { status: 500 }
+          );
+        }
+        if (altPurchase.value) {
+          const confirmRes = await billingService.confirmCreditPurchase(payload.data.reference);
+          if (!confirmRes.ok) {
+            console.error(
+              `[SasPay Webhook] Failed to confirm alt purchase for ${payload.data.reference}:`,
+              confirmRes.error
+            );
+            return NextResponse.json(
+              { error: "Failed to confirm purchase" },
+              { status: 500 }
+            );
+          }
           return NextResponse.json(
             { received: true, confirmed: "credit_purchase" },
             { status: 200 }
@@ -128,8 +188,28 @@ export async function POST(req: NextRequest) {
         const altSub = await billingDal.getSubscriptionByProviderReference(
           payload.data.reference
         );
-        if (altSub.ok && altSub.value) {
-          await billingService.confirmSubscription(payload.data.reference);
+        if (!altSub.ok) {
+          console.error(
+            `[SasPay Webhook] DB error querying alt subscription for ${payload.data.reference}:`,
+            altSub.error
+          );
+          return NextResponse.json(
+            { error: "Database error during alt subscription lookup" },
+            { status: 500 }
+          );
+        }
+        if (altSub.value) {
+          const confirmRes = await billingService.confirmSubscription(payload.data.reference);
+          if (!confirmRes.ok) {
+            console.error(
+              `[SasPay Webhook] Failed to confirm alt subscription for ${payload.data.reference}:`,
+              confirmRes.error
+            );
+            return NextResponse.json(
+              { error: "Failed to confirm subscription" },
+              { status: 500 }
+            );
+          }
           return NextResponse.json(
             { received: true, confirmed: "subscription" },
             { status: 200 }

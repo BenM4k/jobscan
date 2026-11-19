@@ -7,6 +7,7 @@ import { ok, err, type Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 import { getPaymentProvider } from "./provider-factory";
 import { BILLING_TAG, NAVBAR_TAG, revalidateTags } from "@/lib/cache-tags";
+import { cacheGet, cacheSet } from "@/services/cache/redis-client";
 
 export interface InitiateCreditPurchaseResult {
   purchaseId: string;
@@ -117,18 +118,36 @@ export async function initiateCreditPurchase(
   const { purchase, isExisting } = purchaseRes.value;
 
   if (isExisting) {
+    if (purchase.status === "confirmed") {
+      return ok({
+        purchaseId: purchase.id,
+        providerReference: purchase.providerReference || "",
+        status: "confirmed",
+      });
+    }
+
+    if (purchase.status === "failed") {
+      return err(
+        new AppError(
+          "CONFLICT",
+          "Previous payment attempt for this request has failed. Please try again with a new request."
+        )
+      );
+    }
+
     if (purchase.providerReference) {
+      const cachedCheckoutUrl =
+        (await cacheGet<string>(`checkout_url:${purchase.providerReference}`)) ||
+        (await cacheGet<string>(`checkout_url:${purchase.idempotencyKey}`));
+
       return ok({
         purchaseId: purchase.id,
         providerReference: purchase.providerReference,
         status: purchase.status as "pending" | "confirmed" | "failed",
+        checkoutUrl: cachedCheckoutUrl || undefined,
       });
     }
-    return ok({
-      purchaseId: purchase.id,
-      providerReference: "",
-      status: "pending",
-    });
+    // If purchase.providerReference is missing and status is pending, resume initiation with provider
   }
 
   // Initiate transaction with payment provider
@@ -139,6 +158,7 @@ export async function initiateCreditPurchase(
       creditPackId: pack.id,
       amountCents: pack.priceCents,
       phoneNumber,
+      idempotencyKey,
       userEmail: customerDetails?.userEmail,
       userName: customerDetails?.userName,
       country: customerDetails?.country,
@@ -147,6 +167,17 @@ export async function initiateCreditPurchase(
     });
   } catch (providerError) {
     console.error(`[Billing Service] Provider payment initiation failed for user ${userId}:`, providerError);
+
+    // If it's a client or validation error, the provider rejected the request before accepting payment.
+    // Transition purchase record to 'failed' so the idempotency key reaches a terminal state and can be retired safely.
+    const isValidationError =
+      providerError instanceof AppError &&
+      (providerError.code === "VALIDATION_ERROR" || providerError.code === "UNAUTHORIZED");
+
+    if (isValidationError) {
+      await billingDal.updateCreditPurchaseStatus(purchase.id, "failed");
+    }
+
     const message =
       providerError instanceof AppError
         ? providerError.message
@@ -161,6 +192,11 @@ export async function initiateCreditPurchase(
   );
   if (!updateRefRes.ok) {
     return err(updateRefRes.error);
+  }
+
+  if (initiateRes.checkoutUrl) {
+    await cacheSet(`checkout_url:${initiateRes.providerReference}`, initiateRes.checkoutUrl, 3600);
+    await cacheSet(`checkout_url:${idempotencyKey}`, initiateRes.checkoutUrl, 3600);
   }
 
   // Fallback timer for local dev/testing with mock provider when Inngest is not running
@@ -271,10 +307,16 @@ export async function initiateSubscription(
   if (!subRes.ok) return err(subRes.error);
 
   if (subRes.value.isExistingIdempotent && subRes.value.subscription.providerSubscriptionId) {
+    const primaryRef = subRes.value.subscription.providerSubscriptionId.split(",").pop() || "";
+    const cachedCheckoutUrl =
+      (await cacheGet<string>(`checkout_url:${primaryRef}`)) ||
+      (await cacheGet<string>(`checkout_url:${idempotencyKey}`));
+
     return ok({
       userId,
-      providerReference: subRes.value.subscription.providerSubscriptionId.split(",").pop() || "",
+      providerReference: primaryRef,
       status: "pending",
+      checkoutUrl: cachedCheckoutUrl || undefined,
     });
   }
 
@@ -285,6 +327,7 @@ export async function initiateSubscription(
       planId: plan.id,
       amountCents: plan.priceCentsMonthly,
       phoneNumber,
+      idempotencyKey,
       userEmail: customerDetails?.userEmail,
       userName: customerDetails?.userName,
       country: customerDetails?.country,
@@ -307,6 +350,11 @@ export async function initiateSubscription(
   );
   if (!updateRefRes.ok) {
     return err(updateRefRes.error);
+  }
+
+  if (initiateRes.checkoutUrl) {
+    await cacheSet(`checkout_url:${initiateRes.providerReference}`, initiateRes.checkoutUrl, 3600);
+    await cacheSet(`checkout_url:${idempotencyKey}`, initiateRes.checkoutUrl, 3600);
   }
 
   // Fallback timer for local dev/testing with mock provider when Inngest is not running

@@ -4,20 +4,17 @@
  * Tests network connectivity, API key validity, and rate limits without moving money.
  *
  * Usage:
- *   npx tsx scripts/verify-saspay-config.ts
+ *   NODE_OPTIONS='--conditions=react-server' npx tsx scripts/verify-saspay-config.ts
  */
 
 import "dotenv/config";
-import { SasPayClient, SASPAY_DEFAULT_BASE_URL } from "../src/services/billing/saspay/saspay-client";
+import { SasPayClient } from "../src/services/billing/saspay/saspay-client";
 
 async function main() {
   console.log("=== SasPay Configuration Check ===");
 
   const apiKey = process.env.SASPAY_API_KEY;
-  const baseUrl = process.env.SASPAY_BASE_URL || SASPAY_DEFAULT_BASE_URL;
   const webhookSecret = process.env.SASPAY_WEBHOOK_SECRET;
-
-  console.log(`Base URL: ${baseUrl}`);
 
   if (!apiKey) {
     console.error("❌ ERROR: SASPAY_API_KEY is not set in environment.");
@@ -36,7 +33,8 @@ async function main() {
   console.log(`Webhook Secret: ${webhookSecret ? "Configured (Present)" : "Missing (Not set)"}`);
 
   try {
-    const client = new SasPayClient({ baseUrl, apiKey });
+    const client = new SasPayClient({ apiKey });
+    console.log(`Resolved Base URL: ${client.getBaseUrl()}`);
     console.log("\nConnecting to SasPay API...");
 
     const check = await client.checkConfiguration();
