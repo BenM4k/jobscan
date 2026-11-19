@@ -2,6 +2,7 @@ import "server-only";
 
 import { PaymentProvider } from "./payment-provider.interface";
 import { MockMobileMoneyProvider } from "./mock-provider";
+import { SasPayProvider } from "./saspay/saspay-provider";
 
 let providerInstance: PaymentProvider | null = null;
 
@@ -23,6 +24,10 @@ export function getPaymentProvider(): PaymentProvider {
   }
 
   switch (providerType) {
+    case "saspay": {
+      providerInstance = new SasPayProvider();
+      break;
+    }
     case "mock": {
       if (
         process.env.NODE_ENV === "production" &&

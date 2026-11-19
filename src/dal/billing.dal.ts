@@ -367,6 +367,23 @@ export async function updateCreditPurchaseReference(
   }
 }
 
+/** Updates the status of a credit purchase. */
+export async function updateCreditPurchaseStatus(
+  id: string,
+  status: "pending" | "confirmed" | "failed"
+): Promise<Result<void, AppError>> {
+  try {
+    await db
+      .update(creditPurchase)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(creditPurchase.id, id));
+    return ok(undefined);
+  } catch (error) {
+    console.error(`[Billing DAL] Failed to update status for purchase ${id}:`, error);
+    return err(new AppError("DB_ERROR", "Failed to update purchase status", error));
+  }
+}
+
 /** Associates a user's subscription with its payment-provider reference. */
 export async function updateSubscriptionReference(
   userId: string,
@@ -410,7 +427,7 @@ export async function getSubscriptionByProviderReference(
       .select()
       .from(subscription)
       .where(
-        sql`${subscription.providerSubscriptionId} = ${providerSubscriptionId} OR ${subscription.providerSubscriptionId} LIKE ${'%' + providerSubscriptionId + '%'}`
+        sql`${providerSubscriptionId} = ANY(string_to_array(regexp_replace(${subscription.providerSubscriptionId}, '\s+', '', 'g'), ','))`
       )
       .limit(1);
     return ok(row || null);
@@ -635,7 +652,7 @@ export async function confirmSubscriptionAtomic(
         .select()
         .from(subscription)
         .where(
-          sql`${subscription.providerSubscriptionId} = ${providerSubscriptionId} OR ${subscription.providerSubscriptionId} LIKE ${'%' + providerSubscriptionId + '%'}`
+          sql`${providerSubscriptionId} = ANY(string_to_array(regexp_replace(${subscription.providerSubscriptionId}, '\s+', '', 'g'), ','))`
         )
         .for("update")
         .limit(1);

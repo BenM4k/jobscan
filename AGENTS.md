@@ -157,6 +157,37 @@ The following core rules govern all feature implementation in Jobpilot:
 9. **Mandatory shadcn/ui Primitives:** Always compose official shadcn components in `components/ui/`. Handwritten dropdowns, popovers, or modal sheets using raw `useState` and manual coordinate math are strictly prohibited.
 10. **Secret Hygiene:** Never write or output API keys or tokens. Reference environment variables strictly by name in server-only modules.
 11. **Cache Components & Tag-Based Revalidation:** Data fetching utilizes `"use cache"` and `cacheTag()` (centralized via `src/lib/cached-data.ts` and `src/lib/cache-tags.ts`). Mutations in server actions invalidate targeted domains using `revalidateTags()` or `revalidateTag(tag, "max")`. `revalidatePath()` is superseded by semantic tag-based cache revalidation.
+12. **SasPay Payment Integration:**
+    - Reference: Official documentation `/llms.txt` and OpenAPI specification `/api-reference/openapi.json`.
+    - Base URL: `https://api.saspay.me/api/v1` (backend-only requests).
+    - API Key: `SASPAY_API_KEY` (`sk_test_...` in dev, `sk_live_...` in prod). Never in frontend, logs, or git.
+    - Amounts: Strict decimal strings (`"2500.00"`), never floats.
+    - Mandatory `Idempotency-Key` on `POST /payments/softpay/`, `POST /payouts/initialize/`, `POST /wallet-transfers/`, `POST /payments/{id}/retry/`.
+    - Delivery gate: Only deliver access or products when `GET /payments/{payment_id}/verify/` returns `SUCCESS`.
+    - Softpay redirection: If `checkout_url` is non-empty, redirect client immediately.
+    - Webhooks: Verify `X-Webhook-Signature` (HMAC SHA-256) and `X-Webhook-Timestamp` (< 300s) on raw body; idempotent processing.
+    - Payouts / Retraits: Server IP must be whitelisted (`403 ip_not_whitelisted` otherwise).
+    - Error classification: Explicit handling of `401`, `403`, `404`, `409`, `422`, and `429` (spaced retries).
+
+---
+
+## Intégration de l'API SasPay
+
+- Utilisez la documentation officielle : /llms.txt de la documentation SasPay.
+- Utilisez la spécification OpenAPI : /api-reference/openapi.json.
+- Utilisez l'URL de base `https://api.saspay.me/api/v1`.
+- Effectuez toutes les requêtes SasPay depuis le backend.
+- Stockez la clé API dans un gestionnaire de secrets ou une variable d'environnement.
+- Ne placez jamais la clé API dans le frontend, les logs ou le dépôt Git.
+- Envoyez la clé avec `Authorization: Bearer sk_test_...` en développement, `sk_live_...` en production.
+- Montants : chaînes décimales (`"2500.00"`), jamais de flottants.
+- Envoyez un `Idempotency-Key` sur `POST /payments/softpay/`, `POST /payouts/initialize/`, `POST /wallet-transfers/` et `POST /payments/{payment_id}/retry/`.
+- Ne livrez un produit ou n'activez un accès que lorsque `GET /payments/{payment_id}/verify/` renvoie `SUCCESS`.
+- Si `checkout_url` est non vide après un softpay, redirigez le client vers cette URL.
+- Vérifiez la signature des webhooks (`X-Webhook-Signature`, `X-Webhook-Timestamp`) sur le corps brut, et rejetez un horodatage de plus de 300 secondes.
+- Pour un retrait, whitelistez l'IP du serveur ; sinon l'appel renvoie `403 ip_not_whitelisted`.
+- Gérez les réponses `401`, `403`, `404`, `409`, `422` et `429` selon l'endpoint ; en cas de `429`, espacez les appels.
+- N'inventez aucun endpoint, champ, statut ou événement absent de la spécification OpenAPI.
 
 ---
 
