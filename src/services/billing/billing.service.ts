@@ -307,7 +307,11 @@ export async function initiateSubscription(
   if (!subRes.ok) return err(subRes.error);
 
   if (subRes.value.isExistingIdempotent && subRes.value.subscription.providerSubscriptionId) {
-    const primaryRef = subRes.value.subscription.providerSubscriptionId.split(",").pop() || "";
+    const paymentRefs = subRes.value.subscription.providerSubscriptionId
+      .split(",")
+      .map((r) => r.trim())
+      .filter((r) => Boolean(r) && !r.startsWith("admin_gift_"));
+    const primaryRef = paymentRefs.pop() || "";
     const cachedCheckoutUrl =
       (await cacheGet<string>(`checkout_url:${primaryRef}`)) ||
       (await cacheGet<string>(`checkout_url:${idempotencyKey}`));

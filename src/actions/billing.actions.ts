@@ -162,7 +162,11 @@ export async function checkPurchaseStatusAction(providerReference: string) {
         if (elapsed >= 2000) {
           await billingService.confirmCreditPurchase(parsed.data.providerReference);
         }
-      } else if (isSubOwner && subRes.value && subRes.value.status === "past_due") {
+      } else if (
+        isSubOwner &&
+        subRes.value &&
+        (subRes.value.status === "past_due" || subRes.value.provider === "admin_gift")
+      ) {
         const elapsed = Date.now() - new Date(subRes.value.createdAt).getTime();
         if (elapsed >= 2000) {
           await billingService.confirmSubscription(parsed.data.providerReference);
@@ -176,7 +180,11 @@ export async function checkPurchaseStatusAction(providerReference: string) {
     if (status === "confirmed") {
       if (isPurchaseOwner && purchaseRes.value && purchaseRes.value.status !== "confirmed") {
         await billingService.confirmCreditPurchase(parsed.data.providerReference);
-      } else if (isSubOwner && subRes.value && subRes.value.status !== "active") {
+      } else if (
+        isSubOwner &&
+        subRes.value &&
+        (subRes.value.status !== "active" || subRes.value.provider === "admin_gift")
+      ) {
         await billingService.confirmSubscription(parsed.data.providerReference);
       }
 

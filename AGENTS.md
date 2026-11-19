@@ -107,11 +107,11 @@ src/
     job/                    # JobScoreSection, MatchExplanation, SkillGapBreakdown, JobCard
     billing/                # CreditBalanceIndicator, CreditPurchaseCard, SubscriptionCard, InsufficientCreditsDialog
     settings/               # Settings & feature flag cards
-    admin/                  # AdminNav, AdminStatCard, AdminUsersTable, AdminUserRow, AiUsageTable, GrantCreditsDialog, BanUserDialog, AdminFeatureFlagsManager
+    admin/                  # AdminNav, AdminStatCard, AdminUsersTable, AdminUserRow, AiUsageTable, GrantCreditsDialog, GiftSubscriptionDialog, BanUserDialog, AdminFeatureFlagsManager
 
   actions/                  # Server actions (validation + auth boundary → service layer)
     admin.actions.ts        # Admin feature flags actions
-    admin-management.actions.ts # Admin user role, ban, and credit grant actions
+    admin-management.actions.ts # Admin user role, ban, credit grant, and subscription gift actions
   services/                 # Service layer (business logic, orchestration, external integrations)
     admin/                  # Admin business logic & metrics orchestration
     billing/                # Payment provider abstraction, mock mobile money, credit & subscription business logic

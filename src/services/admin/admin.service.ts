@@ -1,7 +1,10 @@
 import "server-only";
 
 import * as adminDal from "@/dal/admin.dal";
+import * as billingDal from "@/dal/billing.dal";
 import { grantCredits } from "@/services/billing/billing.service";
+import { setUserFeatureFlagOverride, FEATURE_FLAGS } from "@/services/flags";
+import { upsertUserPreferences } from "@/dal/growth.dal";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 
@@ -106,9 +109,10 @@ export async function changeUserBanStatus(
  * Grant manual credits to a user from the admin console.
  */
 export async function grantCreditsToUser(
-  _adminUserId: string,
+  adminUserId: string,
   targetUserId: string,
-  amount: number
+  amount: number,
+  reason?: string
 ): Promise<Result<{ balanceAfter: number; amount: number }, AppError>> {
   if (!Number.isInteger(amount) || amount <= 0 || amount > 10000) {
     return err(
@@ -124,7 +128,100 @@ export async function grantCreditsToUser(
     return err(grantRes.error);
   }
 
+  console.log(
+    `[Admin] User ${adminUserId} granted ${amount} credits to user ${targetUserId}. Reason: ${reason || "none"}`
+  );
+
   return ok({ balanceAfter: grantRes.value.balanceAfter, amount });
+}
+
+/**
+ * Gift a Pro subscription to a user from the admin console.
+ */
+export async function giftSubscriptionToUser(
+  adminUserId: string,
+  targetUserId: string,
+  durationDays: number = 30,
+  reason?: string,
+  idempotencyKey?: string
+): Promise<
+  Result<{ targetUserId: string; newPeriodEnd: Date; planName: string }, AppError>
+> {
+  if (!Number.isInteger(durationDays) || durationDays < 1 || durationDays > 730) {
+    return err(
+      new AppError(
+        "VALIDATION_ERROR",
+        "Subscription gift duration must be between 1 and 730 days"
+      )
+    );
+  }
+
+  // Find Pro subscription plan
+  const planRes = await billingDal.getSubscriptionPlanByKey("pro");
+  if (!planRes.ok || !planRes.value) {
+    return err(new AppError("NOT_FOUND", "Pro subscription plan not found"));
+  }
+
+  const plan = planRes.value;
+
+  const giftRes = await billingDal.giftSubscriptionAtomic({
+    userId: targetUserId,
+    planId: plan.id,
+    durationDays,
+    adminUserId,
+    reason,
+    idempotencyKey,
+  });
+
+  if (!giftRes.ok) {
+    return err(giftRes.error);
+  }
+
+  // 1. Grant hybrid scoring feature flag override
+  const flagRes = await setUserFeatureFlagOverride(
+    targetUserId,
+    FEATURE_FLAGS.HYBRID_SCORING,
+    true
+  );
+  if (!flagRes.success) {
+    console.error(
+      `[Admin] Failed to set hybrid scoring flag for ${targetUserId}:`,
+      flagRes.error
+    );
+    return err(
+      new AppError(
+        "INTERNAL_ERROR",
+        `Subscription granted but failed to activate Pro features: ${flagRes.error || "Unknown error"}`
+      )
+    );
+  }
+
+  // 2. Grant daily digest email frequency
+  const prefRes = await upsertUserPreferences(targetUserId, {
+    digestEmailFrequency: "daily",
+  });
+  if (!prefRes.ok) {
+    console.error(
+      `[Admin] Failed to update user preferences for ${targetUserId}:`,
+      prefRes.error
+    );
+    return err(
+      new AppError(
+        "INTERNAL_ERROR",
+        `Subscription granted but failed to update preferences: ${prefRes.error.message}`
+      )
+    );
+  }
+
+  console.log(
+    `[Admin] Admin ${adminUserId} gifted a ${durationDays}-day ${plan.name} subscription to user ${targetUserId}. Reason: ${reason || "none"}`
+  );
+
+  return ok({
+    targetUserId,
+    newPeriodEnd: giftRes.value.newPeriodEnd,
+    planName: plan.name,
+  });
 }
 
 /**

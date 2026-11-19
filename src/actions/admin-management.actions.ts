@@ -6,6 +6,7 @@ import {
   changeUserRole,
   changeUserBanStatus,
   grantCreditsToUser,
+  giftSubscriptionToUser,
 } from "@/services/admin/admin.service";
 import { ADMIN_MUTATION_TAGS, BILLING_TAG, NAVBAR_TAG, revalidateTags } from "@/lib/cache-tags";
 import { z } from "zod";
@@ -25,6 +26,16 @@ const grantCreditsSchema = z.object({
   targetUserId: z.string().uuid(),
   amount: z.number().int().min(1).max(10000),
   reason: z.string().max(255).optional(),
+});
+
+const giftSubscriptionSchema = z.object({
+  targetUserId: z.string().uuid(),
+  durationDays: z.number().int().min(1).max(730).default(30),
+  reason: z
+    .string()
+    .max(255, "Reason / admin memo must be 255 characters or fewer")
+    .optional(),
+  idempotencyKey: z.string().optional(),
 });
 
 export type AdminActionResult<T = undefined> =
@@ -131,7 +142,60 @@ export async function adminGrantCreditsAction(
   const res = await grantCreditsToUser(
     currentUser.id,
     parsed.data.targetUserId,
-    parsed.data.amount
+    parsed.data.amount,
+    parsed.data.reason
+  );
+
+  if (!res.ok) {
+    return { ok: false, error: res.error.message };
+  }
+
+  revalidateTags([...ADMIN_MUTATION_TAGS, BILLING_TAG, NAVBAR_TAG]);
+  return { ok: true, value: res.value };
+}
+
+/**
+ * Server action to gift an active subscription to a user.
+ */
+export async function adminGiftSubscriptionAction(
+  targetUserId: string,
+  durationDays: number = 30,
+  reason?: string,
+  idempotencyKey?: string
+): Promise<
+  AdminActionResult<{ targetUserId: string; newPeriodEnd: Date; planName: string }>
+> {
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok || !sessionResult.value) {
+    return { ok: false, error: "Unauthorized" };
+  }
+
+  const currentUser = sessionResult.value.user;
+  if (!isAdmin(currentUser)) {
+    return { ok: false, error: "Forbidden: Admin privileges required" };
+  }
+
+  const parsed = giftSubscriptionSchema.safeParse({
+    targetUserId,
+    durationDays,
+    reason,
+    idempotencyKey,
+  });
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error:
+        parsed.error.issues[0]?.message ||
+        "Invalid subscription gift parameters (1 - 730 days)",
+    };
+  }
+
+  const res = await giftSubscriptionToUser(
+    currentUser.id,
+    parsed.data.targetUserId,
+    parsed.data.durationDays,
+    parsed.data.reason,
+    parsed.data.idempotencyKey
   );
 
   if (!res.ok) {

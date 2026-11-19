@@ -39,6 +39,7 @@ export interface AdminUserListItem {
   creditBalance: number;
   subscriptionStatus: string | null;
   subscriptionPlanName: string | null;
+  currentPeriodEnd?: Date | null;
   createdAt: Date;
 }
 
@@ -133,6 +134,7 @@ export async function getAdminUsersList(
           creditBalance: sql<number>`COALESCE(${creditBalanceTable.balance}, 0)`,
           subscriptionStatus: subscriptionTable.status,
           subscriptionPlanName: subscriptionPlanTable.name,
+          currentPeriodEnd: subscriptionTable.currentPeriodEnd,
         })
         .from(userTable)
         .leftJoin(creditBalanceTable, eq(userTable.id, creditBalanceTable.userId))
@@ -160,6 +162,7 @@ export async function getAdminUsersList(
       creditBalance: Number(r.creditBalance),
       subscriptionStatus: r.subscriptionStatus,
       subscriptionPlanName: r.subscriptionPlanName,
+      currentPeriodEnd: r.currentPeriodEnd ? new Date(r.currentPeriodEnd) : null,
       createdAt: r.createdAt,
     }));
 

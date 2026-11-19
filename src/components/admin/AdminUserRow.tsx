@@ -13,8 +13,11 @@ import {
   Ban,
   RotateCcw,
   Loader2,
+  Gift,
+  Sparkles,
 } from "lucide-react";
 import { GrantCreditsDialog } from "./GrantCreditsDialog";
+import { GiftSubscriptionDialog } from "./GiftSubscriptionDialog";
 import { BanUserDialog } from "./BanUserDialog";
 
 interface AdminUserRowProps {
@@ -24,6 +27,7 @@ interface AdminUserRowProps {
 export function AdminUserRow({ user }: AdminUserRowProps) {
   const router = useRouter();
   const [isCreditDialogOpen, setIsCreditDialogOpen] = useState(false);
+  const [isGiftSubDialogOpen, setIsGiftSubDialogOpen] = useState(false);
   const [isBanDialogOpen, setIsBanDialogOpen] = useState(false);
   const [isRolePending, startRoleTransition] = useTransition();
 
@@ -71,9 +75,17 @@ export function AdminUserRow({ user }: AdminUserRowProps) {
 
         <td className="px-3 py-3.5 text-sm">
           {user.subscriptionStatus === "active" ? (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400">
-              Pro Active
-            </span>
+            <div>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400">
+                <Sparkles className="w-3 h-3" />
+                Pro Active
+              </span>
+              {user.currentPeriodEnd && (
+                <div className="text-[10px] text-slate-400 dark:text-zinc-500 mt-0.5">
+                  until {new Date(user.currentPeriodEnd).toLocaleDateString()}
+                </div>
+              )}
+            </div>
           ) : (
             <span className="text-xs text-slate-400 dark:text-zinc-500">Free</span>
           )}
@@ -103,6 +115,17 @@ export function AdminUserRow({ user }: AdminUserRowProps) {
             >
               <Coins className="w-3.5 h-3.5 mr-1 text-amber-500" />
               Credits
+            </Button>
+
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 px-2 text-xs"
+              onClick={() => setIsGiftSubDialogOpen(true)}
+              title="Gift Pro subscription"
+            >
+              <Gift className="w-3.5 h-3.5 mr-1 text-purple-600 dark:text-purple-400" />
+              Gift Sub
             </Button>
 
             <Button
@@ -151,6 +174,12 @@ export function AdminUserRow({ user }: AdminUserRowProps) {
         user={user}
         isOpen={isCreditDialogOpen}
         onClose={() => setIsCreditDialogOpen(false)}
+      />
+
+      <GiftSubscriptionDialog
+        user={user}
+        isOpen={isGiftSubDialogOpen}
+        onClose={() => setIsGiftSubDialogOpen(false)}
       />
 
       <BanUserDialog

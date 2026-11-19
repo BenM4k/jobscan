@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { requireSession } from "@/lib/auth-guard";
 import { isAdmin } from "@/services/auth/admin";
 import { redirect } from "next/navigation";
@@ -11,11 +12,17 @@ export const metadata = {
   description: "Jobpilot central administration and operational console.",
 };
 
-export default async function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function AdminLayoutSkeleton() {
+  return (
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 w-full space-y-6 animate-pulse">
+      <div className="h-16 border-b border-slate-200 dark:border-zinc-800 pb-5" />
+      <div className="h-10 bg-slate-100 dark:bg-zinc-800/50 rounded-xl" />
+      <div className="h-96 bg-slate-100 dark:bg-zinc-800/50 rounded-2xl" />
+    </main>
+  );
+}
+
+async function AdminGuard({ children }: { children: React.ReactNode }) {
   const sessionResult = await requireSession();
   if (!sessionResult.ok || !sessionResult.value) {
     redirect("/sign-in");
@@ -69,5 +76,21 @@ export default async function AdminLayout({
         {children}
       </div>
     </main>
+  );
+}
+
+// TODO: Cache Components adoption. Refactor this route so this opt-out can be removed.
+// See: https://nextjs.org/docs/app/guides/migrating-to-cache-components
+export const instant = false;
+
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <Suspense fallback={<AdminLayoutSkeleton />}>
+      <AdminGuard>{children}</AdminGuard>
+    </Suspense>
   );
 }
