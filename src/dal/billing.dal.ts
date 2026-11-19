@@ -1,5 +1,6 @@
 import "server-only";
 
+import crypto from "crypto";
 import { db } from "@/services/db";
 import {
   creditBalance,
@@ -683,6 +684,100 @@ export async function confirmSubscriptionAtomic(
     if (error instanceof AppError) return err(error);
     console.error(`[Billing DAL] Failed to confirm subscription ${providerSubscriptionId}:`, error);
     return err(new AppError("DB_ERROR", "Failed to confirm subscription", error));
+  }
+}
+
+/**
+ * Atomically grants or extends an active subscription for a user (Admin Gift).
+ * If user already has an active subscription, extends currentPeriodEnd by durationDays.
+ * If user has no active subscription, activates plan until (now + durationDays).
+ */
+export async function giftSubscriptionAtomic(params: {
+  userId: string;
+  planId: string;
+  durationDays: number;
+  adminUserId: string;
+  reason?: string;
+}): Promise<
+  Result<
+    { subscription: SubscriptionSelect; previousStatus: string | null; newPeriodEnd: Date },
+    AppError
+  >
+> {
+  try {
+    return await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(subscription)
+        .where(eq(subscription.userId, params.userId))
+        .for("update")
+        .limit(1);
+
+      const now = new Date();
+      const durationMs = params.durationDays * 24 * 60 * 60 * 1000;
+      let newPeriodEnd: Date;
+      let previousStatus: string | null = null;
+
+      if (existing) {
+        previousStatus = existing.status;
+        const isCurrentlyActive =
+          existing.status === "active" && existing.currentPeriodEnd > now;
+
+        if (isCurrentlyActive) {
+          // Extend existing active period
+          newPeriodEnd = new Date(existing.currentPeriodEnd.getTime() + durationMs);
+        } else {
+          // Start fresh active period from now
+          newPeriodEnd = new Date(now.getTime() + durationMs);
+        }
+
+        const giftRef = `admin_gift_${crypto.randomUUID().slice(0, 8)}`;
+        const existingRefs = existing.providerSubscriptionId
+          ? existing.providerSubscriptionId
+              .split(",")
+              .map((r) => r.trim())
+              .filter(Boolean)
+          : [];
+        existingRefs.push(giftRef);
+
+        const [updated] = await tx
+          .update(subscription)
+          .set({
+            planId: params.planId,
+            status: "active",
+            currentPeriodEnd: newPeriodEnd,
+            provider: "admin_gift",
+            providerSubscriptionId: existingRefs.join(","),
+            updatedAt: now,
+          })
+          .where(eq(subscription.userId, params.userId))
+          .returning();
+
+        return ok({ subscription: updated, previousStatus, newPeriodEnd });
+      }
+
+      // No existing subscription record: create new active gifted subscription
+      newPeriodEnd = new Date(now.getTime() + durationMs);
+      const giftRef = `admin_gift_${crypto.randomUUID().slice(0, 8)}`;
+
+      const [created] = await tx
+        .insert(subscription)
+        .values({
+          userId: params.userId,
+          planId: params.planId,
+          status: "active",
+          currentPeriodEnd: newPeriodEnd,
+          provider: "admin_gift",
+          providerSubscriptionId: giftRef,
+          updatedAt: now,
+        })
+        .returning();
+
+      return ok({ subscription: created, previousStatus: null, newPeriodEnd });
+    });
+  } catch (error) {
+    console.error(`[Billing DAL] Failed to gift subscription to ${params.userId}:`, error);
+    return err(new AppError("DB_ERROR", "Failed to gift subscription", error));
   }
 }
 

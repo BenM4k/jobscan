@@ -149,6 +149,11 @@ In `createMasterResumeAction` and `promoteTailoredResumeAction`:
   - Reverts `hybrid_scoring` feature flag to default.
   - Reverts `digestEmailFrequency` to `"weekly"`.
 
+### Admin Manual Grants & Gifted Subscriptions
+From the Admin Console (`/dashboard/admin/users`), administrators can directly manage user perks:
+- **Manual Credit Grants (`adminGrantCreditsAction`):** Transactionally grants 1–10,000 credits to any user, logs to `credit_ledger` (action `refund`), and updates balance under PostgreSQL advisory lock.
+- **Gifted Pro Subscriptions (`adminGiftSubscriptionAction`):** Activates or extends a user's Pro subscription for a selectable duration (30d, 90d, 180d, 365d, or custom up to 730d). Atomically updates `subscription` with provider `"admin_gift"`, immediately grants the `hybrid_scoring` feature flag override, sets daily digest email frequency, and logs the administrative memo.
+
 ---
 
 ## 7. Catalog Seeding & Database Provisioning
