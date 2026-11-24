@@ -2,12 +2,13 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { JobSelect } from "@/dal/jobs.dal";
 import { toast } from "sonner";
 import posthog from "posthog-js";
 import { downloadTextAsPdf } from "@/lib/pdf-export";
-import { parseTailoredResume } from "@/lib/tailored-resume-parser";
 import { useAsyncJobWithRetry } from "@/hooks/useAsyncJobWithRetry";
+import { notifyCreditsUpdated } from "@/hooks/useLiveCreditBalance";
 
 interface UseTailoredResumeOptions {
   job: JobSelect;
@@ -15,9 +16,14 @@ interface UseTailoredResumeOptions {
   selectedResumeId?: string;
 }
 
-/** Manages tailored-resume generation, persistence, clipboard state, and credit errors. */
-export function useTailoredResume({ job, onJobUpdated, selectedResumeId }: UseTailoredResumeOptions) {
+/** Manages tailored-resume generation, editing, version restore, PDF export, and credits. */
+export function useTailoredResume({
+  job,
+  onJobUpdated,
+  selectedResumeId,
+}: UseTailoredResumeOptions) {
   const router = useRouter();
+  const t = useTranslations("jobDetail");
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editedResume, setEditedResume] = useState(job.tailoredResume || "");
@@ -39,6 +45,13 @@ export function useTailoredResume({ job, onJobUpdated, selectedResumeId }: UseTa
     setEditedResume(job.tailoredResume || "");
     setIsEditing(false);
   };
+
+  const handleRestoreVersion = (content: string) => {
+    setEditedResume(content);
+    setIsEditing(true);
+    toast.info(t("restoredToEditor"));
+  };
+
   const [isCopied, setIsCopied] = useState(false);
   const [isInsufficientCreditsOpen, setIsInsufficientCreditsOpen] = useState(false);
   const [insufficientCreditsData, setInsufficientCreditsData] = useState<{
@@ -139,33 +152,37 @@ export function useTailoredResume({ job, onJobUpdated, selectedResumeId }: UseTa
       pendingResumeIdRef.current = undefined;
       posthog.capture("tailored_resume_generated");
       setEditedResume(result.tailoredResume);
+      setIsEditing(false);
       onJobUpdated(result.data);
+      notifyCreditsUpdated();
       router.refresh();
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (overrideContent?: string) => {
+    const contentToSave = overrideContent ?? editedResume;
     try {
       setIsSaving(true);
       const res = await fetch(`/api/jobs/${job.id}/tailor-resume`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tailoredResume: editedResume }),
+        body: JSON.stringify({ tailoredResume: contentToSave }),
       });
 
       if (!res.ok) {
         const errJson = await res.json();
-        throw new Error(errJson.error || "Failed to save tailored resume");
+        throw new Error(errJson.error || t("saveResumeError"));
       }
 
       const { data } = await res.json();
       posthog.capture("tailored_resume_saved");
+      setEditedResume(contentToSave);
       onJobUpdated(data);
       setIsEditing(false);
-      toast.success("Tailored resume saved");
+      toast.success(t("saveResumeSuccess"));
     } catch (err) {
       console.error(err);
-      toast.error(err instanceof Error ? err.message : "Save failed");
+      toast.error(err instanceof Error ? err.message : t("saveResumeError"));
     } finally {
       setIsSaving(false);
     }
@@ -173,11 +190,14 @@ export function useTailoredResume({ job, onJobUpdated, selectedResumeId }: UseTa
 
   const handleDownloadPdf = async (content: string) => {
     try {
-      await downloadTextAsPdf(`${job.company || "Company"}-Tailored-Resume.pdf`, content);
-      toast.success("Downloaded tailored resume PDF");
+      await downloadTextAsPdf(
+        `${job.company || "Company"}-Tailored-Resume.pdf`,
+        content
+      );
+      toast.success(t("downloadPdfSuccess"));
     } catch (err) {
       console.error(err);
-      toast.error("Failed to download PDF");
+      toast.error(t("downloadPdfError"));
     }
   };
 
@@ -185,18 +205,15 @@ export function useTailoredResume({ job, onJobUpdated, selectedResumeId }: UseTa
     try {
       await navigator.clipboard.writeText(editedResume || job.tailoredResume || "");
       setIsCopied(true);
-      toast.success("Copied to clipboard");
+      toast.success(t("copiedClipboard"));
       setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
       console.error("Failed to copy:", err);
-      toast.error("Failed to copy to clipboard");
+      toast.error(t("copyError"));
     }
   };
 
-  const parsedResume = parseTailoredResume(
-    editedResume || job.tailoredResume,
-    job.tailoredResumeData
-  );
+  const isDirty = editedResume !== (job.tailoredResume || "");
 
   return {
     isGenerating: retryRunner.isLoading,
@@ -209,14 +226,15 @@ export function useTailoredResume({ job, onJobUpdated, selectedResumeId }: UseTa
     retryNow: retryRunner.retryNow,
     isSaving,
     isEditing,
+    isDirty,
     setIsEditing,
     handleStartEditing,
     handleCancelEdit,
+    handleRestoreVersion,
     editedResume,
     setEditedResume,
     isCopied,
     hasResume: Boolean(job.tailoredResume),
-    parsedResume,
     handleGenerate,
     handleSave,
     handleDownloadPdf,

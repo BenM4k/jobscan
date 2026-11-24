@@ -16,7 +16,11 @@ import { AI_MODEL } from "@/lib/ai";
 
 export class GeminiProvider implements ScoringProvider {
   name: AIProviderName = "gemini";
-  modelId: string = AI_MODEL;
+  modelId: string;
+
+  constructor(modelId?: string) {
+    this.modelId = modelId?.trim() || AI_MODEL;
+  }
 
   async scoreJob(
     jobTitle: string,
@@ -45,7 +49,7 @@ export class GeminiProvider implements ScoringProvider {
       );
 
       const result = await generateText({
-        model: google(AI_MODEL),
+        model: google(this.modelId),
         output: Output.object({ schema: scoreResultSchema }),
         system: SCORING_INSTRUCTIONS,
         prompt: userPrompt,
@@ -54,7 +58,7 @@ export class GeminiProvider implements ScoringProvider {
       const usage: ScoreUsage = {
         inputTokens: result.usage?.inputTokens,
         outputTokens: result.usage?.outputTokens,
-        modelId: AI_MODEL,
+        modelId: this.modelId,
       };
 
       return ok({ ...result.output, _usage: usage });

@@ -17,6 +17,7 @@ interface ProfileViewModeProps {
   parsedSkillsList: string[];
   aiUsage?: UserAiUsage | null;
   aiUsageError?: boolean;
+  aiUsageSlot?: React.ReactNode;
   resumeLabel?: string;
   resumeVersion?: number;
   resumeLanguage?: string;
@@ -35,6 +36,7 @@ export function ProfileViewMode({
   parsedSkillsList,
   aiUsage,
   aiUsageError = false,
+  aiUsageSlot,
   resumeLabel,
   resumeVersion,
   resumeLanguage,
@@ -78,6 +80,7 @@ export function ProfileViewMode({
         educationCount={education.length}
         aiUsage={aiUsage}
         aiUsageError={aiUsageError}
+        aiUsageSlot={aiUsageSlot}
         resumeLabel={resumeLabel}
         resumeVersion={resumeVersion}
         resumeLanguage={resumeLanguage}

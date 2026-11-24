@@ -9,6 +9,7 @@ import {
   MapPin,
   ArrowUpRight,
   ChevronDown,
+  Banknote,
 } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
 import { formatSourceName } from "@/lib/format-source";
@@ -122,6 +123,19 @@ export function JobDetailHeader({ job, onStatusChange }: JobDetailHeaderProps) {
                 <span>{locationText}</span>
               </span>
             )}
+
+            {job.rawSalaryText && (
+              <span className="inline-flex items-center gap-1.5">
+                <Banknote className="size-4.5 shrink-0 text-muted-foreground" />
+                <span>{job.rawSalaryText}</span>
+              </span>
+            )}
+
+            {job.language && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 dark:bg-zinc-800 text-[10px] font-semibold uppercase tracking-wider text-slate-600 dark:text-zinc-300">
+                {job.language}
+              </span>
+            )}
           </div>
         </div>
 
@@ -132,7 +146,7 @@ export function JobDetailHeader({ job, onStatusChange }: JobDetailHeaderProps) {
               href={safeJobUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-md text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-md text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors duration-300 ease-out cursor-pointer"
             >
               <span>{t("apply")}</span>
               <ArrowUpRight className="size-4.5 shrink-0" />
@@ -140,7 +154,7 @@ export function JobDetailHeader({ job, onStatusChange }: JobDetailHeaderProps) {
           )}
 
           <DropdownMenu>
-            <DropdownMenuTrigger className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground font-normal transition-colors cursor-pointer">
+            <DropdownMenuTrigger className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground font-normal transition-colors duration-300 ease-out cursor-pointer">
               <span>
                 {t("statusLabel")}: {currentStatusLabel}
               </span>

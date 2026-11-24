@@ -12,9 +12,14 @@ import {
 import { recordAdminAuditEvent } from "@/services/admin/admin.service";
 import {
   SUPPORTED_AI_PROVIDERS,
+  isValidModelId,
   setGlobalAiProvider,
   type GlobalAiProvider,
 } from "@/services/ai/provider-config";
+import {
+  listModelsForProvider,
+  type ProviderModelCatalog,
+} from "@/services/ai/model-catalog";
 import { SETTINGS_TAG, ADMIN_OVERVIEW_TAG, revalidateTags } from "@/lib/cache-tags";
 import { ok, err, type Result } from "@/lib/result";
 import { z } from "zod";
@@ -41,6 +46,18 @@ const setGlobalFlagSchema = z.object({
 
 const setGlobalAiProviderSchema = z.object({
   provider: z.enum(SUPPORTED_AI_PROVIDERS),
+  modelId: z
+    .string()
+    .trim()
+    .min(1)
+    .max(120)
+    .refine((val) => isValidModelId(val), "Invalid AI model identifier")
+    .optional(),
+});
+
+const listAiModelsSchema = z.object({
+  provider: z.enum(SUPPORTED_AI_PROVIDERS),
+  forceRefresh: z.boolean().optional(),
 });
 
 /**
@@ -210,11 +227,12 @@ export async function getAdminOverridesAction(
 }
 
 /**
- * Admin action: Update the global AI provider used across the entire app.
+ * Admin action: Update the global AI provider and optional model ID used across the entire app.
  */
 export async function setGlobalAiProviderAction(
-  provider: GlobalAiProvider
-): Promise<Result<{ provider: GlobalAiProvider }, string>> {
+  provider: GlobalAiProvider,
+  modelId?: string
+): Promise<Result<{ provider: GlobalAiProvider; modelId: string }, string>> {
   const sessionResult = await requireSession();
   if (!sessionResult.ok || !sessionResult.value) {
     return err("Unauthorized");
@@ -224,19 +242,47 @@ export async function setGlobalAiProviderAction(
     return err("Forbidden: Admin privileges required");
   }
 
-  const parsed = setGlobalAiProviderSchema.safeParse({ provider });
+  const parsed = setGlobalAiProviderSchema.safeParse({ provider, modelId });
   if (!parsed.success) {
-    return err("Invalid AI provider");
+    return err(parsed.error.issues[0]?.message || "Invalid AI configuration");
   }
 
   const updateRes = await setGlobalAiProvider(
     parsed.data.provider,
-    sessionResult.value.user.id
+    sessionResult.value.user.id,
+    parsed.data.modelId
   );
   if (!updateRes.ok) {
-    return err(updateRes.error.message || "Failed to update global AI provider");
+    return err(updateRes.error.message || "Failed to update global AI configuration");
   }
 
   revalidateTags([ADMIN_OVERVIEW_TAG]);
   return ok(updateRes.value);
+}
+
+/**
+ * Admin action: Lists available models for a provider (cached in Redis or fetched live from provider API).
+ */
+export async function listAiProviderModelsAction(
+  provider: GlobalAiProvider,
+  forceRefresh = false
+): Promise<Result<ProviderModelCatalog, string>> {
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok || !sessionResult.value) {
+    return err("Unauthorized");
+  }
+
+  if (!isAdmin(sessionResult.value.user)) {
+    return err("Forbidden: Admin privileges required");
+  }
+
+  const parsed = listAiModelsSchema.safeParse({ provider, forceRefresh });
+  if (!parsed.success) {
+    return err("Invalid AI provider");
+  }
+
+  const catalog = await listModelsForProvider(parsed.data.provider, {
+    forceRefresh: parsed.data.forceRefresh,
+  });
+  return ok(catalog);
 }

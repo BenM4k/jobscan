@@ -24,6 +24,7 @@ export const aiFeatureEnum = pgEnum("ai_feature", [
   "tailored_resume",
   "tailored_cover_letter",
   "interview_prep",
+  "job_extraction",
   "explanation",
   "embedding",
 ]);

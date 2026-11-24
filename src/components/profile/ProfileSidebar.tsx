@@ -13,6 +13,7 @@ interface ProfileSidebarProps {
   educationCount?: number;
   aiUsage?: UserAiUsage | null;
   aiUsageError?: boolean;
+  aiUsageSlot?: React.ReactNode;
   resumeLabel?: string;
   resumeVersion?: number;
   resumeLanguage?: string;
@@ -26,6 +27,7 @@ export function ProfileSidebar({
   educationCount = 0,
   aiUsage,
   aiUsageError = false,
+  aiUsageSlot,
   resumeLabel,
   resumeVersion,
   resumeLanguage,
@@ -134,7 +136,11 @@ export function ProfileSidebar({
       </div>
 
       {/* AI Usage Progress */}
-      <AiUsageProgress variant="sidebar" usage={aiUsage} error={aiUsageError} />
+      <div>
+        {aiUsageSlot ?? (
+          <AiUsageProgress variant="sidebar" usage={aiUsage} error={aiUsageError} />
+        )}
+      </div>
     </aside>
   );
 }

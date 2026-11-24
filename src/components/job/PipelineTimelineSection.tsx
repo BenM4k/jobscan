@@ -29,15 +29,14 @@ function getStatusTranslationKey(status: string) {
 }
 
 /** Renders chronological pipeline status transitions for the job detail view. */
-export function PipelineTimelineSection({ events }: PipelineTimelineSectionProps) {
+export function PipelineTimelineSection({
+  events,
+}: PipelineTimelineSectionProps) {
   const t = useTranslations("jobDetail");
   const format = useFormatter();
 
   return (
-    <section
-      aria-label={t("timelineHeading")}
-      className="py-4 border-t border-border/40 space-y-3"
-    >
+    <section aria-label={t("timelineHeading")} className="py-4 space-y-3">
       <div className="flex items-start gap-3">
         <Clock className="size-4.5 text-muted-foreground dark:text-zinc-400 shrink-0 mt-0.5" />
         <div className="space-y-0.5">
@@ -56,14 +55,22 @@ export function PipelineTimelineSection({ events }: PipelineTimelineSectionProps
         </p>
       ) : (
         <ol className="ml-7.5 border-l-2 border-border dark:border-zinc-800 pl-4 space-y-3">
-          {events.map((item) => {
+          {events.map((item, idx) => {
             const key = getStatusTranslationKey(item.status);
             const label = key ? t(key) : item.status;
+            const isLocal = item.id.startsWith("local-");
             return (
-              <li key={item.id} className="relative">
+              <li
+                key={item.id}
+                className={isLocal ? "relative jp-reveal" : "relative"}
+              >
                 <span
                   aria-hidden="true"
-                  className="absolute -left-[1.35rem] top-1.5 size-2.5 rounded-full bg-blue-600 dark:bg-blue-400 ring-2 ring-background"
+                  className={`absolute -left-[1.35rem] top-1.5 size-2.5 rounded-full bg-blue-600 dark:bg-blue-400 ${
+                    idx === 0
+                      ? "ring-4 ring-blue-600/15 dark:ring-blue-400/15"
+                      : "ring-2 ring-background"
+                  }`}
                 />
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <span className="text-xs font-semibold text-foreground dark:text-zinc-100 capitalize">

@@ -14,6 +14,7 @@ export {
 export {
   mockPaymentConfirmationJob,
   checkSubscriptionExpiryCron,
+  retryCreditRefundJob,
 } from "./functions/billing";
 export {
   embedResumeOnUpdate,

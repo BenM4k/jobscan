@@ -25,6 +25,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { FileText, Info } from "lucide-react";
 import posthog from "posthog-js";
 import { useTranslations } from "next-intl";
@@ -68,7 +69,9 @@ function reconcileTimeline(
         !isLocalTimelineConfirmed(localEvent, serverEvents),
     )
     .map(({ id, status, changedAt }) => ({ id, status, changedAt }));
-  return unconfirmed.length > 0 ? [...unconfirmed, ...serverEvents] : serverEvents;
+  return unconfirmed.length > 0
+    ? [...unconfirmed, ...serverEvents]
+    : serverEvents;
 }
 
 export function JobDetailView({
@@ -116,11 +119,12 @@ export function JobDetailView({
     }
   };
   const handleStatusChange = async (newStatus: JobStatus) => {
+    const previousStatus = job.status;
     setJob((prev) => ({ ...prev, status: newStatus }));
     const res = await transitionJobStatusAction(job.id, newStatus);
     if (!res.success) {
-      toast.error(res.error || "Failed to update status");
-      setJob((prev) => ({ ...prev, status: job.status }));
+      toast.error(res.error || tJob("statusUpdateError"));
+      setJob((prev) => ({ ...prev, status: previousStatus }));
     } else {
       posthog.capture("job_status_updated", {
         status: newStatus,
@@ -135,7 +139,7 @@ export function JobDetailView({
         },
         ...prev,
       ]);
-      toast.success(`Status updated to ${newStatus}`);
+      toast.success(tJob("statusUpdatedToast", { status: newStatus }));
     }
   };
 
@@ -147,7 +151,7 @@ export function JobDetailView({
   };
 
   return (
-    <div className="divide-y divide-border/40">
+    <div className="divide-y divide-border/40 jp-fade-in">
       <JobDetailHeader job={job} onStatusChange={handleStatusChange} />
 
       <JobScoreSection
@@ -172,6 +176,14 @@ export function JobDetailView({
         job={job}
         onJobUpdated={handleJobUpdated}
         selectedResumeId={selectedResumeId}
+        onResumePromoted={(newPersona) => {
+          setResumes((prev) => [
+            newPersona,
+            ...prev.filter((r) => r.id !== newPersona.id),
+          ]);
+          handleSelectResume(newPersona.id);
+        }}
+        onResumeReverted={handleSelectResume}
       />
 
       <JobCoverLetterSection
@@ -230,34 +242,39 @@ export function JobDetailView({
               {tDash("missingResumeDescription")}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="flex flex-row items-center justify-end gap-3 pt-3 border-t border-border/40">
-            <button
+          <DialogFooter className="flex flex-row items-center justify-end gap-2 pt-3 border-t border-border/40">
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => scoring.setMissingResumeOpen(false)}
-              className="text-xs font-normal text-muted-foreground hover:text-foreground transition-colors cursor-pointer p-0 bg-transparent border-0"
+              className="text-xs cursor-pointer"
             >
               {tCommon("cancel")}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={() => {
                 scoring.setMissingResumeOpen(false);
                 router.push("/dashboard/profile");
               }}
-              className="text-xs font-normal text-muted-foreground hover:text-foreground transition-colors cursor-pointer p-0 bg-transparent border-0"
+              className="text-xs cursor-pointer"
             >
               {tDash("goToProfile")}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              size="sm"
               onClick={() => {
                 scoring.setMissingResumeOpen(false);
                 setCreateResumeOpen(true);
               }}
-              className="text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-3 py-1.5 transition-colors cursor-pointer shadow-xs"
+              className="text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
             >
               {tJob("uploadResume")}
-            </button>
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -1,35 +1,10 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { cookies } from "next/headers";
-import { hasLocale } from "next-intl";
 import { requireSession } from "@/lib/auth-guard";
-import { isAdmin } from "@/services/auth/admin";
-import { Navbar } from "@/components/layout/Navbar";
+import { PublicNavbar } from "@/components/layout/PublicNavbar";
 import { Logo } from "@/components/Logo";
 import { getTranslations } from "next-intl/server";
 import { DashboardFooter } from "@/components/layout/DashboardFooter";
-import { routing } from "@/i18n/routing";
-
-async function LandingNavbar() {
-  const sessionResult = await requireSession();
-  const user = sessionResult.ok ? sessionResult.value?.user : null;
-  const cookieStore = await cookies();
-  const cookieLocale = cookieStore.get("NEXT_LOCALE")?.value;
-  const locale =
-    cookieLocale && hasLocale(routing.locales, cookieLocale)
-      ? cookieLocale
-      : routing.defaultLocale;
-
-  return (
-    <Navbar
-      userId={user?.id}
-      userEmail={user?.email}
-      userName={user?.name}
-      isAdmin={isAdmin(user)}
-      locale={locale}
-    />
-  );
-}
 
 async function LandingCTA() {
   const [sessionResult, t] = await Promise.all([
@@ -74,13 +49,7 @@ export default async function LandingPage() {
       />
 
       <header>
-        <Suspense
-          fallback={
-            <div className="h-16 border-b border-slate-300 dark:border-zinc-800 bg-white/80 dark:bg-[#0A0A0C]/90" />
-          }
-        >
-          <LandingNavbar />
-        </Suspense>
+        <PublicNavbar />
       </header>
 
       {/* Floating Tactical Widgets */}

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { JobSelect } from "@/dal/jobs.dal";
 import { Sparkles, AlertCircle, RotateCcw } from "lucide-react";
 import { getScoreBadgeStyle } from "@/lib/score-style";
@@ -9,6 +9,7 @@ import { MatchExplanation } from "./MatchExplanation";
 import { SkillGapBreakdown } from "./SkillGapBreakdown";
 import { MasterResumeSelect } from "@/services/db/schema";
 import { PersonaSelectDropdown } from "./PersonaSelectDropdown";
+import { ConfirmRegenerateDialog } from "./ConfirmRegenerateDialog";
 import { RetryProgressBadge } from "@/components/ui/RetryProgressBadge";
 import type { AsyncJobStatus } from "@/hooks/useAsyncJobWithRetry";
 
@@ -48,8 +49,15 @@ export function JobScoreSection({
   onCancelRetry,
 }: JobScoreSectionProps) {
   const t = useTranslations("jobDetail");
+  const [hasTriggeredScore, setHasTriggeredScore] = useState(false);
+  const [confirmRescoreOpen, setConfirmRescoreOpen] = useState(false);
   const isScored = job.fitScore !== null && job.fitScore !== undefined;
   const scoreStyle = isScored ? getScoreBadgeStyle(job.fitScore!) : null;
+
+  const handleScoreClick = () => {
+    setHasTriggeredScore(true);
+    onScoreJob();
+  };
 
   return (
     <section aria-label={t("qualificationMatch")} className="py-4 space-y-3">
@@ -94,7 +102,7 @@ export function JobScoreSection({
           ) : (
             <button
               type="button"
-              onClick={() => onScoreJob()}
+              onClick={handleScoreClick}
               className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer font-sans"
             >
               <span>{t("scoreMatch")}</span>
@@ -124,7 +132,7 @@ export function JobScoreSection({
 
       {/* Lightweight Loading State */}
       {isScoring && (
-        <div className="pt-2 pb-1 space-y-2">
+        <div className="pt-2 pb-1 space-y-2 jp-fade-in">
           <div className="h-0.5 w-full bg-blue-600/10 dark:bg-blue-400/10 overflow-hidden rounded-full">
             <div className="h-full w-1/3 bg-blue-600 dark:bg-blue-400 animate-pulse" />
           </div>
@@ -137,7 +145,11 @@ export function JobScoreSection({
 
       {/* Inline Generated Content */}
       {isScored && !isScoring && (
-        <div className="pt-2 space-y-3 font-sans">
+        <div
+          className={`pt-2 space-y-3 font-sans ${
+            hasTriggeredScore ? "jp-reveal" : ""
+          }`}
+        >
           <MatchExplanation explanation={job.scoreReasoning} />
 
           {/* Matched & Missing Skills Breakdown */}
@@ -162,37 +174,29 @@ export function JobScoreSection({
             </div>
           )}
 
-          {/* Actions Directly Below Content, Separated by Divider */}
-          <div className="pt-3 border-t border-border/40 flex items-center justify-between">
+          {/* Action Directly Below Content, Separated by Divider */}
+          <div className="pt-3 border-t border-border/40 flex items-center">
             <button
               type="button"
-              onClick={() => onScoreJob()}
+              onClick={() => setConfirmRescoreOpen(true)}
               disabled={isScoring}
               className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer disabled:opacity-50 font-sans"
             >
-              <RotateCcw className="size-4.5 shrink-0" />
+              <RotateCcw className="size-3.5 shrink-0" />
               <span>{t("reScore")}</span>
             </button>
-
-            {resumes && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground font-sans">
-                  {t("personaPrefix")}
-                </span>
-                <PersonaSelectDropdown
-                  resumes={resumes}
-                  selectedResumeId={selectedResumeId}
-                  onSelectResume={onSelectResume}
-                  onAddPersona={onAddPersona}
-                  size="xs"
-                  showIcon={false}
-                  disabled={isScoring}
-                />
-              </div>
-            )}
           </div>
         </div>
       )}
+
+      <ConfirmRegenerateDialog
+        open={confirmRescoreOpen}
+        onOpenChange={setConfirmRescoreOpen}
+        title={t("confirmRescoreTitle")}
+        description={t("confirmRescoreDesc")}
+        confirmLabel={t("confirmRescoreAction")}
+        onConfirm={handleScoreClick}
+      />
     </section>
   );
 }

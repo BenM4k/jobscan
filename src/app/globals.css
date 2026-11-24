@@ -140,3 +140,65 @@ body {
     font-size: 16px !important;
   }
 }
+
+/* Calm editorial motion utilities (avoids tw-animate-css filter/transform layer snap) */
+:root {
+  --jp-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes jp-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes jp-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.jp-fade-in {
+  animation: jp-fade-in 520ms var(--jp-ease-out);
+}
+
+.jp-reveal {
+  animation: jp-reveal 560ms var(--jp-ease-out) backwards;
+}
+
+.jp-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 480ms var(--jp-ease-out),
+    opacity 400ms var(--jp-ease-out);
+}
+
+.jp-collapse[data-open="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.jp-collapse > div {
+  overflow: hidden;
+  min-height: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jp-fade-in,
+  .jp-reveal {
+    animation: none !important;
+  }
+  .jp-collapse {
+    transition: none !important;
+  }
+}

@@ -134,19 +134,26 @@ export function diffSkills(
 /**
  * Resolves a model instance for structured text generation across configured providers.
  */
-export function resolveLanguageModel(preferredProvider?: string) {
+export function resolveLanguageModel(
+  preferredProvider?: string,
+  preferredModelId?: string
+) {
   const provider = (
     preferredProvider ||
     process.env.AI_PROVIDER ||
     "gemini"
   ).toLowerCase();
+  const overrideId = preferredModelId?.trim() || undefined;
 
   switch (provider) {
     case "claude": {
       const apiKey = process.env.ANTHROPIC_API_KEY;
       if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not configured");
       const anthropic = createAnthropic({ apiKey });
-      const modelId = "claude-3-5-sonnet-latest";
+      const modelId =
+        overrideId ||
+        process.env.ANTHROPIC_MODEL?.trim() ||
+        "claude-3-5-sonnet-latest";
       return {
         model: anthropic(modelId),
         provider: "claude",
@@ -158,7 +165,8 @@ export function resolveLanguageModel(preferredProvider?: string) {
       const apiKey = process.env.OPENAI_API_KEY;
       if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
       const openai = createOpenAI({ apiKey });
-      const modelId = "gpt-4o";
+      const modelId =
+        overrideId || process.env.OPENAI_MODEL?.trim() || "gpt-4o";
       return {
         model: openai(modelId),
         provider: "openai",
@@ -167,7 +175,8 @@ export function resolveLanguageModel(preferredProvider?: string) {
       };
     }
     case "gateway": {
-      const modelId = process.env.AI_GATEWAY_MODEL || "openai/gpt-4o";
+      const modelId =
+        overrideId || process.env.AI_GATEWAY_MODEL?.trim() || "openai/gpt-4o";
       return {
         model: gateway(modelId),
         provider: "gateway",
@@ -181,7 +190,7 @@ export function resolveLanguageModel(preferredProvider?: string) {
         process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
       if (!apiKey) throw new Error("GEMINI_API_KEY is not configured");
       const google = createGoogleGenerativeAI({ apiKey });
-      const modelId = AI_MODEL;
+      const modelId = overrideId || AI_MODEL;
       return {
         model: google(modelId),
         provider: "gemini",
@@ -198,10 +207,11 @@ export function resolveLanguageModel(preferredProvider?: string) {
 export async function extractSkillsFromJob(
   jobTitle: string,
   jobDescription: string,
-  preferredProvider?: string
+  preferredProvider?: string,
+  preferredModelId?: string
 ): Promise<Result<string[], AppError>> {
   try {
-    const { model } = resolveLanguageModel(preferredProvider);
+    const { model } = resolveLanguageModel(preferredProvider, preferredModelId);
     const result = await generateText({
       model,
       output: Output.object({ schema: extractSkillsSchema }),
@@ -224,10 +234,11 @@ export async function extractSkillsFromJob(
  */
 export async function extractSkillsFromResume(
   resumeText: string,
-  preferredProvider?: string
+  preferredProvider?: string,
+  preferredModelId?: string
 ): Promise<Result<string[], AppError>> {
   try {
-    const { model } = resolveLanguageModel(preferredProvider);
+    const { model } = resolveLanguageModel(preferredProvider, preferredModelId);
     const result = await generateText({
       model,
       output: Output.object({ schema: extractSkillsSchema }),
@@ -252,10 +263,11 @@ export async function extractSkillsCombined(
   jobTitle: string,
   jobDescription: string,
   resumeText: string,
-  preferredProvider?: string
+  preferredProvider?: string,
+  preferredModelId?: string
 ): Promise<Result<{ jobSkills: string[]; resumeSkills: string[] }, AppError>> {
   try {
-    const { model } = resolveLanguageModel(preferredProvider);
+    const { model } = resolveLanguageModel(preferredProvider, preferredModelId);
     const result = await generateText({
       model,
       output: Output.object({ schema: extractCombinedSkillsSchema }),
@@ -297,6 +309,7 @@ export async function performSkillGapAnalysis(params: {
   resumeText: string;
   mode?: "combined" | "separate";
   preferredProvider?: string;
+  preferredModelId?: string;
 }): Promise<
   Result<
     {
@@ -316,6 +329,7 @@ export async function performSkillGapAnalysis(params: {
     resumeText,
     mode = "combined",
     preferredProvider,
+    preferredModelId,
   } = params;
 
   let jobSkills: string[] = [];
@@ -323,8 +337,8 @@ export async function performSkillGapAnalysis(params: {
 
   if (mode === "separate") {
     const [jobRes, resumeRes] = await Promise.all([
-      extractSkillsFromJob(jobTitle, jobDescription, preferredProvider),
-      extractSkillsFromResume(resumeText, preferredProvider),
+      extractSkillsFromJob(jobTitle, jobDescription, preferredProvider, preferredModelId),
+      extractSkillsFromResume(resumeText, preferredProvider, preferredModelId),
     ]);
 
     if (!jobRes.ok) return err(jobRes.error);
@@ -337,7 +351,8 @@ export async function performSkillGapAnalysis(params: {
       jobTitle,
       jobDescription,
       resumeText,
-      preferredProvider
+      preferredProvider,
+      preferredModelId
     );
     if (!combinedRes.ok) return err(combinedRes.error);
 
@@ -418,10 +433,14 @@ export async function analyzeJobResumeMatch(
   resumeContent: string,
   language: "en" | "fr" = "en",
   userId?: string | null,
-  preferredProvider?: string
+  preferredProvider?: string,
+  preferredModelId?: string
 ): Promise<Result<MatchAnalysisResult, AppError>> {
   try {
-    const { model, provider, modelId } = resolveLanguageModel(preferredProvider);
+    const { model, provider, modelId } = resolveLanguageModel(
+      preferredProvider,
+      preferredModelId
+    );
     const { system, prompt } = buildMatchAnalysisPrompt(
       jobDescription,
       resumeContent,
@@ -470,7 +489,8 @@ export async function analyzeSkillGap(
   resumeContent: string,
   language: "en" | "fr" = "en",
   userId?: string,
-  preferredProvider?: string
+  preferredProvider?: string,
+  preferredModelId?: string
 ): Promise<
   Result<
     {
@@ -488,7 +508,8 @@ export async function analyzeSkillGap(
     resumeContent,
     language,
     userId,
-    preferredProvider
+    preferredProvider,
+    preferredModelId
   );
 
   if (!matchRes.ok) return err(matchRes.error);

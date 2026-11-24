@@ -57,7 +57,7 @@ export async function getCreditBalance(
  * Gets configured credit cost for an action from `credit_cost`, falling back to default constants.
  */
 export async function getCreditCost(
-  action: "tailored_resume" | "tailored_cover_letter" | "interview_prep"
+  action: "tailored_resume" | "tailored_cover_letter" | "interview_prep" | "job_extraction"
 ): Promise<Result<number, AppError>> {
   try {
     const [row] = await db
@@ -75,6 +75,7 @@ export async function getCreditCost(
       tailored_resume: 5,
       tailored_cover_letter: 5,
       interview_prep: 3,
+      job_extraction: 1,
     };
     return ok(defaults[action] ?? 5);
   } catch (error) {
@@ -88,7 +89,7 @@ export async function getCreditCost(
  */
 export async function spendCreditsWithLock(
   userId: string,
-  action: "tailored_resume" | "tailored_cover_letter" | "interview_prep",
+  action: "tailored_resume" | "tailored_cover_letter" | "interview_prep" | "job_extraction",
   cost: number,
   relatedId?: string | null
 ): Promise<Result<{ balanceAfter: number }, AppError>> {

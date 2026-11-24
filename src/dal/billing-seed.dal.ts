@@ -16,18 +16,16 @@ export async function seedBillingDefaultsIfEmpty(): Promise<Result<void, AppErro
         sql`SELECT pg_advisory_xact_lock(hashtext('billing_seed_lock'))`
       );
 
-      // 1. Seed credit costs
-      const existingCosts = await tx.select().from(creditCost);
-      if (existingCosts.length === 0) {
-        await tx
-          .insert(creditCost)
-          .values([
-            { action: "tailored_resume", cost: 5 },
-            { action: "tailored_cover_letter", cost: 5 },
-            { action: "interview_prep", cost: 3 },
-          ])
-          .onConflictDoNothing();
-      }
+      // 1. Seed credit costs (idempotent across schema updates)
+      await tx
+        .insert(creditCost)
+        .values([
+          { action: "tailored_resume", cost: 5 },
+          { action: "tailored_cover_letter", cost: 5 },
+          { action: "interview_prep", cost: 3 },
+          { action: "job_extraction", cost: 1 },
+        ])
+        .onConflictDoNothing();
 
       // 2. Seed starter credit packs
       const existingPacks = await tx.select().from(creditPack);

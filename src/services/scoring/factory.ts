@@ -5,7 +5,10 @@ import { GeminiProvider } from "./gemini-provider";
 import { OpenAIProvider } from "./openai-provider";
 import { GatewayProvider } from "./gateway-provider";
 
-export function getScoringProvider(providerName?: string): ScoringProvider {
+export function getScoringProvider(
+  providerName?: string,
+  modelId?: string
+): ScoringProvider {
   const selected = (
     providerName ||
     process.env.AI_PROVIDER ||
@@ -14,13 +17,13 @@ export function getScoringProvider(providerName?: string): ScoringProvider {
 
   switch (selected) {
     case "gateway":
-      return new GatewayProvider();
+      return new GatewayProvider(modelId);
     case "claude":
-      return new ClaudeProvider();
+      return new ClaudeProvider(modelId);
     case "openai":
-      return new OpenAIProvider();
+      return new OpenAIProvider(modelId);
     case "gemini":
     default:
-      return new GeminiProvider();
+      return new GeminiProvider(modelId);
   }
 }

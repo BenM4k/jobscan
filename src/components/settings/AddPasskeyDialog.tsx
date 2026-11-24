@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Loader2, Fingerprint } from "lucide-react";
+import { Loader2, Fingerprint, ShieldCheck } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -17,8 +17,10 @@ interface AddPasskeyDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultName: string;
+  initialName?: string;
+  reauthReady?: boolean;
   isSubmitting: boolean;
-  onConfirm: (name: string) => Promise<void>;
+  onConfirm: (name: string) => Promise<boolean>;
 }
 
 /** Accessible shadcn Dialog replacing browser `window.prompt()` for passkey naming. */
@@ -26,16 +28,19 @@ export function AddPasskeyDialog({
   open,
   onOpenChange,
   defaultName,
+  initialName,
+  reauthReady = false,
   isSubmitting,
   onConfirm,
 }: AddPasskeyDialogProps) {
   const t = useTranslations("settings");
   const tCommon = useTranslations("common");
-  const [name, setName] = useState(defaultName);
+  const [name, setName] = useState(initialName || defaultName);
 
   const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && isSubmitting) return;
     if (nextOpen) {
-      setName(defaultName);
+      setName(initialName || defaultName);
     }
     onOpenChange(nextOpen);
   };
@@ -43,8 +48,10 @@ export function AddPasskeyDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const resolved = name.trim() || defaultName;
-    onOpenChange(false);
-    await onConfirm(resolved);
+    const completed = await onConfirm(resolved);
+    if (completed) {
+      onOpenChange(false);
+    }
   };
 
   return (
@@ -61,6 +68,13 @@ export function AddPasskeyDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 pt-1">
+          {reauthReady && (
+            <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/70 dark:bg-emerald-950/30 px-3 py-2.5 text-xs text-emerald-700 dark:text-emerald-300 flex items-start gap-2">
+              <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{t("passkeyReauthReady")}</span>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <label
               htmlFor="passkey-device-name"

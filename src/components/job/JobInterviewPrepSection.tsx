@@ -1,11 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { MessageSquare, RotateCcw, Copy, Check } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { JobSelect } from "@/dal/jobs.dal";
 import type { InterviewQuestionItem } from "@/dal/interview.dal";
 import { useInterviewPrep } from "./useInterviewPrep";
+import { ConfirmRegenerateDialog } from "./ConfirmRegenerateDialog";
 import { InsufficientCreditsDialog } from "@/components/billing/InsufficientCreditsDialog";
 
 interface JobInterviewPrepSectionProps {
@@ -41,6 +42,8 @@ export function JobInterviewPrepSection({
 }: JobInterviewPrepSectionProps) {
   const t = useTranslations("jobDetail");
   const tCommon = useTranslations("common");
+  const [generationCount, setGenerationCount] = useState(0);
+  const [confirmRegenOpen, setConfirmRegenOpen] = useState(false);
   const {
     questions,
     isGenerating,
@@ -59,11 +62,13 @@ export function JobInterviewPrepSection({
     onPipelineEntryResolved,
   });
 
+  const onGenerateClick = () => {
+    setGenerationCount((c) => c + 1);
+    void handleGenerate();
+  };
+
   return (
-    <section
-      aria-label={t("interviewPrepHeading")}
-      className="py-4 border-b border-border/40 space-y-3"
-    >
+    <section aria-label={t("interviewPrepHeading")} className="py-4 space-y-3">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
           <MessageSquare className="size-4.5 text-muted-foreground dark:text-zinc-400 shrink-0 mt-0.5" />
@@ -81,18 +86,23 @@ export function JobInterviewPrepSection({
           <div className="shrink-0 pt-0.5">
             <button
               type="button"
-              onClick={handleGenerate}
-              className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors p-0 bg-transparent border-0 cursor-pointer font-sans"
+              onClick={onGenerateClick}
+              className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors p-0 bg-transparent border-0 cursor-pointer font-sans inline-flex items-center gap-1.5"
             >
-              {t("generateInterviewPrep")}
+              <span>{t("generateInterviewPrep")}</span>
+              <span className="text-xs text-muted-foreground font-normal">
+                ({t("cost3Credits")})
+              </span>
             </button>
           </div>
         )}
       </div>
 
       {isGenerating && (
-        <div className="ml-7.5 border-l-2 border-border dark:border-zinc-800 pl-3.5 py-1 space-y-2">
-          <p className="text-xs text-muted-foreground">{t("regeneratingInterviewPrep")}</p>
+        <div className="ml-7.5 border-l-2 border-border dark:border-zinc-800 pl-3.5 py-1 space-y-2 jp-fade-in">
+          <p className="text-xs text-muted-foreground">
+            {t("regeneratingInterviewPrep")}
+          </p>
           <div className="h-3.5 w-full bg-muted dark:bg-zinc-800 animate-pulse rounded-sm" />
           <div className="h-3.5 w-5/6 bg-muted dark:bg-zinc-800 animate-pulse rounded-sm" />
         </div>
@@ -105,7 +115,10 @@ export function JobInterviewPrepSection({
       )}
 
       {questions.length > 0 && !isGenerating && (
-        <div className="space-y-3">
+        <div
+          key={generationCount}
+          className={generationCount > 0 ? "space-y-3 jp-reveal" : "space-y-3"}
+        >
           <div className="ml-7.5 border-l-2 border-border dark:border-zinc-800 pl-3.5 space-y-4">
             {questions.map((item, idx) => (
               <div key={idx} className="space-y-1.5">
@@ -117,7 +130,9 @@ export function JobInterviewPrepSection({
                     {idx + 1}. {item.question}
                   </h3>
                 </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">{item.context}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {item.context}
+                </p>
                 {item.suggestedTalkingPoints.length > 0 && (
                   <div className="space-y-1 pt-0.5">
                     <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -140,13 +155,17 @@ export function JobInterviewPrepSection({
               onClick={handleCopyAll}
               className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer font-sans"
             >
-              {isCopied ? <Check className="size-3.5 shrink-0" /> : <Copy className="size-3.5 shrink-0" />}
+              {isCopied ? (
+                <Check className="size-3.5 shrink-0" />
+              ) : (
+                <Copy className="size-3.5 shrink-0" />
+              )}
               <span>{isCopied ? tCommon("copied") : t("copyQuestions")}</span>
             </button>
 
             <button
               type="button"
-              onClick={handleGenerate}
+              onClick={() => setConfirmRegenOpen(true)}
               disabled={isGenerating}
               className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer disabled:opacity-50 font-sans"
             >
@@ -156,6 +175,16 @@ export function JobInterviewPrepSection({
           </div>
         </div>
       )}
+
+      <ConfirmRegenerateDialog
+        open={confirmRegenOpen}
+        onOpenChange={setConfirmRegenOpen}
+        title={t("confirmRegenInterviewTitle")}
+        description={t("confirmRegenInterviewDesc")}
+        confirmLabel={t("regenerateInterviewPrep")}
+        costLabel={t("cost3Credits")}
+        onConfirm={onGenerateClick}
+      />
 
       <InsufficientCreditsDialog
         open={insufficientOpen}

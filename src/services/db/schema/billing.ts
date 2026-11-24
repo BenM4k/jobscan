@@ -22,6 +22,7 @@ export const creditLedgerActionEnum = pgEnum("credit_ledger_action", [
   "tailored_resume",
   "tailored_cover_letter",
   "interview_prep",
+  "job_extraction",
   "refund",
   "admin_grant",
 ]);
@@ -30,6 +31,7 @@ export const creditCostActionEnum = pgEnum("credit_cost_action", [
   "tailored_resume",
   "tailored_cover_letter",
   "interview_prep",
+  "job_extraction",
 ]);
 
 export const creditPurchaseStatusEnum = pgEnum("credit_purchase_status", [

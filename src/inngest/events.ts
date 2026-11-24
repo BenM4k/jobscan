@@ -49,6 +49,15 @@ export const resumeUpdatedEvent = eventType("resume.updated", {
   }),
 });
 
+export const creditRefundRetryEvent = eventType("billing.refund.retry", {
+  schema: z.object({
+    userId: z.string(),
+    amount: z.number().int().positive(),
+    reason: z.string(),
+    idempotencyKey: z.string(),
+  }),
+});
+
 export type JobFetchRequestedInput = z.infer<
   typeof jobFetchRequestedEvent.schema
 >;
