@@ -419,6 +419,30 @@ async function runSasPayTests() {
   }
   assert(err410?.code === "CONFLICT", "HTTP 410 must map to CONFLICT");
 
+  // 7. verifySasPayAmountAndCurrency optional requested_amount fallback to debited_amount
+  assert(
+    verifySasPayAmountAndCurrency(
+      {
+        currency: "USD",
+        requested_amount: undefined,
+        debited_amount: "15.00",
+      },
+      1500
+    ).valid,
+    "Missing requested_amount must fall back to debited_amount"
+  );
+  assert(
+    !verifySasPayAmountAndCurrency(
+      {
+        currency: "USD",
+        requested_amount: "",
+        debited_amount: "10.00",
+      },
+      1500
+    ).valid,
+    "Empty requested_amount must fall back to debited_amount and fail when underpaid"
+  );
+
   console.log("✅ All SasPay integration unit tests passed successfully!");
 }
 

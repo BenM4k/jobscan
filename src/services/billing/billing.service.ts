@@ -587,7 +587,7 @@ export async function getBillingOverviewData(userId: string): Promise<
   let plans = initialPlansRes.value;
 
   if (packs.length === 0 || plans.length === 0) {
-    await seedBillingDefaultsIfEmpty();
+    const seedRes = await seedBillingDefaultsIfEmpty();
     const [refetchedPacks, refetchedPlans] = await Promise.all([
       billingDal.getCreditPacks(true),
       billingDal.getSubscriptionPlans(true),
@@ -597,6 +597,14 @@ export async function getBillingOverviewData(userId: string): Promise<
     }
     if (refetchedPlans.ok && refetchedPlans.value.length > 0) {
       plans = refetchedPlans.value;
+    }
+    if (packs.length === 0 || plans.length === 0) {
+      if (!refetchedPacks.ok) return err(refetchedPacks.error);
+      if (!refetchedPlans.ok) return err(refetchedPlans.error);
+      if (!seedRes.ok) return err(seedRes.error);
+      return err(
+        new AppError("DB_ERROR", "Billing catalog could not be initialized")
+      );
     }
   }
 
@@ -625,11 +633,16 @@ export async function readBillingSnapshot(userId: string): Promise<{
     billingDal.getCreditLedger(userId, 50),
   ]);
 
+  if (!balanceRes.ok) throw balanceRes.error;
+  if (!subRes.ok) throw subRes.error;
+  if (!packsRes.ok) throw packsRes.error;
+  if (!plansRes.ok) throw plansRes.error;
+
   return {
-    balance: balanceRes.ok ? balanceRes.value : 0,
-    subscription: subRes.ok ? subRes.value : null,
-    packs: packsRes.ok ? packsRes.value : [],
-    plans: plansRes.ok ? plansRes.value : [],
+    balance: balanceRes.value,
+    subscription: subRes.value,
+    packs: packsRes.value,
+    plans: plansRes.value,
     ledger: ledgerRes.ok ? ledgerRes.value : [],
   };
 }
@@ -747,9 +760,9 @@ export async function checkAndConfirmPurchaseStatus(
         }
         const amountCheck = verifySasPayAmountAndCurrency(
           {
-            currency: verified.currency ?? "",
-            requested_amount: verified.requestedAmount ?? "",
-            debited_amount: verified.debitedAmount ?? "",
+            currency: verified.currency,
+            requested_amount: verified.requestedAmount,
+            debited_amount: verified.debitedAmount,
           },
           packRes.value.priceCents
         );
@@ -780,9 +793,9 @@ export async function checkAndConfirmPurchaseStatus(
         }
         const amountCheck = verifySasPayAmountAndCurrency(
           {
-            currency: verified.currency ?? "",
-            requested_amount: verified.requestedAmount ?? "",
-            debited_amount: verified.debitedAmount ?? "",
+            currency: verified.currency,
+            requested_amount: verified.requestedAmount,
+            debited_amount: verified.debitedAmount,
           },
           plan.priceCentsMonthly
         );

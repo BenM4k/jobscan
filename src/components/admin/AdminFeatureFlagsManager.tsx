@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
   searchUsersAction,
@@ -33,6 +33,7 @@ export function AdminFeatureFlagsManager({
   const [overrides, setOverrides] = useState(initialOverrides);
   const [isPending, startTransition] = useTransition();
 
+  const searchRequestIdRef = useRef(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchedFlagUser[]>([]);
@@ -68,32 +69,50 @@ export function AdminFeatureFlagsManager({
     });
   };
 
-  const handleSearchUsers = async () => {
+  const handleSearchQueryChange = (value: string) => {
+    searchRequestIdRef.current += 1;
+    setSearchQuery(value);
+  };
+
+  const handleSearchUsers = async (): Promise<boolean> => {
     const query = (selectedUser ? selectedUser.email : searchQuery).trim();
     if (!query) {
       toast.error("Please enter an email to search");
-      return;
+      return false;
     }
 
+    const reqId = ++searchRequestIdRef.current;
     setIsSearching(true);
     try {
       const res = await searchUsersAction(query);
+      if (reqId !== searchRequestIdRef.current) {
+        return false;
+      }
       if (res.success && res.users) {
         setSearchResults(res.users);
         if (res.users.length === 0) {
           toast.info("No users found matching that email");
+          return false;
         }
+        return true;
       } else {
         toast.error(res.error || "Failed to search users");
+        return false;
       }
     } catch {
-      toast.error("An unexpected error occurred while searching");
+      if (reqId === searchRequestIdRef.current) {
+        toast.error("An unexpected error occurred while searching");
+      }
+      return false;
     } finally {
-      setIsSearching(false);
+      if (reqId === searchRequestIdRef.current) {
+        setIsSearching(false);
+      }
     }
   };
 
   const handleSelectUser = (user: SearchedFlagUser | null) => {
+    searchRequestIdRef.current += 1;
     if (!user) {
       setSelectedUser(null);
       return;
@@ -173,7 +192,7 @@ export function AdminFeatureFlagsManager({
       <UserFlagOverrideForm
         flags={flags}
         searchQuery={searchQuery}
-        onSearchQueryChange={setSearchQuery}
+        onSearchQueryChange={handleSearchQueryChange}
         isSearching={isSearching}
         searchResults={searchResults}
         selectedUser={selectedUser}

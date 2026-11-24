@@ -92,7 +92,7 @@ export const job = pgTable(
     ),
     index("job_simhash_idx").on(t.simhash),
     index("job_description_tsv_idx").using("gin", t.descriptionTsv),
-    index("job_posted_at_idx").on(t.postedAt),
+    index("job_posted_at_idx").on(t.postedAt.desc().nullsLast(), t.createdAt.desc()),
   ]
 );
 

@@ -33,6 +33,9 @@ export const score = pgTable(
   },
   (t) => [
     index("score_pipeline_entry_idx").on(t.pipelineEntryId),
-    index("score_pipeline_entry_created_idx").on(t.pipelineEntryId, t.createdAt),
+    index("score_pipeline_entry_created_idx").on(
+      t.pipelineEntryId.asc(),
+      t.createdAt.desc()
+    ),
   ]
 );

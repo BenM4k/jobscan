@@ -38,6 +38,10 @@ export function CreditPackGrid({
 }: CreditPackGridProps) {
   const t = useTranslations("billing");
   const effectiveSelectedId = pendingAttempt?.packId ?? selectedPackId;
+  const canSubmitPurchase =
+    !isInitiating &&
+    Boolean(phoneNumber.trim()) &&
+    Boolean(selectedPackId);
 
   return (
     <>
@@ -93,7 +97,9 @@ export function CreditPackGrid({
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
-                onPurchase();
+                if (canSubmitPurchase) {
+                  onPurchase();
+                }
               }
             }}
             disabled={purchaseStatus === "pending" || pendingAttempt !== null}
@@ -128,7 +134,7 @@ export function CreditPackGrid({
           <Button
             variant="secondary"
             onClick={onPurchase}
-            disabled={isInitiating || !phoneNumber.trim() || !selectedPackId}
+            disabled={!canSubmitPurchase}
             className="h-10 px-6 rounded-lg text-sm font-medium border border-border/80 bg-secondary/80 hover:bg-secondary text-secondary-foreground transition-colors shadow-2xs"
           >
             {isInitiating ? (

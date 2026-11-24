@@ -34,6 +34,7 @@ export function SubscriptionActionArea({
   onCancel,
 }: SubscriptionActionAreaProps) {
   const t = useTranslations("billing");
+  const canSubscribe = !isInitiating && Boolean(phoneNumber.trim());
 
   if (isActive) {
     return (
@@ -87,7 +88,9 @@ export function SubscriptionActionArea({
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
-              onSubscribe();
+              if (canSubscribe) {
+                onSubscribe();
+              }
             }
           }}
           className="w-full pl-10 pr-3.5 h-10 rounded-lg border border-input bg-transparent text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
@@ -95,7 +98,7 @@ export function SubscriptionActionArea({
       </div>
       <Button
         onClick={onSubscribe}
-        disabled={isInitiating || !phoneNumber.trim()}
+        disabled={!canSubscribe}
         className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold h-10 px-6 rounded-lg shrink-0 shadow-xs transition-colors"
       >
         {isInitiating ? (

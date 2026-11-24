@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Search, UserPlus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,7 +29,7 @@ interface UserFlagOverrideFormProps {
   overrideValue: boolean;
   onOverrideValueChange: (val: boolean) => void;
   isPending: boolean;
-  onSearchUsers: () => Promise<void>;
+  onSearchUsers: () => Promise<boolean>;
   onAddOverride: () => void;
 }
 
@@ -51,10 +51,14 @@ export function UserFlagOverrideForm({
   onAddOverride,
 }: UserFlagOverrideFormProps) {
   const [resultsOpen, setResultsOpen] = useState(false);
+  const searchTokenRef = useRef(0);
 
   const runSearch = async () => {
-    await onSearchUsers();
-    setResultsOpen(true);
+    const token = ++searchTokenRef.current;
+    const hasResults = await onSearchUsers();
+    if (token === searchTokenRef.current && hasResults) {
+      setResultsOpen(true);
+    }
   };
 
   const showPopover = resultsOpen && searchResults.length > 0 && !selectedUser;
@@ -89,6 +93,7 @@ export function UserFlagOverrideForm({
                   type="text"
                   value={selectedUser ? selectedUser.email : searchQuery}
                   onChange={(e) => {
+                    searchTokenRef.current += 1;
                     onSelectUser(null);
                     onSearchQueryChange(e.target.value);
                     setResultsOpen(false);

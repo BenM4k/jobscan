@@ -33,9 +33,11 @@ export function calculatePaymentAmount(amountCents: number, currency: string): s
  * Verifies that the verified SasPay transaction amount and currency match the expected catalog price.
  */
 export function verifySasPayAmountAndCurrency(
-  verify: Pick<
-    SasPayVerifyPaymentResponse,
-    "currency" | "requested_amount" | "debited_amount"
+  verify: Partial<
+    Pick<
+      SasPayVerifyPaymentResponse,
+      "currency" | "requested_amount" | "debited_amount"
+    >
   >,
   expectedAmountCents: number
 ): { valid: boolean; reason?: string } {
@@ -46,7 +48,12 @@ export function verifySasPayAmountAndCurrency(
 
   const expectedStr = calculatePaymentAmount(expectedAmountCents, currency);
   const expectedMinor = Math.round(Number(expectedStr) * 100);
-  const actualRaw = verify.requested_amount ?? verify.debited_amount;
+  const actualRaw =
+    verify.requested_amount !== undefined &&
+    verify.requested_amount !== null &&
+    verify.requested_amount !== ""
+      ? verify.requested_amount
+      : verify.debited_amount;
   const actualNum = Number(actualRaw);
 
   if (

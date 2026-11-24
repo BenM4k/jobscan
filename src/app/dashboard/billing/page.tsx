@@ -21,12 +21,22 @@ async function BillingContent() {
 
   const userId = session.value.user.id;
 
-  let data = await getCachedBillingData(userId);
-  if (data.packs.length === 0 || data.plans.length === 0) {
-    const overviewRes = await getBillingOverviewData(userId);
-    if (overviewRes.ok) {
-      data = overviewRes.value;
+  let data: Awaited<ReturnType<typeof getCachedBillingData>> | null = null;
+  try {
+    const cached = await getCachedBillingData(userId);
+    if (cached.packs.length > 0 && cached.plans.length > 0) {
+      data = cached;
     }
+  } catch {
+    // Fall back to live overview loader so transient snapshot read errors can recover or propagate cleanly.
+  }
+
+  if (!data) {
+    const overviewRes = await getBillingOverviewData(userId);
+    if (!overviewRes.ok) {
+      throw overviewRes.error;
+    }
+    data = overviewRes.value;
   }
 
   return (

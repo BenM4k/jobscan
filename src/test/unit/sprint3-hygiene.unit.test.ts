@@ -128,18 +128,45 @@ async function runSprint3HygieneTests() {
 
   const flagsSrc = readRepoFile("src/services/flags/is-enabled.ts");
   assert(
-    !flagsSrc.includes(".smembers(") && flagsSrc.includes(".sscan("),
-    "is-enabled.ts must use bounded sscan instead of smembers"
+    !flagsSrc.includes(".smembers(") &&
+      flagsSrc.includes(".sscan(") &&
+      flagsSrc.includes("scanComplete"),
+    "is-enabled.ts must scan all cursors until 0 before deleting tracking set"
   );
 
-  // 5. shadcn/ui & HTML accessibility hygiene
+  // 5. shadcn/ui & HTML accessibility hygiene & PR review safeguards
   const passkeySrc = readRepoFile("src/components/settings/PasskeyManagementCard.tsx");
-  assert(!passkeySrc.includes("window.prompt"), "PasskeyManagementCard must use AddPasskeyDialog instead of window.prompt");
+  assert(
+    !passkeySrc.includes("window.prompt") &&
+      passkeySrc.includes("/sign-in?redirect=") &&
+      !passkeySrc.includes("callbackUrl="),
+    "PasskeyManagementCard must use AddPasskeyDialog and redirect= query param"
+  );
 
   const navbarMobileSrc = readRepoFile("src/components/layout/NavbarMobile.tsx");
   assert(
-    navbarMobileSrc.includes('from "@/components/ui/dialog"'),
-    "NavbarMobile must compose shadcn Dialog"
+    navbarMobileSrc.includes('from "@/components/ui/dialog"') &&
+      navbarMobileSrc.includes("max-h-[calc(100dvh-2rem)]") &&
+      navbarMobileSrc.includes("overflow-y-auto"),
+    "NavbarMobile must compose shadcn Dialog with viewport scroll bounds"
+  );
+
+  for (const dlg of [
+    "src/components/admin/GrantCreditsDialog.tsx",
+    "src/components/admin/GiftSubscriptionDialog.tsx",
+    "src/components/admin/BanUserDialog.tsx",
+  ]) {
+    const dlgSrc = readRepoFile(dlg);
+    assert(
+      dlgSrc.includes("!open && !isPending"),
+      `${dlg} must ignore dismissal while isPending is true`
+    );
+  }
+
+  const pollingHookSrc = readRepoFile("src/hooks/useBillingStatusPolling.ts");
+  assert(
+    !pollingHookSrc.includes("setInterval") && pollingHookSrc.includes("setTimeout"),
+    "useBillingStatusPolling must use sequential setTimeout and elapsed deadline"
   );
 
   const overrideFormSrc = readRepoFile("src/components/admin/UserFlagOverrideForm.tsx");

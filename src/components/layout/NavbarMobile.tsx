@@ -67,7 +67,7 @@ export function NavbarMobile({
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="top-4 translate-y-0 w-[calc(100%-1.5rem)] max-w-md rounded-2xl bg-white dark:bg-[#0A0A0C] border-gray-200 dark:border-zinc-800 p-5 gap-4">
+        <DialogContent className="top-4 translate-y-0 w-[calc(100%-1.5rem)] max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl bg-white dark:bg-[#0A0A0C] border-gray-200 dark:border-zinc-800 p-5 gap-4">
           <DialogHeader className="text-left">
             <DialogTitle className="text-sm font-bold text-gray-900 dark:text-zinc-100">
               {t("menu")}

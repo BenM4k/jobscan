@@ -115,30 +115,36 @@ export async function invalidateFeatureFlagCache(
         await client.srem(`flag:${flagKey}:users`, userId).catch(() => {});
       }
     } else {
-      // Global flag-change flow: invalidate anonymous entry and all cached user evaluations
+      // Global flag-change flow: invalidate anonymous entry and scan all tracked users before deleting the tracking set
       const anonKey = getFeatureFlagCacheKey(flagKey, null);
-      const keysToDel: string[] = [anonKey];
+      await cacheDel(anonKey);
       const usersSetKey = `flag:${flagKey}:users`;
       const client = getRedisClient();
       if (client) {
         let cursor = "0";
-        for (let iter = 0; iter < 50; iter++) {
-          const [nextCursor, members] = await client
-            .sscan(usersSetKey, cursor, { count: 200 })
-            .catch(() => ["0", []] as [string, string[]]);
-          if (Array.isArray(members)) {
-            for (const u of members) {
-              keysToDel.push(getFeatureFlagCacheKey(flagKey, String(u)));
-            }
+        let scanComplete = false;
+        while (true) {
+          const [nextCursor, members] = await client.sscan(
+            usersSetKey,
+            cursor,
+            { count: 200 }
+          );
+          if (Array.isArray(members) && members.length > 0) {
+            await cacheDel(
+              ...members.map((u) => getFeatureFlagCacheKey(flagKey, String(u)))
+            );
           }
-          if (!nextCursor || String(nextCursor) === "0") {
+          const normalizedCursor = String(nextCursor ?? "0");
+          if (!nextCursor || normalizedCursor === "0") {
+            scanComplete = true;
             break;
           }
-          cursor = String(nextCursor);
+          cursor = normalizedCursor;
         }
-        keysToDel.push(usersSetKey);
+        if (scanComplete) {
+          await cacheDel(usersSetKey);
+        }
       }
-      await cacheDel(...keysToDel);
     }
   } catch (err) {
     console.warn(`[Flags] Failed to invalidate cache for flag "${flagKey}":`, err);

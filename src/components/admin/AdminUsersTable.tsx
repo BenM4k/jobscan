@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { AdminUserListItem } from "@/dal/admin.dal";
 import { AdminUserRow, type AdminUserDialogType } from "./AdminUserRow";
@@ -30,7 +30,9 @@ export function AdminUsersTable({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchTerm, setSearchTerm] = useState(currentSearch);
+  const dialogSeqRef = useRef(0);
   const [activeDialog, setActiveDialog] = useState<{
+    id: number;
     type: AdminUserDialogType;
     user: AdminUserListItem;
   } | null>(null);
@@ -118,7 +120,11 @@ export function AdminUsersTable({
                   key={u.id}
                   user={u}
                   onOpenDialog={(type, targetUser) =>
-                    setActiveDialog({ type, user: targetUser })
+                    setActiveDialog({
+                      id: ++dialogSeqRef.current,
+                      type,
+                      user: targetUser,
+                    })
                   }
                 />
               ))
@@ -161,23 +167,35 @@ export function AdminUsersTable({
 
       {activeDialog?.type === "credits" && (
         <GrantCreditsDialog
+          key={activeDialog.id}
           user={activeDialog.user}
           isOpen
-          onClose={() => setActiveDialog(null)}
+          onClose={() => {
+            const id = activeDialog.id;
+            setActiveDialog((cur) => (cur?.id === id ? null : cur));
+          }}
         />
       )}
       {activeDialog?.type === "gift" && (
         <GiftSubscriptionDialog
+          key={activeDialog.id}
           user={activeDialog.user}
           isOpen
-          onClose={() => setActiveDialog(null)}
+          onClose={() => {
+            const id = activeDialog.id;
+            setActiveDialog((cur) => (cur?.id === id ? null : cur));
+          }}
         />
       )}
       {activeDialog?.type === "ban" && (
         <BanUserDialog
+          key={activeDialog.id}
           user={activeDialog.user}
           isOpen
-          onClose={() => setActiveDialog(null)}
+          onClose={() => {
+            const id = activeDialog.id;
+            setActiveDialog((cur) => (cur?.id === id ? null : cur));
+          }}
         />
       )}
     </div>

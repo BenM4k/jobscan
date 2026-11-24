@@ -58,7 +58,7 @@ export function PasskeyManagementCard({
               window.sessionStorage.setItem(PENDING_PASSKEY_STORAGE_KEY, passkeyName);
             }
             toast.info(t("passkeySessionNotFresh"));
-            router.push("/sign-in?callbackUrl=%2Fdashboard%2Fsettings%3FretryPasskey%3D1");
+            router.push("/sign-in?redirect=%2Fdashboard%2Fsettings%3FretryPasskey%3D1");
             return;
           }
           toast.error(res.error.message || t("passkeyAddedError"));

@@ -81,7 +81,8 @@ Jobpilot uses **Drizzle ORM** with PostgreSQL. Schema definitions are organized 
 ## 5. Schema Conventions, Indexes & Migrations
 
 - **Keys & Timestamps:** Every table must define an explicit `id` (UUID default random), `createdAt` (timestamp default now), and `updatedAt` (timestamp with automatic or application update).
-- **Performance Indexes (`0026_purple_morg.sql`):** Core hot paths are indexed across `job` (`job_posted_at_idx`), `job_source_ref` (`job_source_ref_job_id_idx`), `pipeline_entry` (`pipeline_entry_job_id_idx`), `job_match_score` (`score_pipeline_entry_created_idx`), `ai_call_log` (`ai_call_log_user_created_idx`), and `feature_flag_assignment` (`feature_flag_assignment_user_idx`).
+- **Performance Indexes (`0026_purple_morg.sql` & follow-up ordering migration):** Core hot paths are indexed across `job` (`job_posted_at_idx` matching `posted_at DESC NULLS LAST, created_at DESC`), `job_source_ref` (`job_source_ref_job_id_idx`), `pipeline_entry` (`pipeline_entry_job_id_idx`), `score` (`score_pipeline_entry_created_idx` matching `pipeline_entry_id ASC, created_at DESC`), `ai_call_log` (`ai_call_log_user_created_idx`), and `feature_flag_assignment` (`feature_flag_assignment_user_idx`).
+- **Index Migration Rollout Policy:** Because `drizzle-kit migrate` runs each SQL migration inside a transaction block (where PostgreSQL disallows `CREATE INDEX CONCURRENTLY`), ingestion and scoring background writers (Inngest cron/workers) should be paused before running `pnpm db:migrate` on index migrations and resumed once the migration commits.
 - **Migration Workflow:**
   1. Modify schemas in `src/services/db/schema/*.ts`.
   2. Inspect changes with `pnpm drizzle-kit generate`.
