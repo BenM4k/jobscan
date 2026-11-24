@@ -20,7 +20,7 @@ export async function fetchEmploiCdJobs(
     try {
       const norm = normalize(item.payload);
       jobs.push({
-        source: "emploicd",
+        source: "emploi_cd",
         externalId: norm.externalId,
         title: norm.title,
         company: norm.company,
@@ -43,7 +43,7 @@ export async function fetchEmploiCdJobs(
   return {
     jobs,
     result: {
-      source: "emploicd",
+      source: "emploi_cd",
       fetched: rawItems.length,
       matched: jobs.length,
       upserted: 0,

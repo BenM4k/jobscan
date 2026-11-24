@@ -1,7 +1,5 @@
 import "server-only";
-import { db } from "@/services/db";
-import { score, pipelineEntry } from "@/services/db/schema";
-import { eq } from "drizzle-orm";
+import type { score } from "@/services/db/schema";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 import { getCachedScore, setCachedScore } from "@/services/ai/score-cache";
@@ -12,7 +10,7 @@ import * as skillsDal from "@/dal/skills.dal";
 import { logAiCall } from "@/services/ai/with-cost-tracking";
 import * as skillsService from "@/services/skills.service";
 import { computeHybridScore } from "@/services/job.service";
-import { isFeatureEnabled } from "@/services/flags";
+import { isHybridScoringEnabled } from "@/services/flags";
 
 /**
  * Versioned label stored across hybrid score records.
@@ -89,39 +87,36 @@ export async function scoreJobForResume(
       });
     }
 
+    const isHybridEnabled = await isHybridScoringEnabled(userId);
+    const cacheModelKey = isHybridEnabled ? MODEL_USED : `${MODEL_USED}-semantic`;
+
     // 2. Cache check
     const cached = await getCachedScore<CachedHybridScore>(
       job.id,
       resume.id,
       resume.version,
-      MODEL_USED
+      cacheModelKey
     );
 
     if (cached) {
-      // 3. Cache HIT: A score row is STILL inserted so history/analytics stay complete
-      const [insertedScore] = await db
-        .insert(score)
-        .values({
-          pipelineEntryId,
-          resumeVersion: resume.version,
-          modelUsed: MODEL_USED,
-          finalScore: cached.finalScore.toString(),
-          cosineSimilarity:
-            cached.cosineSimilarity != null
-              ? cached.cosineSimilarity.toString()
-              : null,
-          bm25Rank:
-            cached.bm25Rank != null ? cached.bm25Rank.toString() : null,
-          matchedSkills: cached.matchedSkills ?? [],
-          missingSkills: cached.missingSkills ?? [],
-          explanation: cached.explanation ?? null,
-        })
-        .returning();
+      // 3. Cache HIT: A score row is STILL inserted via DAL so history/analytics stay complete
+      const insertRes = await jobsDal.insertHybridScoreRecord({
+        pipelineEntryId,
+        userId,
+        resumeId: resume.id,
+        resumeVersion: resume.version,
+        modelUsed: MODEL_USED,
+        finalScore: cached.finalScore,
+        cosineSimilarity: cached.cosineSimilarity,
+        bm25Rank: cached.bm25Rank,
+        matchedSkills: cached.matchedSkills ?? [],
+        missingSkills: cached.missingSkills ?? [],
+        explanation: cached.explanation ?? null,
+      });
 
-      await db
-        .update(pipelineEntry)
-        .set({ updatedAt: new Date(), resumeIdUsed: resume.id })
-        .where(eq(pipelineEntry.id, pipelineEntryId));
+      if (!insertRes.ok) {
+        return err(insertRes.error);
+      }
 
       await logAiCall({
         userId,
@@ -134,7 +129,7 @@ export async function scoreJobForResume(
         cacheHit: true,
       });
 
-      return ok(insertedScore);
+      return ok(insertRes.value);
     }
 
     // 4. Cache MISS:
@@ -142,18 +137,11 @@ export async function scoreJobForResume(
     const resumeLanguage = (resume.language as "en" | "fr") || "en";
     const isLanguageMatch = jobLanguage === resumeLanguage;
 
-    // A. Cosine distance + BM25 lookup (gated by "hybrid-scoring-v1" feature flag)
-    const isHybridEnabled = await isFeatureEnabled(userId, "hybrid-scoring-v1");
-    const canComputeBm25 = isLanguageMatch && isHybridEnabled;
-
     const skillsRes = await resumeDal.getResumeSkills(resume.id);
     const resumeSkills = skillsRes.ok ? skillsRes.value : [];
-    const queryTerms =
-      resumeSkills.length > 0
-        ? resumeSkills.slice(0, 20).join(" or ")
-        : jobLanguage === "fr"
-          ? "développeur"
-          : "developer";
+    const canComputeBm25 =
+      isLanguageMatch && isHybridEnabled && resumeSkills.length > 0;
+    const queryTerms = resumeSkills.slice(0, 20).join(" or ");
 
     const [cosineRes, bm25Res] = await Promise.all([
       jobsDal.getJobResumeSimilarity(job.id, resume.id),
@@ -214,42 +202,48 @@ export async function scoreJobForResume(
       resumeDal.syncResumeSkills(resume.id, extractedResumeSkills),
     ]);
 
-    // E. Persist to score table (undecayed raw score)
-    const [insertedScore] = await db
-      .insert(score)
-      .values({
-        pipelineEntryId,
-        resumeVersion: resume.version,
-        modelUsed: MODEL_USED,
-        finalScore: finalScore.toString(),
-        cosineSimilarity: cosine != null ? cosine.toString() : null,
-        bm25Rank: bm25 != null ? bm25.toString() : null,
-        matchedSkills,
-        missingSkills,
-        explanation,
-      })
-      .returning();
-
-    await db
-      .update(pipelineEntry)
-      .set({ updatedAt: new Date(), resumeIdUsed: resume.id })
-      .where(eq(pipelineEntry.id, pipelineEntryId));
-
-    // F. Cache write with 7-day TTL
-    const cachePayload: CachedHybridScore = {
+    // E. Persist to score table via DAL (undecayed raw score)
+    const insertRes = await jobsDal.insertHybridScoreRecord({
+      pipelineEntryId,
+      userId,
+      resumeId: resume.id,
+      resumeVersion: resume.version,
+      modelUsed: MODEL_USED,
       finalScore,
       cosineSimilarity: cosine,
       bm25Rank: bm25,
       matchedSkills,
       missingSkills,
       explanation,
-      jobSkills: extractedJobSkills,
-      resumeSkills: extractedResumeSkills,
-    };
+    });
 
-    await setCachedScore(job.id, resume.id, resume.version, MODEL_USED, cachePayload);
+    if (!insertRes.ok) {
+      return err(insertRes.error);
+    }
 
-    return ok(insertedScore);
+    // F. Cache write only when skill/explanation analysis succeeded (never cache degraded fallbacks)
+    if (matchRes.ok) {
+      const cachePayload: CachedHybridScore = {
+        finalScore,
+        cosineSimilarity: cosine,
+        bm25Rank: bm25,
+        matchedSkills,
+        missingSkills,
+        explanation,
+        jobSkills: extractedJobSkills,
+        resumeSkills: extractedResumeSkills,
+      };
+
+      await setCachedScore(
+        job.id,
+        resume.id,
+        resume.version,
+        cacheModelKey,
+        cachePayload
+      );
+    }
+
+    return ok(insertRes.value);
   } catch (error) {
     return err(
       new AppError(

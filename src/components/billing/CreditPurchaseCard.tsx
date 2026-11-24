@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useTranslations } from "next-intl";
+import { sanitizeExternalUrl } from "@/lib/safe-url";
 import { Button } from "@/components/ui/button";
 import { CreditPackSelect } from "@/dal/billing.dal";
 import {
@@ -39,15 +40,30 @@ export function CreditPurchaseSection({
     selectedPackRef.current = selectedPack;
   }, [selectedPack]);
 
-  // Keep a single client idempotency key per purchase attempt
-  const idempotencyKeyRef = useRef<string>(crypto.randomUUID());
+  // Keep a single client idempotency key per purchase attempt (initialized lazily on submit)
+  const idempotencyKeyRef = useRef<string | null>(null);
 
-  // Poll status while pending
+  // Poll status while pending with unmount cleanup and timeout cap
   useEffect(() => {
     if (!pollingRef || purchaseStatus !== "pending") return;
 
+    let cancelled = false;
+    let attempts = 0;
+    const MAX_POLL_ATTEMPTS = 60;
+
     const interval = setInterval(async () => {
+      if (cancelled) return;
+      attempts += 1;
+      if (attempts > MAX_POLL_ATTEMPTS) {
+        clearInterval(interval);
+        setPurchaseStatus("idle");
+        setPollingRef(null);
+        toast.error("Payment confirmation timed out. Refresh billing to check status.");
+        return;
+      }
+
       const res = await checkPurchaseStatusAction(pollingRef);
+      if (cancelled) return;
       if (res.success && res.data) {
         if (res.data.status === "confirmed") {
           const amount = selectedPackRef.current?.creditAmount ?? "";
@@ -65,7 +81,10 @@ export function CreditPurchaseSection({
       }
     }, 2000);
 
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [pollingRef, purchaseStatus, onBalanceUpdated, t]);
 
   const handlePurchase = async () => {
@@ -78,12 +97,16 @@ export function CreditPurchaseSection({
       return;
     }
 
+    const idempotencyKey =
+      idempotencyKeyRef.current ??
+      (idempotencyKeyRef.current = crypto.randomUUID());
+
     try {
       setIsInitiating(true);
       const res = await initiateCreditPurchaseAction({
         creditPackId: effectivePackId,
         phoneNumber: phoneNumber.trim(),
-        idempotencyKey: idempotencyKeyRef.current,
+        idempotencyKey,
       });
 
       if (!res.success || !res.data) {
@@ -96,7 +119,15 @@ export function CreditPurchaseSection({
       }
 
       if (res.data.checkoutUrl) {
-        window.location.href = res.data.checkoutUrl;
+        const safeUrl = sanitizeExternalUrl(res.data.checkoutUrl, {
+          httpsOnly: process.env.NODE_ENV === "production",
+        });
+        if (!safeUrl) {
+          toast.error(t("initiateError"));
+          setIsInitiating(false);
+          return;
+        }
+        window.location.href = safeUrl;
         return;
       }
 

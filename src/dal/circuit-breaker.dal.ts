@@ -8,7 +8,7 @@ import {
 } from "@/services/db/schema";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 export async function getCircuitBreaker(
   source: string
@@ -117,22 +117,44 @@ export async function claimHalfOpenProbe(
 ): Promise<Result<{ allowed: boolean }, AppError>> {
   try {
     return await db.transaction(async (tx) => {
-      const [row] = await tx
-        .select()
-        .from(adapterCircuitBreaker)
-        .where(eq(adapterCircuitBreaker.source, source))
-        .for("update")
-        .limit(1);
+      const selectStateWithSqlExpiry = async () => {
+        const [selected] = await tx
+          .select({
+            state: adapterCircuitBreaker.state,
+            openedAt: adapterCircuitBreaker.openedAt,
+            probeExpired: sql<boolean>`${adapterCircuitBreaker.updatedAt} IS NULL OR ${adapterCircuitBreaker.updatedAt} <= NOW() - (${probeLeaseMs} * INTERVAL '1 millisecond')`,
+            backoffExpired: sql<boolean>`${adapterCircuitBreaker.openedAt} IS NULL OR ${adapterCircuitBreaker.openedAt} <= NOW() - (${backoffMs} * INTERVAL '1 millisecond')`,
+          })
+          .from(adapterCircuitBreaker)
+          .where(eq(adapterCircuitBreaker.source, source))
+          .for("update")
+          .limit(1);
+        return selected;
+      };
+
+      let row = await selectStateWithSqlExpiry();
 
       if (!row) {
-        await tx.insert(adapterCircuitBreaker).values({
-          source,
-          state: "closed",
-          consecutiveFailures: 0,
-          consecutiveOpens: 0,
-          openedAt: null,
-        });
-        return ok({ allowed: true });
+        const [inserted] = await tx
+          .insert(adapterCircuitBreaker)
+          .values({
+            source,
+            state: "closed",
+            consecutiveFailures: 0,
+            consecutiveOpens: 0,
+            openedAt: null,
+          })
+          .onConflictDoNothing()
+          .returning({ source: adapterCircuitBreaker.source });
+
+        if (inserted) {
+          return ok({ allowed: true });
+        }
+
+        row = await selectStateWithSqlExpiry();
+        if (!row) {
+          return ok({ allowed: true });
+        }
       }
 
       if (row.state === "closed") {
@@ -140,35 +162,23 @@ export async function claimHalfOpenProbe(
       }
 
       if (row.state === "half_open") {
-        const probeElapsed = row.updatedAt
-          ? Date.now() - row.updatedAt.getTime()
-          : Infinity;
-        if (probeElapsed < probeLeaseMs) {
+        if (!row.probeExpired) {
           return ok({ allowed: false });
         }
 
         // Stale probe lease expired: reclaim and permit a new probe
         await tx
           .update(adapterCircuitBreaker)
-          .set({ updatedAt: new Date() })
+          .set({ updatedAt: sql`NOW()` })
           .where(eq(adapterCircuitBreaker.source, source));
         return ok({ allowed: true });
       }
 
       if (row.state === "open") {
-        if (!row.openedAt) {
+        if (!row.openedAt || row.backoffExpired) {
           await tx
             .update(adapterCircuitBreaker)
-            .set({ state: "half_open", updatedAt: new Date() })
-            .where(eq(adapterCircuitBreaker.source, source));
-          return ok({ allowed: true });
-        }
-
-        const elapsed = Date.now() - row.openedAt.getTime();
-        if (elapsed >= backoffMs) {
-          await tx
-            .update(adapterCircuitBreaker)
-            .set({ state: "half_open", updatedAt: new Date() })
+            .set({ state: "half_open", updatedAt: sql`NOW()` })
             .where(eq(adapterCircuitBreaker.source, source));
           return ok({ allowed: true });
         }
@@ -199,12 +209,17 @@ export async function recordFailureAtomic(
 ): Promise<Result<AdapterCircuitBreakerSelect, AppError>> {
   try {
     return await db.transaction(async (tx) => {
-      const [row] = await tx
-        .select()
-        .from(adapterCircuitBreaker)
-        .where(eq(adapterCircuitBreaker.source, source))
-        .for("update")
-        .limit(1);
+      const selectForUpdate = async () => {
+        const [found] = await tx
+          .select()
+          .from(adapterCircuitBreaker)
+          .where(eq(adapterCircuitBreaker.source, source))
+          .for("update")
+          .limit(1);
+        return found;
+      };
+
+      let row = await selectForUpdate();
 
       if (!row) {
         const [inserted] = await tx
@@ -214,10 +229,24 @@ export async function recordFailureAtomic(
             state: threshold <= 1 ? "open" : "closed",
             consecutiveFailures: 1,
             consecutiveOpens: 0,
-            openedAt: threshold <= 1 ? new Date() : null,
+            openedAt: threshold <= 1 ? sql`NOW()` : null,
           })
+          .onConflictDoNothing()
           .returning();
-        return ok(inserted);
+
+        if (inserted) {
+          return ok(inserted);
+        }
+
+        row = await selectForUpdate();
+        if (!row) {
+          return err(
+            new AppError(
+              "DB_ERROR",
+              `Failed to resolve circuit breaker row for ${source}`
+            )
+          );
+        }
       }
 
       const nextFailures = row.consecutiveFailures + 1;
@@ -236,8 +265,8 @@ export async function recordFailureAtomic(
           state: shouldTrip ? "open" : row.state,
           consecutiveFailures: nextFailures,
           consecutiveOpens: nextOpens,
-          openedAt: shouldTrip ? new Date() : row.openedAt,
-          updatedAt: new Date(),
+          openedAt: shouldTrip ? sql`NOW()` : row.openedAt,
+          updatedAt: sql`NOW()`,
         })
         .where(eq(adapterCircuitBreaker.source, source))
         .returning();

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { JobSelect } from "@/dal/jobs.dal";
 import { JobStatus } from "@/services/db/schema";
 import {
@@ -36,6 +37,7 @@ export function JobList({
   endDate,
   queryFilter,
 }: JobListProps) {
+  const router = useRouter();
   const [jobsList, setJobsList] = useState<JobSelect[]>(initialJobs);
   const [hasMore, setHasMore] = useState<boolean>(initialJobs.length >= 20);
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
@@ -77,24 +79,50 @@ export function JobList({
   ]);
 
   const handleStatusChange = async (jobId: string, newStatus: JobStatus) => {
+    const previousJob = jobsList.find((j) => j.id === jobId);
+    setJobsList((prev) =>
+      prev.map((j) => (j.id === jobId ? { ...j, status: newStatus } : j)),
+    );
+
     const res = await transitionJobStatusAction(jobId, newStatus);
     if (res.success) {
       posthog.capture("job_status_updated", { status: newStatus, location: "list" });
+      toast.success(`Status updated to ${newStatus}`);
+      router.refresh();
+    } else {
+      if (previousJob) {
+        setJobsList((prev) =>
+          prev.map((j) =>
+            j.id === jobId ? { ...j, status: previousJob.status } : j,
+          ),
+        );
+      }
+      toast.error(res.error || "Failed to update status");
     }
-    window.location.reload();
   };
 
   const confirmDeleteJob = async () => {
     if (!jobToDelete) return;
     const targetJob = jobToDelete;
+    const targetIndex = jobsList.findIndex((j) => j.id === targetJob.id);
     setJobToDelete(null);
 
     setJobsList((prev) => prev.filter((j) => j.id !== targetJob.id));
 
     const deleteResult = await deleteJobAction(targetJob.id);
-    if (deleteResult.success) {
-      posthog.capture("job_deleted", { location: "list" });
+    if (!deleteResult.success) {
+      setJobsList((prev) => {
+        if (prev.some((j) => j.id === targetJob.id)) return prev;
+        const next = [...prev];
+        next.splice(Math.max(0, targetIndex), 0, targetJob);
+        return next;
+      });
+      toast.error(deleteResult.error || `Failed to remove "${targetJob.title}"`);
+      return;
     }
+
+    posthog.capture("job_deleted", { location: "list" });
+    router.refresh();
 
     toast.success(`Deleted "${targetJob.title}"`, {
       duration: 5000,
@@ -102,12 +130,23 @@ export function JobList({
       action: {
         label: "Undo",
         onClick: async () => {
-          setJobsList((prev) => [targetJob, ...prev]);
+          setJobsList((prev) => {
+            if (prev.some((j) => j.id === targetJob.id)) return prev;
+            const next = [...prev];
+            next.splice(Math.max(0, targetIndex), 0, targetJob);
+            return next;
+          });
           const restoreResult = await restoreJobAction(targetJob);
           if (restoreResult.success) {
             posthog.capture("job_restored", { location: "list" });
+            toast.info(`Restored "${targetJob.title}"`);
+            router.refresh();
+          } else {
+            setJobsList((prev) => prev.filter((j) => j.id !== targetJob.id));
+            toast.error(
+              restoreResult.error || `Failed to restore "${targetJob.title}"`,
+            );
           }
-          toast.info(`Restored "${targetJob.title}"`);
         },
       },
     });

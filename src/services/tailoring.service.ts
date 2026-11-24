@@ -189,7 +189,9 @@ export async function generateTailoredResume(
       return err(updateResult.error);
     }
 
-    const tailoredResumeRecord = await tailoringDal.getTailoredResume(job.id);
+    const tailoredResumeRecord = await tailoringDal.getTailoredResume(
+      updateResult.value.id
+    );
     const tailoredResumeRecordId = tailoredResumeRecord.ok && tailoredResumeRecord.value
       ? tailoredResumeRecord.value.id
       : undefined;
@@ -311,7 +313,9 @@ export async function generateTailoredCoverLetter(
       return err(updateResult.error);
     }
 
-    const clRecord = await tailoringDal.getTailoredCoverLetter(job.id);
+    const clRecord = await tailoringDal.getTailoredCoverLetter(
+      updateResult.value.id
+    );
     const coverLetterRecordId = clRecord.ok && clRecord.value
       ? clRecord.value.id
       : undefined;

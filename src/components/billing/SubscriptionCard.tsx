@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useTranslations } from "next-intl";
+import { sanitizeExternalUrl } from "@/lib/safe-url";
 import { Button } from "@/components/ui/button";
 import { SubscriptionPlanSelect, SubscriptionSelect } from "@/dal/billing.dal";
 import {
@@ -33,7 +34,7 @@ export function SubscriptionSection({
     "idle" | "pending" | "confirmed" | "failed"
   >("idle");
 
-  const idempotencyKeyRef = useRef<string>(crypto.randomUUID());
+  const idempotencyKeyRef = useRef<string | null>(null);
 
   const isActive =
     subscription?.status === "active" &&
@@ -43,12 +44,27 @@ export function SubscriptionSection({
     subscription?.status === "canceled" &&
     new Date(subscription.currentPeriodEnd) > new Date();
 
-  // Polling for subscription confirmation
+  // Polling for subscription confirmation with unmount cleanup and timeout cap
   useEffect(() => {
     if (!pollingRef || subStatus !== "pending") return;
 
+    let cancelled = false;
+    let attempts = 0;
+    const MAX_POLL_ATTEMPTS = 60;
+
     const interval = setInterval(async () => {
+      if (cancelled) return;
+      attempts += 1;
+      if (attempts > MAX_POLL_ATTEMPTS) {
+        clearInterval(interval);
+        setSubStatus("idle");
+        setPollingRef(null);
+        toast.error("Payment confirmation timed out. Refresh billing to check status.");
+        return;
+      }
+
       const res = await checkPurchaseStatusAction(pollingRef);
+      if (cancelled) return;
       if (res.success && res.data) {
         if (res.data.status === "confirmed") {
           setSubStatus("confirmed");
@@ -65,7 +81,10 @@ export function SubscriptionSection({
       }
     }, 2000);
 
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [pollingRef, subStatus, onSubscriptionUpdated, t]);
 
   const handleSubscribe = async () => {
@@ -75,12 +94,16 @@ export function SubscriptionSection({
       return;
     }
 
+    const idempotencyKey =
+      idempotencyKeyRef.current ??
+      (idempotencyKeyRef.current = crypto.randomUUID());
+
     try {
       setIsInitiating(true);
       const res = await initiateSubscriptionAction({
         planId,
         phoneNumber: phoneNumber.trim(),
-        idempotencyKey: idempotencyKeyRef.current,
+        idempotencyKey,
       });
 
       if (!res.success || !res.data) {
@@ -90,7 +113,15 @@ export function SubscriptionSection({
       }
 
       if (res.data.checkoutUrl) {
-        window.location.href = res.data.checkoutUrl;
+        const safeUrl = sanitizeExternalUrl(res.data.checkoutUrl, {
+          httpsOnly: process.env.NODE_ENV === "production",
+        });
+        if (!safeUrl) {
+          toast.error(t("subInitiateError"));
+          setIsInitiating(false);
+          return;
+        }
+        window.location.href = safeUrl;
         return;
       }
 

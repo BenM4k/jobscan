@@ -10,14 +10,16 @@ import {
   creditPurchase,
   subscriptionPlan,
   subscription,
+  subscriptionPayment,
   CreditBalanceSelect,
   CreditLedgerSelect,
   CreditPackSelect,
   CreditPurchaseSelect,
   SubscriptionPlanSelect,
   SubscriptionSelect,
+  SubscriptionPaymentSelect,
 } from "@/services/db/schema";
-import { eq, desc, sql, and } from "drizzle-orm";
+import { eq, desc, sql, and, gt } from "drizzle-orm";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 
@@ -28,6 +30,7 @@ export type {
   CreditPurchaseSelect,
   SubscriptionPlanSelect,
   SubscriptionSelect,
+  SubscriptionPaymentSelect,
 };
 
 /**
@@ -424,17 +427,141 @@ export async function getSubscriptionByProviderReference(
   providerSubscriptionId: string
 ): Promise<Result<SubscriptionSelect | null, AppError>> {
   try {
+    const [payment] = await db
+      .select()
+      .from(subscriptionPayment)
+      .where(eq(subscriptionPayment.providerReference, providerSubscriptionId))
+      .limit(1);
+
+    if (payment) {
+      const [sub] = await db
+        .select()
+        .from(subscription)
+        .where(eq(subscription.userId, payment.userId))
+        .limit(1);
+      return ok(sub || null);
+    }
+
     const [row] = await db
       .select()
       .from(subscription)
       .where(
-        sql`${providerSubscriptionId} = ANY(string_to_array(regexp_replace(${subscription.providerSubscriptionId}, '\s+', '', 'g'), ','))`
+        sql`${providerSubscriptionId} = ANY(string_to_array(regexp_replace(${subscription.providerSubscriptionId}, '[[:space:]]+', '', 'g'), ','))`
       )
       .limit(1);
     return ok(row || null);
   } catch (error) {
     console.error(`[Billing DAL] Failed to get subscription by reference:`, error);
     return err(new AppError("DB_ERROR", "Failed to get subscription by reference", error));
+  }
+}
+
+/**
+ * Create or reuse a subscription payment attempt (idempotency key scoped per user).
+ */
+export async function createSubscriptionPayment(data: {
+  userId: string;
+  planId: string;
+  provider: string;
+  idempotencyKey: string;
+  providerReference?: string;
+}): Promise<Result<{ payment: SubscriptionPaymentSelect; isExistingIdempotent: boolean }, AppError>> {
+  try {
+    return await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(subscriptionPayment)
+        .values({
+          userId: data.userId,
+          planId: data.planId,
+          status: "pending",
+          provider: data.provider,
+          providerReference: data.providerReference || null,
+          idempotencyKey: data.idempotencyKey,
+        })
+        .onConflictDoNothing({
+          target: [subscriptionPayment.userId, subscriptionPayment.idempotencyKey],
+        })
+        .returning();
+
+      if (created) {
+        return ok({ payment: created, isExistingIdempotent: false });
+      }
+
+      const [existing] = await tx
+        .select()
+        .from(subscriptionPayment)
+        .where(
+          and(
+            eq(subscriptionPayment.userId, data.userId),
+            eq(subscriptionPayment.idempotencyKey, data.idempotencyKey)
+          )
+        )
+        .limit(1);
+
+      if (!existing) {
+        return err(new AppError("DB_ERROR", "Failed to retrieve existing subscription payment"));
+      }
+
+      return ok({ payment: existing, isExistingIdempotent: true });
+    });
+  } catch (error) {
+    console.error("[Billing DAL] Failed to create subscription payment:", error);
+    return err(new AppError("DB_ERROR", "Failed to create subscription payment", error));
+  }
+}
+
+/** Associates a pending subscription payment with its payment-provider reference. */
+export async function updateSubscriptionPaymentReference(
+  paymentId: string,
+  providerReference: string
+): Promise<Result<void, AppError>> {
+  try {
+    await db
+      .update(subscriptionPayment)
+      .set({ providerReference, updatedAt: new Date() })
+      .where(eq(subscriptionPayment.id, paymentId));
+    return ok(undefined);
+  } catch (error) {
+    console.error(`[Billing DAL] Failed to update reference for subscription payment ${paymentId}:`, error);
+    return err(new AppError("DB_ERROR", "Failed to update subscription payment reference", error));
+  }
+}
+
+/** Marks a subscription payment attempt as failed. */
+export async function markSubscriptionPaymentFailed(
+  paymentId: string
+): Promise<Result<void, AppError>> {
+  try {
+    await db
+      .update(subscriptionPayment)
+      .set({ status: "failed", updatedAt: new Date() })
+      .where(
+        and(
+          eq(subscriptionPayment.id, paymentId),
+          eq(subscriptionPayment.status, "pending")
+        )
+      );
+    return ok(undefined);
+  } catch (error) {
+    console.error(`[Billing DAL] Failed to mark subscription payment ${paymentId} failed:`, error);
+    return err(new AppError("DB_ERROR", "Failed to update subscription payment status", error));
+  }
+}
+
+/** Retrieves a subscription payment attempt by its payment-provider reference. */
+export async function getSubscriptionPaymentByReference(
+  providerReference: string
+): Promise<Result<SubscriptionPaymentSelect | null, AppError>> {
+  try {
+    const [row] = await db
+      .select()
+      .from(subscriptionPayment)
+      .where(eq(subscriptionPayment.providerReference, providerReference))
+      .limit(1);
+    return ok(row || null);
+  } catch (error) {
+    console.error(`[Billing DAL] Failed to get subscription payment by ref ${providerReference}:`, error);
+    return err(new AppError("DB_ERROR", "Failed to get subscription payment by reference", error));
   }
 }
 
@@ -581,6 +708,10 @@ export async function createOrUpdateSubscription(data: {
 }): Promise<Result<{ subscription: SubscriptionSelect; isExistingIdempotent: boolean }, AppError>> {
   try {
     return await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext('subscription_' || ${data.userId}))`
+      );
+
       const [existing] = await tx
         .select()
         .from(subscription)
@@ -597,7 +728,7 @@ export async function createOrUpdateSubscription(data: {
         const status = isActive ? existing.status : "past_due";
         const currentPeriodEnd = isActive
           ? existing.currentPeriodEnd
-          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+          : new Date(0);
 
         const [updated] = await tx
           .update(subscription)
@@ -619,13 +750,13 @@ export async function createOrUpdateSubscription(data: {
         return ok({ subscription: updated, isExistingIdempotent: false });
       }
 
-      const currentPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const currentPeriodEnd = new Date(0);
       const [created] = await tx
         .insert(subscription)
         .values({
           userId: data.userId,
           planId: data.planId,
-          status: "past_due", // pending activation
+          status: "past_due", // pending activation — no Pro access until confirmed
           currentPeriodEnd,
           provider: data.provider,
           providerSubscriptionId: data.providerSubscriptionId || null,
@@ -643,18 +774,113 @@ export async function createOrUpdateSubscription(data: {
 
 /**
  * Atomically marks subscription active with 1 month period.
- * If user currently has an active gifted subscription, extends from currentPeriodEnd.
+ * Uses subscription_payment to guarantee each provider reference can only be redeemed once.
+ * Extends active subscriptions (both gifted and paid renewals) from currentPeriodEnd.
  */
 export async function confirmSubscriptionAtomic(
   providerSubscriptionId: string
 ): Promise<Result<{ subscription: SubscriptionSelect; alreadyConfirmed: boolean }, AppError>> {
   try {
     return await db.transaction(async (tx) => {
+      const [payment] = await tx
+        .select()
+        .from(subscriptionPayment)
+        .where(eq(subscriptionPayment.providerReference, providerSubscriptionId))
+        .for("update")
+        .limit(1);
+
+      if (payment) {
+        await tx.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtext('subscription_' || ${payment.userId}))`
+        );
+
+        const [existing] = await tx
+          .select()
+          .from(subscription)
+          .where(eq(subscription.userId, payment.userId))
+          .for("update")
+          .limit(1);
+
+        if (payment.status === "confirmed") {
+          if (!existing) {
+            return err(new AppError("NOT_FOUND", "Subscription record not found"));
+          }
+          return ok({ subscription: existing, alreadyConfirmed: true });
+        }
+
+        if (payment.status === "failed") {
+          return err(
+            new AppError("VALIDATION_ERROR", "Cannot confirm a failed subscription payment")
+          );
+        }
+
+        const now = new Date();
+        await tx
+          .update(subscriptionPayment)
+          .set({
+            status: "confirmed",
+            confirmedAt: now,
+            updatedAt: now,
+          })
+          .where(eq(subscriptionPayment.id, payment.id));
+
+        const isCurrentlyActive = Boolean(
+          existing && existing.status === "active" && existing.currentPeriodEnd > now
+        );
+        const baseTime =
+          isCurrentlyActive && existing
+            ? existing.currentPeriodEnd.getTime()
+            : now.getTime();
+        const nextPeriodEnd = new Date(baseTime + 30 * 24 * 60 * 60 * 1000);
+
+        const existingRefs = existing?.providerSubscriptionId
+          ? existing.providerSubscriptionId.split(",").map((r) => r.trim()).filter(Boolean)
+          : [];
+        if (!existingRefs.includes(providerSubscriptionId)) {
+          existingRefs.push(providerSubscriptionId);
+        }
+
+        if (existing) {
+          const [updated] = await tx
+            .update(subscription)
+            .set({
+              planId: payment.planId,
+              status: "active",
+              currentPeriodEnd: nextPeriodEnd,
+              provider: payment.provider,
+              providerSubscriptionId: existingRefs.join(","),
+              idempotencyKey: payment.idempotencyKey,
+              updatedAt: now,
+            })
+            .where(eq(subscription.userId, payment.userId))
+            .returning();
+
+          return ok({ subscription: updated, alreadyConfirmed: false });
+        }
+
+        const [created] = await tx
+          .insert(subscription)
+          .values({
+            userId: payment.userId,
+            planId: payment.planId,
+            status: "active",
+            currentPeriodEnd: nextPeriodEnd,
+            provider: payment.provider,
+            providerSubscriptionId: existingRefs.join(","),
+            idempotencyKey: payment.idempotencyKey,
+            updatedAt: now,
+          })
+          .returning();
+
+        return ok({ subscription: created, alreadyConfirmed: false });
+      }
+
+      // Legacy pre-migration fallback
       const [sub] = await tx
         .select()
         .from(subscription)
         .where(
-          sql`${providerSubscriptionId} = ANY(string_to_array(regexp_replace(${subscription.providerSubscriptionId}, '\s+', '', 'g'), ','))`
+          sql`${providerSubscriptionId} = ANY(string_to_array(regexp_replace(${subscription.providerSubscriptionId}, '[[:space:]]+', '', 'g'), ','))`
         )
         .for("update")
         .limit(1);
@@ -667,13 +893,10 @@ export async function confirmSubscriptionAtomic(
       const isCurrentlyActive = sub.status === "active" && sub.currentPeriodEnd > now;
       const isGiftActive = sub.provider === "admin_gift";
 
-      // If active from a previous paid confirmation, avoid double-confirmation.
-      // But if active from an admin gift, grant the purchased 30-day period.
       if (isCurrentlyActive && !isGiftActive) {
         return ok({ subscription: sub, alreadyConfirmed: true });
       }
 
-      // Preserve active period (e.g. gifted or unexpired time) by extending from currentPeriodEnd
       const baseTime = isCurrentlyActive ? sub.currentPeriodEnd.getTime() : now.getTime();
       const nextPeriodEnd = new Date(baseTime + 30 * 24 * 60 * 60 * 1000);
 
@@ -838,17 +1061,26 @@ export async function cancelSubscription(
   userId: string
 ): Promise<Result<SubscriptionSelect, AppError>> {
   try {
+    const now = new Date();
     const [sub] = await db
       .update(subscription)
       .set({
         status: "canceled",
-        updatedAt: new Date(),
+        updatedAt: now,
       })
-      .where(eq(subscription.userId, userId))
+      .where(
+        and(
+          eq(subscription.userId, userId),
+          eq(subscription.status, "active"),
+          gt(subscription.currentPeriodEnd, now)
+        )
+      )
       .returning();
 
     if (!sub) {
-      return err(new AppError("NOT_FOUND", "No subscription found to cancel"));
+      return err(
+        new AppError("VALIDATION_ERROR", "No active subscription found to cancel")
+      );
     }
     return ok(sub);
   } catch (error) {

@@ -3,32 +3,38 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "./schema";
 
-const connectionString =
-  process.env.DATABASE_URL ||
-  "postgres://benny:bennymak@localhost:5432/jobscan";
+const connectionString = process.env.DATABASE_URL?.trim();
 
-const isRemote =
-  connectionString.includes("prisma.io") ||
-  connectionString.includes("neon.tech") ||
-  connectionString.includes("supabase.co") ||
-  connectionString.includes("sslmode");
-
-function cleanConnectionString(rawUrl: string, remote: boolean): string {
-  if (!remote) return rawUrl;
-  try {
-    const url = new URL(rawUrl);
-    url.searchParams.delete("sslmode");
-    return url.toString();
-  } catch {
-    return rawUrl;
-  }
+if (
+  !connectionString &&
+  process.env.NODE_ENV === "production" &&
+  process.env.NEXT_PHASE !== "phase-production-build"
+) {
+  throw new Error("DATABASE_URL environment variable is required");
 }
 
-const sanitizedConnectionString = cleanConnectionString(connectionString, isRemote);
+const basePool = connectionString
+  ? new Pool({
+      connectionString,
+      ssl:
+        process.env.DB_SSL_REJECT_UNAUTHORIZED === "false"
+          ? { rejectUnauthorized: false }
+          : undefined,
+    })
+  : new Pool({ connectionString: undefined });
 
-const pool = new Pool({
-  connectionString: sanitizedConnectionString,
-  ssl: isRemote ? { rejectUnauthorized: false } : undefined,
-});
+const pool: Pool = connectionString
+  ? basePool
+  : new Proxy(basePool, {
+      get(target, prop, receiver) {
+        if (prop === "query" || prop === "connect") {
+          return () =>
+            Promise.reject(
+              new Error("DATABASE_URL environment variable is required")
+            );
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    });
 
 export const db = drizzle(pool, { schema });

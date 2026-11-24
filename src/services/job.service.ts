@@ -18,14 +18,14 @@ import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 
 const VALID_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
-  new: ["saved", "scored", "tailored", "applied", "rejected"],
-  saved: ["scored", "tailored", "applied", "rejected"],
-  scored: ["tailored", "applied", "rejected"],
-  tailored: ["applied", "rejected"],
-  applied: ["interviewing", "rejected"],
-  interviewing: ["offer", "rejected"],
-  rejected: ["saved"],
-  offer: [],
+  new: ["saved", "applied", "interviewing", "offer", "rejected", "withdrawn"],
+  saved: ["applied", "interviewing", "offer", "rejected", "withdrawn"],
+  scored: ["saved", "applied", "interviewing", "offer", "rejected", "withdrawn"],
+  tailored: ["saved", "applied", "interviewing", "offer", "rejected", "withdrawn"],
+  applied: ["saved", "interviewing", "offer", "rejected", "withdrawn"],
+  interviewing: ["saved", "applied", "offer", "rejected", "withdrawn"],
+  rejected: ["saved", "applied", "interviewing", "offer", "withdrawn"],
+  offer: ["saved", "applied", "interviewing", "rejected", "withdrawn"],
   withdrawn: ["saved"],
 };
 
@@ -125,6 +125,84 @@ export async function scoreJobWithAI(
         "User master resume is not configured. Please set up your master resume in Profile before scoring jobs.",
       ),
     );
+  }
+
+  // Pro hybrid scoring fast-path when embeddings exist and no explicit LLM provider override is requested
+  if (!preferredProvider) {
+    const { isHybridScoringEnabled } = await import("@/services/flags");
+    if (await isHybridScoringEnabled(userId)) {
+      let resolvedPipelineEntryId: string | null = null;
+      let canonicalJobId = job.id;
+
+      const byEntry = await pipelineDal.getPipelineEntryById(jobId, userId);
+      if (byEntry.ok) {
+        resolvedPipelineEntryId = byEntry.value.id;
+        canonicalJobId = byEntry.value.jobId;
+      } else {
+        const byJob = await pipelineDal.getPipelineEntryByUserAndJob(
+          userId,
+          jobId
+        );
+        if (byJob.ok && byJob.value) {
+          resolvedPipelineEntryId = byJob.value.id;
+          canonicalJobId = byJob.value.jobId;
+        } else {
+          const createdEntry = await pipelineDal.upsertPipelineEntry(
+            userId,
+            canonicalJobId,
+            "saved",
+            activeResume.id
+          );
+          if (createdEntry.ok) {
+            resolvedPipelineEntryId = createdEntry.value.id;
+          }
+        }
+      }
+
+      if (resolvedPipelineEntryId) {
+        const simRes = await jobsDal.getJobResumeSimilarity(
+          canonicalJobId,
+          activeResume.id
+        );
+        if (simRes.ok && simRes.value !== null) {
+          const { scoreJobForResume } = await import(
+            "@/services/scoring/score-job"
+          );
+          const hybridRes = await scoreJobForResume(
+            {
+              id: canonicalJobId,
+              title: job.title,
+              description: job.description,
+              language: job.language ?? "en",
+            },
+            {
+              id: activeResume.id,
+              version: activeResume.version,
+              content: activeResume.content,
+              language: activeResume.language,
+            },
+            resolvedPipelineEntryId,
+            userId
+          );
+
+          if (hybridRes.ok) {
+            return await jobsDal.getJobById(resolvedPipelineEntryId, userId);
+          }
+
+          if (
+            "code" in hybridRes.error &&
+            hybridRes.error.code === "rate_limited"
+          ) {
+            return err(
+              new AppError(
+                "RATE_LIMITED",
+                `Rate limit exceeded for AI scoring. Please wait ${hybridRes.error.retryAfterSeconds}s before retrying.`
+              )
+            );
+          }
+        }
+      }
+    }
   }
 
   const provider = getScoringProvider(preferredProvider);
@@ -458,7 +536,7 @@ export async function transitionJobStatus(
     );
   }
 
-  return await jobsDal.updateJobStatus(jobId, targetStatus);
+  return await jobsDal.updateJobStatus(jobId, targetStatus, userId);
 }
 
 export async function updateTailoredResume(

@@ -54,7 +54,8 @@ Job Listing (FR / EN)                     Master Resume (FR / EN)
 ### Weighting & Cross-Lingual Fallback
 - **Same Language:** $W_{\text{SEMANTIC}} = 0.6$, $W_{\text{KEYWORD}} = 0.4$.
 - **Cross-Language Mismatch (`jobLanguage !== resumeLanguage`):** Cross-lingual keyword search produces poor lexical results. The engine bypasses sparse search entirely and redistributes 100% of score weight to dense semantic embeddings ($W_{\text{SEMANTIC}} = 1.0$).
-- **Cost Advantage:** Fast hybrid scoring (`scoreJobHybrid` in `src/services/job.service.ts`) executes entirely within PostgreSQL in milliseconds at zero LLM API cost.
+- **Cost Advantage:** Fast hybrid scoring (`scoreJobForResume` in `src/services/scoring/score-job.ts`) executes dense + sparse scoring inside PostgreSQL. When `isHybridScoringEnabled(userId)` (`"hybrid_scoring"` / `"hybrid-scoring-v1"`) is active and embeddings exist (without an explicit LLM provider override), `scoreJobWithAI()` automatically routes through `scoreJobForResume()`, falling back to LLM scoring if embeddings have not been generated yet.
+- **Cache Isolation:** `scoreJobForResume()` separates Redis cache keys by hybrid flag state (`hybrid-v1` vs `hybrid-v1-semantic`) and skips caching degraded fallbacks when skill/explanation extraction fails.
 
 ---
 

@@ -173,6 +173,15 @@ export async function POST(
     }
 
     if (state.type === "completed") {
+      if (state.record.targetId && state.record.targetId !== id) {
+        return NextResponse.json(
+          {
+            error: `Idempotency key was completed for target job ${state.record.targetId}, cannot reuse for ${id}`,
+          },
+          { status: 409 }
+        );
+      }
+
       // If regeneration is explicitly requested, reopen the idempotency record instead of returning stale cache
       if (isRegenerateRequested) {
         const reopenRes = await idempotencyDal.reopenIdempotentAction(state.record.id, id);
@@ -186,14 +195,6 @@ export async function POST(
         }
       } else {
         const storedTarget = state.record.targetId || id;
-        if (state.record.targetId && state.record.targetId !== id) {
-          return NextResponse.json(
-            {
-              error: `Idempotency key was completed for target job ${state.record.targetId}, cannot reuse for ${id}`,
-            },
-            { status: 409 }
-          );
-        }
 
         let cachedText = "";
         if (state.record.resultRef) {
@@ -367,13 +368,28 @@ export async function POST(
                 }
               : null;
 
-            await jobsDal.updateJobCoverLetter(
+            const saveRes = await jobsDal.updateJobCoverLetter(
               job.id,
               userId,
               newText,
               activeResume.id,
               diffFromPrevious
             );
+
+            if (!saveRes.ok) {
+              console.error(
+                "Failed to persist generated cover letter; refunding credits:",
+                saveRes.error
+              );
+              await safeRefund();
+              if (idempotencyAttemptId && idempotencyRecordId) {
+                await idempotencyDal.failIdempotentAction(
+                  idempotencyRecordId,
+                  idempotencyAttemptId
+                );
+              }
+              return;
+            }
 
             revalidateTags([jobTag(job.id), BILLING_TAG, NAVBAR_TAG]);
 
@@ -385,9 +401,11 @@ export async function POST(
               costEstimateUsd: "0.001",
             });
 
-            const clRecord = await tailoringDal.getTailoredCoverLetter(job.id);
+            const clRecord = await tailoringDal.getTailoredCoverLetter(
+              saveRes.value.id
+            );
             const clRecordId =
-              clRecord.ok && clRecord.value ? clRecord.value.id : job.id;
+              clRecord.ok && clRecord.value ? clRecord.value.id : saveRes.value.id;
 
             if (idempotencyAttemptId && idempotencyRecordId) {
               const completeRes = await idempotencyDal.completeIdempotentAction(

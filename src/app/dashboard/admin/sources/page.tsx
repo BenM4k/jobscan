@@ -1,4 +1,6 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
+import { requireAdmin } from "@/lib/auth-guard";
 import { getAdminSourcesStatus } from "@/services/admin/admin.service";
 import { Database, Activity, AlertTriangle, CheckCircle2 } from "lucide-react";
 
@@ -16,6 +18,11 @@ function SourcesSkeleton() {
 }
 
 async function SourcesContent() {
+  const adminResult = await requireAdmin();
+  if (!adminResult.ok) {
+    redirect(adminResult.error.code === "FORBIDDEN" ? "/dashboard" : "/sign-in");
+  }
+
   const res = await getAdminSourcesStatus();
   const sources = res.ok ? res.value : [];
 

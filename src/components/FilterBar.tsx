@@ -58,9 +58,10 @@ export function FilterBar() {
     parseAsStringEnum<SourceOption>([
       "all",
       "reliefweb",
-      "emploicd",
+      "emploi_cd",
       "congojob",
       "unjobs",
+      "fecrdc",
       "greenhouse",
       "remoteok",
       "lever",

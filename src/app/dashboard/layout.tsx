@@ -54,7 +54,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0A0A0C] text-gray-900 dark:text-zinc-100 font-sans flex flex-col relative overflow-hidden transition-colors duration-300">
+    <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0A0A0C] text-gray-900 dark:text-zinc-100 font-sans flex flex-col relative overflow-x-clip transition-colors duration-300">
       {/* Subtle Dot Grid Background Pattern */}
       <div
         className="absolute inset-0 pointer-events-none opacity-40 dark:opacity-20"

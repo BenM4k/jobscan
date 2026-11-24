@@ -1,7 +1,47 @@
 import "server-only";
 import * as cheerio from "cheerio";
 import { BaseJobSourceAdapter } from "./base";
+import { AppError } from "@/lib/errors";
 import type { NormalizedJobInput, RawJobItem } from "./types";
+
+const DEFAULT_UNJOBS_URL = "https://unjobs.org/duty_stations/fih";
+const ALLOWED_UNJOBS_HOSTS = new Set(["unjobs.org", "www.unjobs.org"]);
+
+/**
+ * Validates that a UNjobs fetch target is strictly an HTTPS URL on unjobs.org,
+ * blocking SSRF into internal networks, cloud metadata endpoints, or arbitrary hosts.
+ */
+export function resolveSafeUnJobsUrl(target?: string): string {
+  const trimmed = target?.trim();
+  if (!trimmed) {
+    return DEFAULT_UNJOBS_URL;
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Invalid UNjobs target URL: only https://unjobs.org URLs are allowed"
+    );
+  }
+
+  if (
+    parsed.protocol !== "https:" ||
+    !ALLOWED_UNJOBS_HOSTS.has(parsed.hostname.toLowerCase()) ||
+    Boolean(parsed.username) ||
+    Boolean(parsed.password) ||
+    (Boolean(parsed.port) && parsed.port !== "443")
+  ) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Invalid UNjobs target URL: only https://unjobs.org URLs are allowed"
+    );
+  }
+
+  return parsed.toString();
+}
 
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -29,13 +69,14 @@ export async function fetchRaw(options?: {
   target?: string;
   keyword?: string;
 }): Promise<RawJobItem[]> {
-  const url = options?.target || "https://unjobs.org/duty_stations/fih";
+  const url = resolveSafeUnJobsUrl(options?.target);
   const res = await fetch(url, {
     headers: {
       "User-Agent": USER_AGENT,
       Accept:
         "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     },
+    redirect: "error",
     signal: AbortSignal.timeout(8000),
   });
 

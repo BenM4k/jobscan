@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
 import { formatSourceName } from "@/lib/format-source";
+import { sanitizeExternalUrl } from "@/lib/safe-url";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -30,12 +31,12 @@ export function JobDetailHeader({ job, onStatusChange }: JobDetailHeaderProps) {
   const locale = useLocale();
 
   const statusOptions: { id: JobStatus; label: string }[] = [
-    { id: "new", label: tDash("statusNew") },
-    { id: "scored", label: tDash("statusScored") },
+    { id: "saved", label: tDash("statusSaved") },
     { id: "applied", label: tDash("statusApplied") },
     { id: "interviewing", label: tDash("statusInterviewing") },
-    { id: "rejected", label: tDash("statusRejected") },
     { id: "offer", label: tDash("statusOffer") },
+    { id: "rejected", label: tDash("statusRejected") },
+    { id: "withdrawn", label: tDash("statusWithdrawn") },
   ];
 
   const currentStatusLabel =
@@ -52,6 +53,8 @@ export function JobDetailHeader({ job, onStatusChange }: JobDetailHeaderProps) {
     job.alsoPostedOn && job.alsoPostedOn.length > 0
       ? job.alsoPostedOn.map(formatSourceName).join(", ")
       : null;
+
+  const safeJobUrl = sanitizeExternalUrl(job.url);
 
   return (
     <header className="pb-6">
@@ -124,11 +127,11 @@ export function JobDetailHeader({ job, onStatusChange }: JobDetailHeaderProps) {
 
         {/* Right: Solid Primary Action & Pipeline Status */}
         <div className="flex items-center sm:flex-col sm:items-end gap-3 sm:gap-2.5 shrink-0 pt-1 sm:pt-0">
-          {job.url && (
+          {safeJobUrl && (
             <a
-              href={job.url}
+              href={safeJobUrl}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-md text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors cursor-pointer"
             >
               <span>{t("apply")}</span>

@@ -10,7 +10,19 @@ import {
 } from "@/services/db/schema";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
-import { eq, and, desc, sql, or, ilike, count, gte, lte } from "drizzle-orm";
+import {
+  eq,
+  and,
+  desc,
+  sql,
+  or,
+  ilike,
+  count,
+  gte,
+  lte,
+  ne,
+  isNull,
+} from "drizzle-orm";
 import * as pipelineDal from "@/dal/pipeline.dal";
 import {
   JobSelect,
@@ -21,13 +33,20 @@ import {
   JobWithSimilarity,
 } from "./types";
 
+export function buildManualJobVisibilityCondition(userId?: string) {
+  if (userId) {
+    return or(ne(job.source, "manual"), eq(job.addedByUserId, userId))!;
+  }
+  return and(ne(job.source, "manual"), isNull(job.addedByUserId))!;
+}
+
 export function buildUnscopedJobConditions(
   sourceFilter?: string,
   startDate?: string,
   endDate?: string,
   queryFilter?: string,
 ) {
-  const conditions = [];
+  const conditions = [buildManualJobVisibilityCondition()];
   if (sourceFilter && sourceFilter !== "all") {
     conditions.push(eq(job.source, sourceFilter as JobSource));
   }
@@ -84,10 +103,13 @@ export async function getJobById(
       }
     }
 
-    // 3. Fallback to direct job table query
+    // 3. Fallback to direct job table query (never expose another user's private manual job)
     const [found] = await db.select().from(job).where(eq(job.id, id)).limit(1);
 
-    if (!found) {
+    if (
+      !found ||
+      (found.source === "manual" && (!userId || found.addedByUserId !== userId))
+    ) {
       return err(new AppError("NOT_FOUND", `Job with ID ${id} not found`));
     }
 
@@ -273,13 +295,20 @@ export async function isJobDeleted(
 export async function searchJobsByVector(
   embedding: number[],
   limit: number = 10,
+  userId?: string,
 ): Promise<Result<CanonicalJobSelect[], AppError>> {
   try {
     const vectorLiteral = `[${embedding.join(",")}]`;
     const rows = await db
       .select()
       .from(job)
-      .where(sql`${job.embedding} IS NOT NULL`)
+      .where(
+        and(
+          sql`${job.embedding} IS NOT NULL`,
+          eq(job.status, "active"),
+          buildManualJobVisibilityCondition(userId),
+        ),
+      )
       .orderBy(sql`${job.embedding} <=> ${vectorLiteral}::vector`)
       .limit(limit);
 
@@ -297,7 +326,7 @@ export async function searchJobsByVector(
  */
 export async function searchJobsByCosineSimilarity(
   embedding: number[],
-  options: { limit?: number; minSimilarity?: number } = {},
+  options: { limit?: number; minSimilarity?: number; userId?: string } = {},
 ): Promise<Result<JobWithSimilarity[], AppError>> {
   try {
     const limit = options.limit ?? 10;
@@ -305,7 +334,11 @@ export async function searchJobsByCosineSimilarity(
     const distanceExpr = sql<number>`${job.embedding} <=> ${vectorLiteral}::vector`;
     const similarityExpr = sql<number>`1 - (${job.embedding} <=> ${vectorLiteral}::vector)`;
 
-    const conditions = [sql`${job.embedding} IS NOT NULL`];
+    const conditions = [
+      sql`${job.embedding} IS NOT NULL`,
+      eq(job.status, "active"),
+      buildManualJobVisibilityCondition(options.userId),
+    ];
     if (options.minSimilarity !== undefined) {
       conditions.push(
         sql`(1 - (${job.embedding} <=> ${vectorLiteral}::vector)) >= ${options.minSimilarity}`,
@@ -354,7 +387,10 @@ export async function findJobsSimilarToResume(
 ): Promise<Result<JobWithSimilarity[], AppError>> {
   try {
     const [found] = await db
-      .select({ embedding: masterResume.embedding })
+      .select({
+        embedding: masterResume.embedding,
+        userId: masterResume.userId,
+      })
       .from(masterResume)
       .where(eq(masterResume.id, resumeId))
       .limit(1);
@@ -368,7 +404,10 @@ export async function findJobsSimilarToResume(
       );
     }
 
-    return searchJobsByCosineSimilarity(found.embedding, options);
+    return searchJobsByCosineSimilarity(found.embedding, {
+      ...options,
+      userId: found.userId,
+    });
   } catch (error) {
     return err(
       new AppError(
@@ -423,13 +462,18 @@ export async function getJobResumeSimilarity(
 export async function searchJobsFullText(
   queryString: string,
   limit: number = 20,
+  userId?: string,
 ): Promise<Result<CanonicalJobSelect[], AppError>> {
   try {
     const rows = await db
       .select()
       .from(job)
       .where(
-        sql`${job.descriptionTsv} @@ plainto_tsquery('english', ${queryString})`,
+        and(
+          sql`${job.descriptionTsv} @@ plainto_tsquery('english', ${queryString})`,
+          eq(job.status, "active"),
+          buildManualJobVisibilityCondition(userId),
+        ),
       )
       .orderBy(
         sql`ts_rank(${job.descriptionTsv}, plainto_tsquery('english', ${queryString}), 32) DESC`,
@@ -490,6 +534,7 @@ export async function findJobsRankedByKeyword(
   queryOrKeywords: string,
   resumeLanguage: "en" | "fr" = "en",
   limit: number = 20,
+  userId?: string,
 ): Promise<Result<Array<CanonicalJobSelect & { bm25Rank: number }>, AppError>> {
   try {
     if (!queryOrKeywords || !queryOrKeywords.trim()) {
@@ -509,6 +554,8 @@ export async function findJobsRankedByKeyword(
       .where(
         and(
           eq(job.language, resumeLanguage),
+          eq(job.status, "active"),
+          buildManualJobVisibilityCondition(userId),
           sql`${job.descriptionTsv} @@ ${tsquery}`,
         )
       )

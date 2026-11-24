@@ -31,7 +31,6 @@ const DRC_COUNTRY_VARIANTS = [
   "rdc",
   "congo-kinshasa",
   "congo kinshasa",
-  "cd",
 ];
 
 const DRC_CITIES = [

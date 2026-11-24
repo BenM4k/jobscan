@@ -144,30 +144,49 @@ export async function checkPurchaseStatusAction(providerReference: string) {
 
     const userId = session.value.user.id;
 
-    // Load the matching purchase or subscription and verify ownership
-    const purchaseRes = await billingDal.getCreditPurchaseByReference(parsed.data.providerReference);
-    const subRes = await billingDal.getSubscriptionByProviderReference(parsed.data.providerReference);
+    // Load the matching purchase or subscription payment and verify ownership
+    const [purchaseRes, subPaymentRes, subRes] = await Promise.all([
+      billingDal.getCreditPurchaseByReference(parsed.data.providerReference),
+      billingDal.getSubscriptionPaymentByReference(parsed.data.providerReference),
+      billingDal.getSubscriptionByProviderReference(parsed.data.providerReference),
+    ]);
 
-    const isPurchaseOwner = purchaseRes.ok && purchaseRes.value && purchaseRes.value.userId === userId;
-    const isSubOwner = subRes.ok && subRes.value && subRes.value.userId === userId;
+    const purchase = purchaseRes.ok ? purchaseRes.value : null;
+    const subPayment = subPaymentRes.ok ? subPaymentRes.value : null;
+    const legacySub = !subPayment && subRes.ok ? subRes.value : null;
 
-    if (!isPurchaseOwner && !isSubOwner) {
+    const ownerPurchase = purchase && purchase.userId === userId ? purchase : null;
+    const ownerSubPayment =
+      subPayment && subPayment.userId === userId ? subPayment : null;
+    const ownerLegacySub =
+      legacySub && legacySub.userId === userId ? legacySub : null;
+
+    if (!ownerPurchase && !ownerSubPayment && !ownerLegacySub) {
       return { success: false, error: "Payment reference not found or access denied" };
     }
 
-    // Auto-confirm mock provider payments if elapsed >= 2000ms
-    if (parsed.data.providerReference.startsWith("mock_")) {
-      if (isPurchaseOwner && purchaseRes.value && purchaseRes.value.status === "pending") {
-        const elapsed = Date.now() - new Date(purchaseRes.value.createdAt).getTime();
+    // Auto-confirm mock provider payments if mock payments are explicitly enabled and elapsed >= 2000ms
+    const isMockAllowed =
+      process.env.PAYMENT_PROVIDER === "mock" &&
+      (process.env.NODE_ENV !== "production" ||
+        process.env.ALLOW_MOCK_PAYMENTS === "true");
+
+    if (isMockAllowed && parsed.data.providerReference.startsWith("mock_")) {
+      if (ownerPurchase && ownerPurchase.status === "pending") {
+        const elapsed = Date.now() - new Date(ownerPurchase.createdAt).getTime();
         if (elapsed >= 2000) {
           await billingService.confirmCreditPurchase(parsed.data.providerReference);
         }
+      } else if (ownerSubPayment && ownerSubPayment.status === "pending") {
+        const elapsed = Date.now() - new Date(ownerSubPayment.createdAt).getTime();
+        if (elapsed >= 2000) {
+          await billingService.confirmSubscription(parsed.data.providerReference);
+        }
       } else if (
-        isSubOwner &&
-        subRes.value &&
-        (subRes.value.status === "past_due" || subRes.value.provider === "admin_gift")
+        ownerLegacySub &&
+        (ownerLegacySub.status === "past_due" || ownerLegacySub.provider === "admin_gift")
       ) {
-        const elapsed = Date.now() - new Date(subRes.value.createdAt).getTime();
+        const elapsed = Date.now() - new Date(ownerLegacySub.createdAt).getTime();
         if (elapsed >= 2000) {
           await billingService.confirmSubscription(parsed.data.providerReference);
         }
@@ -178,12 +197,13 @@ export async function checkPurchaseStatusAction(providerReference: string) {
     const status = await provider.checkPurchaseStatus(parsed.data.providerReference);
 
     if (status === "confirmed") {
-      if (isPurchaseOwner && purchaseRes.value && purchaseRes.value.status !== "confirmed") {
+      if (ownerPurchase && ownerPurchase.status !== "confirmed") {
         await billingService.confirmCreditPurchase(parsed.data.providerReference);
+      } else if (ownerSubPayment && ownerSubPayment.status === "pending") {
+        await billingService.confirmSubscription(parsed.data.providerReference);
       } else if (
-        isSubOwner &&
-        subRes.value &&
-        (subRes.value.status !== "active" || subRes.value.provider === "admin_gift")
+        ownerLegacySub &&
+        (ownerLegacySub.status !== "active" || ownerLegacySub.provider === "admin_gift")
       ) {
         await billingService.confirmSubscription(parsed.data.providerReference);
       }

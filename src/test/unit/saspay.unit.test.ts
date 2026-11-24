@@ -13,6 +13,7 @@ import {
 import {
   SasPayProvider,
   calculatePaymentAmount,
+  verifySasPayAmountAndCurrency,
 } from "../../services/billing/saspay/saspay-provider";
 
 function assert(condition: boolean, msg: string): asserts condition {
@@ -100,6 +101,23 @@ async function runSasPayTests() {
   });
   assert(wrongSecretResult === false, "Wrong secret must fail verification");
 
+  // Non-digit timestamps (floats, scientific notation)
+  for (const badTs of ["123456.7", "1e9", "abc"]) {
+    const badTsSig = crypto
+      .createHmac("sha256", secret)
+      .update(`${badTs}.${rawBody}`)
+      .digest("hex");
+    assert(
+      verifySasPayWebhookSignature({
+        rawBody,
+        signature: badTsSig,
+        timestamp: badTs,
+        secret,
+      }) === false,
+      `Non-integer timestamp '${badTs}' must be rejected`
+    );
+  }
+
   // 3. Network and Phone Resolution
   console.log("- Testing phone normalization and network resolution...");
   assert(normalizePhoneNumber("081 234 5678") === "+243812345678", "DRC local 081 should normalize to +243");
@@ -124,6 +142,15 @@ async function runSasPayTests() {
 
   const ciOrange = resolveNetworkFromPhone("+22507000000");
   assert(ciOrange.country === "CI" && ciOrange.network === "orange_ci", "22507 should resolve to orange_ci");
+
+  const snOrange = resolveNetworkFromPhone("+221771234567");
+  assert(snOrange.country === "SN" && snOrange.network === "orange_sn" && snOrange.currency === "XOF", "22177 should resolve to SN / orange_sn / XOF");
+
+  const tgTmoney = resolveNetworkFromPhone("+22890123456");
+  assert(tgTmoney.country === "TG" && tgTmoney.network === "tmoney_tg" && tgTmoney.currency === "XOF", "22890 should resolve to TG / tmoney_tg / XOF");
+
+  const bfOrange = resolveNetworkFromPhone("+22675123456");
+  assert(bfOrange.country === "BF" && bfOrange.network === "orange_bf" && bfOrange.currency === "XOF", "22675 should resolve to BF / orange_bf / XOF");
 
   // Country overrides:
   const cmOverride = resolveNetworkFromPhone("067123456", "CM", "mtn_cm");
@@ -154,7 +181,40 @@ async function runSasPayTests() {
 
   const validTestClient = new SasPayClient({ apiKey: "sk_test_fake_sandbox_key_123" });
   assert(validTestClient instanceof SasPayClient, "SasPayClient should instantiate with valid test key");
-  assert(validTestClient.getBaseUrl().includes("sandbox"), "Test key should resolve to sandbox base URL");
+  assert(
+    validTestClient.getBaseUrl() === "https://api.saspay.me/api/v1",
+    "Test key should resolve to unified SasPay API v1 base URL"
+  );
+
+  // 4b. Verify amount & currency verification helper
+  assert(
+    verifySasPayAmountAndCurrency(
+      { currency: "USD", requested_amount: "15.00", debited_amount: "15.00" },
+      1500
+    ).valid,
+    "Exact USD amount must pass verification"
+  );
+  assert(
+    verifySasPayAmountAndCurrency(
+      { currency: "XOF", requested_amount: "9000.00", debited_amount: "9000.00" },
+      1500
+    ).valid,
+    "Exact XOF converted amount must pass verification"
+  );
+  assert(
+    !verifySasPayAmountAndCurrency(
+      { currency: "USD", requested_amount: "1.00", debited_amount: "1.00" },
+      1500
+    ).valid,
+    "Underpayment must fail verification"
+  );
+  assert(
+    !verifySasPayAmountAndCurrency(
+      { currency: "", requested_amount: "15.00", debited_amount: "15.00" },
+      1500
+    ).valid,
+    "Missing currency must fail verification"
+  );
 
   // 5. SasPayProvider status checking logic
   console.log("- Testing SasPayProvider checkPurchaseStatus mapping...");

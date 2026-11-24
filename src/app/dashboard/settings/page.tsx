@@ -3,7 +3,13 @@ import { headers } from "next/headers";
 import { requireSession } from "@/lib/auth-guard";
 import { redirect } from "next/navigation";
 import { auth } from "@/services/auth/auth";
-import { getCachedUserFlags, getCachedUserPreferences, getCachedAiUsage } from "@/lib/cached-data";
+import {
+  getCachedUserFlags,
+  getCachedUserPreferences,
+  getCachedAiUsage,
+  getCachedBillingData,
+} from "@/lib/cached-data";
+import { hasProAccess } from "@/services/billing/billing.service";
 import * as authDal from "@/dal/auth.dal";
 import { AccountSettingsCard } from "@/components/settings/AccountSettingsCard";
 import { SessionManagementCard } from "@/components/settings/SessionManagementCard";
@@ -33,14 +39,23 @@ async function SettingsContent() {
   const currentToken = currentSession.token;
   const reqHeaders = await headers();
 
-  // Fetch user flags, preferences, AI usage, sessions, and passkeys concurrently on server
-  const [flags, prefResult, aiUsageResult, sessionsResult, passkeysResult] = await Promise.all([
+  // Fetch user flags, preferences, AI usage, billing, sessions, and passkeys concurrently on server
+  const [
+    flags,
+    prefResult,
+    aiUsageResult,
+    billingData,
+    sessionsResult,
+    passkeysResult,
+  ] = await Promise.all([
     getCachedUserFlags(user.id),
     getCachedUserPreferences(user.id),
     getCachedAiUsage(user.id),
+    getCachedBillingData(user.id),
     authDal.getActiveSessionsForUser(user.id),
     authDal.getUserPasskeys(user.id),
   ]);
+  const isPro = hasProAccess(billingData.subscription);
 
   let sessionsList: SessionData[] = sessionsResult.ok
     ? (sessionsResult.value as unknown as SessionData[])
@@ -112,7 +127,7 @@ async function SettingsContent() {
           </Link>
         </div>
       )}
-      <AccountSettingsCard user={user} />
+      <AccountSettingsCard user={user} isPro={isPro} />
       <SessionManagementCard
         initialSessions={sessionsList}
         currentSessionToken={currentToken}

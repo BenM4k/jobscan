@@ -296,30 +296,35 @@ export async function initiateSubscription(
 
   const provider = getPaymentProvider();
 
-  // Create initial subscription row in past_due state pending activation
-  const subRes = await billingDal.createOrUpdateSubscription({
+  // Create per-attempt subscription payment record (replay-safe & idempotent)
+  const paymentRes = await billingDal.createSubscriptionPayment({
     userId,
     planId: plan.id,
     provider: provider.name,
     idempotencyKey,
   });
 
-  if (!subRes.ok) return err(subRes.error);
+  if (!paymentRes.ok) return err(paymentRes.error);
 
-  if (subRes.value.isExistingIdempotent && subRes.value.subscription.providerSubscriptionId) {
-    const paymentRefs = subRes.value.subscription.providerSubscriptionId
-      .split(",")
-      .map((r) => r.trim())
-      .filter((r) => Boolean(r) && !r.startsWith("admin_gift_"));
-    const primaryRef = paymentRefs.pop() || "";
+  const { payment, isExistingIdempotent } = paymentRes.value;
+
+  if (isExistingIdempotent && payment.providerReference) {
+    if (payment.status === "confirmed") {
+      return ok({
+        userId,
+        providerReference: payment.providerReference,
+        status: "confirmed",
+      });
+    }
+
     const cachedCheckoutUrl =
-      (await cacheGet<string>(`checkout_url:${primaryRef}`)) ||
+      (await cacheGet<string>(`checkout_url:${payment.providerReference}`)) ||
       (await cacheGet<string>(`checkout_url:${idempotencyKey}`));
 
     return ok({
       userId,
-      providerReference: primaryRef,
-      status: "pending",
+      providerReference: payment.providerReference,
+      status: payment.status,
       checkoutUrl: cachedCheckoutUrl || undefined,
     });
   }
@@ -339,6 +344,7 @@ export async function initiateSubscription(
       returnUrl: customerDetails?.returnUrl,
     });
   } catch (providerError) {
+    await billingDal.markSubscriptionPaymentFailed(payment.id);
     console.error(`[Billing Service] Provider subscription initiation failed for user ${userId}:`, providerError);
     const message =
       providerError instanceof AppError
@@ -348,8 +354,8 @@ export async function initiateSubscription(
     return err(new AppError(code, message, providerError));
   }
 
-  const updateRefRes = await billingDal.updateSubscriptionReference(
-    userId,
+  const updateRefRes = await billingDal.updateSubscriptionPaymentReference(
+    payment.id,
     initiateRes.providerReference,
   );
   if (!updateRefRes.ok) {
@@ -362,7 +368,12 @@ export async function initiateSubscription(
   }
 
   // Fallback timer for local dev/testing with mock provider when Inngest is not running
+  const isMockAllowed =
+    process.env.PAYMENT_PROVIDER === "mock" &&
+    (process.env.NODE_ENV !== "production" ||
+      process.env.ALLOW_MOCK_PAYMENTS === "true");
   if (
+    isMockAllowed &&
     initiateRes.providerReference.startsWith("mock_") &&
     process.env.DISABLE_MOCK_PAYMENT_TIMER !== "true"
   ) {

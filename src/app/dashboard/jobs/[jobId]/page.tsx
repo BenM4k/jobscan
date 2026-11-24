@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 import { JobDetailView } from "@/components/job/JobDetailView";
 import { JobDetailSkeleton } from "@/components/job/JobDetailSkeleton";
+import { sanitizeJobDescriptionHtml } from "@/lib/sanitize-job-html";
 
 interface JobDetailPageProps {
   params: Promise<{ jobId: string }>;
@@ -58,9 +59,14 @@ async function JobDetailContent({
     );
   }
 
+  const sanitizedDescriptionHtml = jobResult.value.description?.includes("<")
+    ? sanitizeJobDescriptionHtml(jobResult.value.description)
+    : undefined;
+
   return (
     <JobDetailView
       initialJob={jobResult.value}
+      sanitizedDescriptionHtml={sanitizedDescriptionHtml}
       initialResumes={
         resumesResult.ok && resumesResult.value ? resumesResult.value : []
       }

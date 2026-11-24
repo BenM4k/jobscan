@@ -40,26 +40,8 @@ export async function saveTailoredResume(
   language?: "en" | "fr"
 ): Promise<Result<TailoredResumeSelect, AppError>> {
   try {
-    const existingRes = await getTailoredResume(pipelineEntryId);
-    if (!existingRes.ok) return err(existingRes.error);
-    const existing = existingRes.value;
-
-    let currentRecord: TailoredResumeSelect;
-
-    if (existing) {
-      const [updated] = await db
-        .update(tailoredResume)
-        .set({
-          content,
-          strategyLabel: strategyLabel ?? existing.strategyLabel,
-          ...(language ? { language } : {}),
-          updatedAt: new Date(),
-        })
-        .where(eq(tailoredResume.id, existing.id))
-        .returning();
-      currentRecord = updated;
-    } else {
-      const [inserted] = await db
+    const currentRecord = await db.transaction(async (tx) => {
+      const [upserted] = await tx
         .insert(tailoredResume)
         .values({
           pipelineEntryId,
@@ -67,15 +49,24 @@ export async function saveTailoredResume(
           strategyLabel,
           ...(language ? { language } : {}),
         })
+        .onConflictDoUpdate({
+          target: [tailoredResume.pipelineEntryId],
+          set: {
+            content,
+            ...(strategyLabel !== undefined ? { strategyLabel } : {}),
+            ...(language ? { language } : {}),
+            updatedAt: new Date(),
+          },
+        })
         .returning();
-      currentRecord = inserted;
-    }
 
-    // Save version snapshot
-    await db.insert(tailoredResumeVersion).values({
-      tailoredResumeId: currentRecord.id,
-      content,
-      diffFromPrevious: diffFromPrevious || null,
+      await tx.insert(tailoredResumeVersion).values({
+        tailoredResumeId: upserted.id,
+        content,
+        diffFromPrevious: diffFromPrevious || null,
+      });
+
+      return upserted;
     });
 
     return ok(currentRecord);
@@ -109,38 +100,29 @@ export async function saveTailoredCoverLetter(
   diffFromPrevious?: unknown
 ): Promise<Result<TailoredCoverLetterSelect, AppError>> {
   try {
-    const existingRes = await getTailoredCoverLetter(pipelineEntryId);
-    if (!existingRes.ok) return err(existingRes.error);
-    const existing = existingRes.value;
-
-    let currentRecord: TailoredCoverLetterSelect;
-
-    if (existing) {
-      const [updated] = await db
-        .update(tailoredCoverLetter)
-        .set({
-          content,
-          updatedAt: new Date(),
-        })
-        .where(eq(tailoredCoverLetter.id, existing.id))
-        .returning();
-      currentRecord = updated;
-    } else {
-      const [inserted] = await db
+    const currentRecord = await db.transaction(async (tx) => {
+      const [upserted] = await tx
         .insert(tailoredCoverLetter)
         .values({
           pipelineEntryId,
           content,
         })
+        .onConflictDoUpdate({
+          target: [tailoredCoverLetter.pipelineEntryId],
+          set: {
+            content,
+            updatedAt: new Date(),
+          },
+        })
         .returning();
-      currentRecord = inserted;
-    }
 
-    // Save version snapshot
-    await db.insert(coverLetterVersion).values({
-      tailoredCoverLetterId: currentRecord.id,
-      content,
-      diffFromPrevious: diffFromPrevious || null,
+      await tx.insert(coverLetterVersion).values({
+        tailoredCoverLetterId: upserted.id,
+        content,
+        diffFromPrevious: diffFromPrevious || null,
+      });
+
+      return upserted;
     });
 
     return ok(currentRecord);

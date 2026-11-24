@@ -31,6 +31,7 @@ All billing tables live in [`src/services/db/schema/billing.ts`](../src/services
 | `credit_purchase` | Purchase attempts lifecycle tracking | `id` (PK), `user_id`, `credit_pack_id`, `status` (`pending`, `confirmed`, `failed`), `provider`, `provider_reference`, `idempotency_key` (unique per user), `confirmed_at` |
 | `subscription_plan` | Recurring subscription SKUs | `id` (PK), `key` (`"pro"`), `name`, `price_cents_monthly`, `active` |
 | `subscription` | One subscription record per user | `user_id` (PK), `plan_id`, `status` (`active`, `canceled`, `past_due`), `current_period_end`, `provider`, `provider_subscription_id`, `idempotency_key` |
+| `subscription_payment` | Per-attempt subscription payment tracking | `id` (PK), `user_id`, `plan_id`, `status` (`pending`, `confirmed`, `failed`), `provider`, `provider_reference` (unique), `idempotency_key` (unique per user), `confirmed_at` |
 
 ---
 
@@ -62,14 +63,14 @@ export interface PaymentProvider {
 
 ### SasPayProvider
 
-[`SasPayProvider`](../src/services/billing/saspay/saspay-provider.ts) integrates with the official [SasPay REST API v1](https://api.saspay.me/api/v1) for African mobile money networks (Airtel Money, Vodacom M-Pesa, Orange Money in DRC; MTN, MoMo, Wave in West & Central Africa) and card payments:
-- **Base URL:** `https://api.saspay.me/api/v1` (configured via `SASPAY_BASE_URL`).
+[`SasPayProvider`](../src/services/billing/saspay/saspay-provider.ts) integrates with the official [SasPay REST API v1](https://api.saspay.me/api/v1) for African mobile money networks (Airtel Money, Vodacom M-Pesa, Orange Money in DRC; MTN, MoMo, Wave, Orange, Free, T-Money across West & Central Africa including `SN`, `TG`, `BF`, `BJ`, `CI`, `CM`) and card payments:
+- **Base URL:** Unified `https://api.saspay.me/api/v1` for both `sk_test_` and `sk_live_` keys (configurable via `SASPAY_BASE_URL`).
 - **Authentication:** `Authorization: Bearer $SASPAY_API_KEY` (`sk_test_...` in dev, `sk_live_...` in prod). Server-only.
-- **Amounts:** Strictly formatted as 2-decimal strings (`(cents / 100).toFixed(2)`), never floating-point numbers.
+- **Amounts & Currency Verification:** Strictly formatted as 2-decimal strings (`(cents / 100).toFixed(2)`), never floating-point numbers. Webhook confirmations strictly validate verified `requested_amount`/`debited_amount` and `currency` via `verifySasPayAmountAndCurrency()` against the catalog price before granting credits or Pro access.
 - **Idempotency:** Generates unique client UUID `Idempotency-Key` headers on `POST /payments/softpay/`, `POST /payouts/initialize/`, and `POST /payments/{id}/retry/`.
 - **Softpay & Hosted Checkout:** If `checkout_url` is returned (e.g. Wave, Orange Money, Djamo, cards), the client UI immediately redirects to the hosted payment page.
 - **Verification Gate:** `checkPurchaseStatus` queries `GET /payments/{payment_id}/verify/` and only resolves `"confirmed"` when status is strictly `"SUCCESS"`.
-- **Webhooks:** Inbound webhook route at `/api/webhooks/saspay` verifies `X-Webhook-Signature` (HMAC SHA-256) and `X-Webhook-Timestamp` (< 300s window) on the raw payload stream using constant-time comparison before confirming transactions atomically and idempotently.
+- **Webhooks:** Inbound webhook route at `/api/webhooks/saspay` verifies `X-Webhook-Signature` (HMAC SHA-256) and integer `X-Webhook-Timestamp` (< 300s window) on the raw payload stream using constant-time comparison. Handles `transaction.success` (after `/verify/` + amount/currency check) as well as `transaction.failed` and `transaction.cancelled` events to transition pending records to `failed`.
 - **Config Verification:** Health check script `scripts/verify-saspay-config.ts` validates API credentials and rate limits.
 
 ### MockMobileMoneyProvider
@@ -120,11 +121,12 @@ Idempotency is enforced across three critical boundaries:
 
 1. **Purchase & Subscription Initiation:**
    - Client sends a UUID `idempotencyKey` on form submission.
-   - DB enforces `UNIQUE(user_id, idempotency_key)` on `credit_purchase` and `subscription`.
-   - Re-submitting the same key returns the existing pending/confirmed purchase instead of creating duplicate charges.
-2. **Payment Confirmation:**
-   - Webhook handlers and simulated confirmation callbacks lock the purchase/subscription row using `SELECT ... FOR UPDATE`.
-   - If `status === "confirmed"` or `status === "active"`, the handler exits immediately with `{ alreadyConfirmed: true }`, preventing double-granting of credits on duplicate webhook deliveries.
+   - DB enforces `UNIQUE(user_id, idempotency_key)` on `credit_purchase` and `subscription_payment`, plus `UNIQUE(provider_reference)` on `subscription_payment`.
+   - Re-submitting the same key returns the existing pending/confirmed payment attempt instead of creating duplicate charges.
+2. **Payment Confirmation & Replay Protection:**
+   - Webhook handlers and status checks lock the `credit_purchase` or `subscription_payment` row using `SELECT ... FOR UPDATE`.
+   - If `payment.status === "confirmed"`, the handler exits immediately with `{ alreadyConfirmed: true }`, preventing credit double-granting or replaying an old `providerReference` to extend/re-activate an expired or canceled subscription.
+   - Active paid renewals and gifted subscriptions extend from the remaining `currentPeriodEnd`.
 3. **AI Generation Actions:**
    - Managed via `runWithIdempotency` in [`src/services/idempotency.service.ts`](../src/services/idempotency.service.ts). Client retries reuse the completed result without debiting credits again.
 
@@ -137,11 +139,13 @@ In `createMasterResumeAction` and `promoteTailoredResumeAction`:
 - Users with 0 existing personas can create their first resume for free.
 - Creating a 2nd+ persona requires an active subscription:
   ```typescript
-  sub.status === "active" && sub.currentPeriodEnd > new Date()
+  (sub.status === "active" || sub.status === "canceled") && sub.currentPeriodEnd > new Date()
   ```
 
-### Automated Expiry Sweep
+### Active-Only Cancellation & Automated Expiry Sweep
+- `cancelSubscription(userId)` only transitions subscriptions where `status === "active"` and `currentPeriodEnd > now` (unpaid `past_due` attempts cannot be canceled into active Pro access).
 - When a subscription is confirmed, Jobpilot immediately applies feature flag overrides (`setUserFeatureFlagOverride(userId, "hybrid_scoring", true)`) and updates user preferences (`updateUserPreferences(userId, { digestEmailFrequency: "daily" })`).
+- Pro-only preferences (`daily` digests, `hybrid_scoring` flag) are also gated on `hasProAccess(sub)` in `src/actions/settings.actions.ts`.
 - When canceled, the subscription remains accessible until `currentPeriodEnd`.
 - An Inngest cron job [`checkSubscriptionExpiryCron`](../src/inngest/functions/billing.ts) runs daily at `0 0 * * *`:
   - Finds subscriptions where `currentPeriodEnd < now` and `status != 'past_due'`.

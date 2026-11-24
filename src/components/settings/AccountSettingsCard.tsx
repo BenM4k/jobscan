@@ -9,9 +9,13 @@ interface AccountSettingsCardProps {
     name?: string | null;
     createdAt?: Date | string | null;
   };
+  isPro?: boolean;
 }
 
-export function AccountSettingsCard({ user }: AccountSettingsCardProps) {
+export function AccountSettingsCard({
+  user,
+  isPro = false,
+}: AccountSettingsCardProps) {
   const initials = (user.name || user.email || "US").slice(0, 2).toUpperCase();
   const createdDate = user.createdAt
     ? new Date(user.createdAt).toLocaleDateString(undefined, {
@@ -31,9 +35,15 @@ export function AccountSettingsCard({ user }: AccountSettingsCardProps) {
           <div>
             <h2 className="text-base font-bold text-gray-900 dark:text-zinc-100 flex items-center gap-2">
               <span>{user.name || "Jobpilot User"}</span>
-              <span className="text-xs font-medium px-2.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60">
-                Pro candidate
-              </span>
+              {isPro ? (
+                <span className="text-xs font-medium px-2.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60">
+                  Pro plan
+                </span>
+              ) : (
+                <span className="text-xs font-medium px-2.5 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border border-slate-200 dark:border-zinc-700/60">
+                  Free plan
+                </span>
+              )}
             </h2>
             <p className="text-xs text-gray-500 dark:text-zinc-400 flex items-center gap-1.5 mt-0.5">
               <Mail className="w-3.5 h-3.5 text-gray-400 dark:text-zinc-500" />

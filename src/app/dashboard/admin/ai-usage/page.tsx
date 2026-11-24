@@ -1,4 +1,6 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
+import { requireAdmin } from "@/lib/auth-guard";
 import { getAdminAiTelemetry } from "@/services/admin/admin.service";
 import { AiUsageTable } from "@/components/admin/AiUsageTable";
 import { Cpu, Zap, DollarSign } from "lucide-react";
@@ -24,6 +26,11 @@ async function TelemetryContent({
 }: {
   searchParams: Promise<{ page?: string; feature?: string }>;
 }) {
+  const adminResult = await requireAdmin();
+  if (!adminResult.ok) {
+    redirect(adminResult.error.code === "FORBIDDEN" ? "/dashboard" : "/sign-in");
+  }
+
   const PAGE_SIZE = 15;
   const params = await searchParams;
   const page = parseInt(params.page || "1", 10) || 1;

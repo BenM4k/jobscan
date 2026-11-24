@@ -169,6 +169,20 @@
       "when": 1790502918240,
       "tag": "0023_vengeful_glorian",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1795505414207,
+      "tag": "0024_early_hellcat",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1795506842070,
+      "tag": "0025_aspiring_ultragirl",
+      "breakpoints": true
     }
   ]
 }

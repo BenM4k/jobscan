@@ -13,7 +13,6 @@ import type {
 } from "./saspay.types";
 
 export const SASPAY_LIVE_BASE_URL = "https://api.saspay.me/api/v1";
-export const SASPAY_SANDBOX_BASE_URL = "https://sandbox-api.saspay.me/api/v1";
 export const SASPAY_DEFAULT_BASE_URL = SASPAY_LIVE_BASE_URL;
 export const WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS = 300;
 
@@ -53,8 +52,13 @@ export function verifySasPayWebhookSignature(params: {
     return false;
   }
 
-  const timestampNum = Number(timestamp);
-  if (!Number.isFinite(timestampNum)) {
+  const trimmedTimestamp = timestamp.trim();
+  if (!/^\d+$/.test(trimmedTimestamp)) {
+    return false;
+  }
+
+  const timestampNum = Number(trimmedTimestamp);
+  if (!Number.isSafeInteger(timestampNum)) {
     return false;
   }
 
@@ -103,20 +107,12 @@ export class SasPayClient {
 
     this.apiKey = key;
 
-    // Resolve base URL: custom options > environment variable (if not mismatching test key) > auto-detect
-    if (options?.baseUrl) {
-      this.baseUrl = options.baseUrl.replace(/\/+$/, "");
-    } else if (
-      process.env.SASPAY_BASE_URL &&
-      !(key.startsWith("sk_test_") && process.env.SASPAY_BASE_URL === SASPAY_LIVE_BASE_URL)
-    ) {
-      this.baseUrl = process.env.SASPAY_BASE_URL.replace(/\/+$/, "");
-    } else {
-      // Auto-select sandbox endpoint for test keys, live endpoint for production keys
-      this.baseUrl = key.startsWith("sk_test_")
-        ? SASPAY_SANDBOX_BASE_URL
-        : SASPAY_LIVE_BASE_URL;
-    }
+    // Both sk_test_ and sk_live_ use the unified SasPay API v1 base URL
+    const resolvedBaseUrl =
+      options?.baseUrl ||
+      process.env.SASPAY_BASE_URL ||
+      SASPAY_DEFAULT_BASE_URL;
+    this.baseUrl = resolvedBaseUrl.replace(/\/+$/, "");
   }
 
   /**
@@ -153,6 +149,7 @@ export class SasPayClient {
       headers,
       body: options.body ? JSON.stringify(options.body) : undefined,
       cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
     });
 
     const text = await res.text();
@@ -164,7 +161,13 @@ export class SasPayClient {
     }
 
     if (!res.ok) {
-      this.handleHttpError(res.status, parsed, endpoint);
+      const retryAfterRaw = res.headers.get("retry-after");
+      const retryAfterParsed = retryAfterRaw ? parseInt(retryAfterRaw, 10) : NaN;
+      const retryAfterSeconds =
+        Number.isFinite(retryAfterParsed) && retryAfterParsed > 0
+          ? retryAfterParsed
+          : undefined;
+      this.handleHttpError(res.status, parsed, endpoint, retryAfterSeconds);
     }
 
     // Unbox SasPay response envelope { success: true, data: {...}, code: 200 }
@@ -191,7 +194,12 @@ export class SasPayClient {
     return parsed as T;
   }
 
-  private handleHttpError(status: number, body: unknown, endpoint: string): never {
+  private handleHttpError(
+    status: number,
+    body: unknown,
+    endpoint: string,
+    retryAfterSeconds?: number
+  ): never {
     const errorRecord =
       typeof body === "object" && body !== null
         ? (body as Record<string, unknown>)
@@ -217,7 +225,13 @@ export class SasPayClient {
       errorMessage
     );
 
-    const errorDetails = { status, errorCode, endpoint, raw: errorMessage };
+    const errorDetails = {
+      status,
+      errorCode,
+      endpoint,
+      raw: errorMessage,
+      ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
+    };
 
     switch (status) {
       case 400:

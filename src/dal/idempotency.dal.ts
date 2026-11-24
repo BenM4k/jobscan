@@ -4,7 +4,7 @@ import { db } from "@/services/db";
 import { idempotencyKey, IdempotencyKeySelect } from "@/services/db/schema";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 
 export type BeginIdempotencyResult =
   | { type: "locked"; record: IdempotencyKeySelect; attemptId: string }
@@ -63,8 +63,38 @@ export async function beginIdempotentAction(
           targetId: targetId || null,
           attemptId: initialAttemptId,
         })
+        .onConflictDoNothing()
         .returning();
-      return ok({ type: "locked", record: reinserted, attemptId: reinserted.attemptId });
+
+      if (reinserted) {
+        return ok({
+          type: "locked",
+          record: reinserted,
+          attemptId: reinserted.attemptId,
+        });
+      }
+
+      const [existingFallback] = await db
+        .select()
+        .from(idempotencyKey)
+        .where(
+          and(
+            eq(idempotencyKey.userId, userId),
+            eq(idempotencyKey.action, action),
+            eq(idempotencyKey.key, key)
+          )
+        )
+        .limit(1);
+
+      if (existingFallback?.status === "completed") {
+        return ok({ type: "completed", record: existingFallback });
+      }
+      if (existingFallback) {
+        return ok({ type: "in_progress", record: existingFallback });
+      }
+      return err(
+        new AppError("DB_ERROR", `Failed to acquire idempotency lock for ${action}:${key}`)
+      );
     }
 
     if (existing.status === "completed") {
@@ -80,7 +110,7 @@ export async function beginIdempotentAction(
           status: "in_progress",
           targetId: targetId || existing.targetId,
           attemptId: nextAttemptId,
-          createdAt: new Date(),
+          createdAt: sql`NOW()`,
         })
         .where(
           and(
@@ -98,31 +128,26 @@ export async function beginIdempotentAction(
       return ok({ type: "locked", record: updated, attemptId: nextAttemptId });
     }
 
-    // Status is "in_progress". Check for stale lock timeout (> 5 minutes)
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-    if (existing.createdAt < fiveMinutesAgo) {
-      // Lock expired from crashed process/hung request, re-lock
-      const nextAttemptId = crypto.randomUUID();
-      const [reclaimed] = await db
-        .update(idempotencyKey)
-        .set({
-          status: "in_progress",
-          attemptId: nextAttemptId,
-          createdAt: new Date(),
-        })
-        .where(
-          and(
-            eq(idempotencyKey.id, existing.id),
-            eq(idempotencyKey.status, "in_progress"),
-            eq(idempotencyKey.attemptId, existing.attemptId)
-          )
+    // Status is "in_progress". Check for stale lock timeout (> 5 minutes) in SQL to avoid timezone skew
+    const nextAttemptId = crypto.randomUUID();
+    const [reclaimed] = await db
+      .update(idempotencyKey)
+      .set({
+        status: "in_progress",
+        attemptId: nextAttemptId,
+        createdAt: sql`NOW()`,
+      })
+      .where(
+        and(
+          eq(idempotencyKey.id, existing.id),
+          eq(idempotencyKey.status, "in_progress"),
+          eq(idempotencyKey.attemptId, existing.attemptId),
+          sql`${idempotencyKey.createdAt} < NOW() - INTERVAL '5 minutes'`
         )
-        .returning();
+      )
+      .returning();
 
-      if (!reclaimed) {
-        // Lost race to another concurrent reclaim
-        return ok({ type: "in_progress", record: existing });
-      }
+    if (reclaimed) {
       return ok({ type: "locked", record: reclaimed, attemptId: nextAttemptId });
     }
 

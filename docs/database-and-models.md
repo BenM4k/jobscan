@@ -32,6 +32,8 @@ Jobpilot uses **Drizzle ORM** with PostgreSQL. Schema definitions are organized 
 | `adapter_circuit_breaker` | `schema/ops.ts` | Adapter health tracking, failure counters, and backoff states. |
 | `ai_call_log` | `schema/ops.ts` | Telemetry audit log recording token counts, latency, and estimated cost per call. |
 | `feature_flag` / `feature_flag_assignment` | `schema/ops.ts` | Global flag toggles and per-user overrides. |
+| `credit_balance` / `credit_ledger` / `credit_purchase` | `schema/billing.ts` | User credit balances, append-only credit audit journal, and purchase lifecycle records. |
+| `subscription` / `subscription_payment` | `schema/billing.ts` | Active subscription state per user and per-attempt payment tracking preventing reference replay. |
 | `user` / `session` / `account` | `schema/auth.ts` | better-auth tables for identity, credentials, and session management. |
 
 ---

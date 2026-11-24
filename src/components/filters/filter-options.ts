@@ -6,9 +6,10 @@ export type Source =
   | "lever"
   | "ashby"
   | "reliefweb"
-  | "emploicd"
+  | "emploi_cd"
   | "congojob"
   | "unjobs"
+  | "fecrdc"
   | "manual";
 
 export type SourceOption = "all" | Source;
@@ -16,9 +17,10 @@ export type StatusOption = "all" | PipelineStatus;
 
 export const SOURCE_OPTIONS: { value: Source; label: string }[] = [
   { value: "reliefweb", label: "🇨🇩 ReliefWeb" },
-  { value: "emploicd", label: "🇨🇩 Emploi.cd" },
+  { value: "emploi_cd", label: "🇨🇩 Emploi.cd" },
   { value: "congojob", label: "🇨🇩 CongoJob" },
   { value: "unjobs", label: "🇨🇩 UNJobs" },
+  { value: "fecrdc", label: "🇨🇩 FEC-RDC" },
   { value: "greenhouse", label: "Greenhouse" },
   { value: "ashby", label: "Ashby" },
   { value: "lever", label: "Lever" },

@@ -66,7 +66,7 @@ export const jobFetchRequested = inngest.createFunction(
     id: "job-fetch-requested",
     triggers: [jobFetchRequestedEvent],
     debounce: {
-      key: "event.data.userId || 'global'",
+      key: "has(event.data.userId) && event.data.userId != '' ? event.data.userId : 'global'",
       period: "10m",
     },
   },

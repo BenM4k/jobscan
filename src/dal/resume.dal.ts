@@ -80,9 +80,11 @@ export async function createMasterResume(
   skills?: string[]
 ): Promise<Result<MasterResumeSelect, AppError>> {
   try {
+    const shouldActivate = data.isActive ?? true;
+
     // If setting as active, deactivate other personas and create in one transaction
     const created = await db.transaction(async (tx) => {
-      if (data.isActive) {
+      if (shouldActivate) {
         await tx.execute(
           sql`SELECT pg_advisory_xact_lock(hashtext('master_resume_' || ${data.userId}))`
         );
@@ -94,7 +96,10 @@ export async function createMasterResume(
 
       const [res] = await tx
         .insert(masterResume)
-        .values(data)
+        .values({
+          ...data,
+          isActive: shouldActivate,
+        })
         .returning();
 
       return res;
@@ -334,28 +339,28 @@ export async function promoteTailoredResumeToMaster(
   label: string
 ): Promise<Result<PromoteTailoredResumeResult, AppError>> {
   try {
-    // 1. Verify tailored resume existence and ownership via pipelineEntry
-    const [tailored] = await db
-      .select({
-        id: tailoredResume.id,
-        content: tailoredResume.content,
-        language: tailoredResume.language,
-        userId: pipelineEntry.userId,
-      })
-      .from(tailoredResume)
-      .innerJoin(pipelineEntry, eq(tailoredResume.pipelineEntryId, pipelineEntry.id))
-      .where(and(eq(tailoredResume.id, tailoredResumeId), eq(pipelineEntry.userId, userId)))
-      .limit(1);
-
-    if (!tailored) {
-      return err(new AppError("NOT_FOUND", "Tailored resume not found or unauthorized"));
-    }
-
-    // 2. Perform promotion in a transaction: capture previous active ID, demote, insert new active
+    // Verify ownership, demote active persona, and insert new active persona atomically
     const result = await db.transaction(async (tx) => {
       await tx.execute(
         sql`SELECT pg_advisory_xact_lock(hashtext('master_resume_' || ${userId}))`
       );
+
+      const [tailored] = await tx
+        .select({
+          id: tailoredResume.id,
+          content: tailoredResume.content,
+          language: tailoredResume.language,
+          userId: pipelineEntry.userId,
+        })
+        .from(tailoredResume)
+        .innerJoin(pipelineEntry, eq(tailoredResume.pipelineEntryId, pipelineEntry.id))
+        .where(and(eq(tailoredResume.id, tailoredResumeId), eq(pipelineEntry.userId, userId)))
+        .limit(1);
+
+      if (!tailored) {
+        return null;
+      }
+
       const [currentActive] = await tx
         .select({ id: masterResume.id })
         .from(masterResume)
@@ -391,10 +396,20 @@ export async function promoteTailoredResumeToMaster(
       };
     });
 
+    if (!result) {
+      return err(new AppError("NOT_FOUND", "Tailored resume not found or unauthorized"));
+    }
+
     if (!result.newMasterResume) {
       return err(new AppError("DB_ERROR", "Failed to create promoted master resume"));
     }
 
+    const extractedSkills = parseResumeContent(
+      result.newMasterResume.content
+    ).skills;
+    if (extractedSkills && extractedSkills.length > 0) {
+      await syncResumeSkills(result.newMasterResume.id, extractedSkills);
+    }
 
     return ok(result);
   } catch (error) {

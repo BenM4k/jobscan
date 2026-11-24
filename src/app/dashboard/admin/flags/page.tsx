@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { requireSession } from "@/lib/auth-guard";
+import { requireAdmin } from "@/lib/auth-guard";
 import { redirect } from "next/navigation";
 import {
   getUserFeatureFlags,
@@ -17,12 +17,12 @@ function FlagsSkeleton() {
 }
 
 async function FlagsContent() {
-  const sessionResult = await requireSession();
-  if (!sessionResult.ok || !sessionResult.value) {
-    redirect("/sign-in");
+  const adminResult = await requireAdmin();
+  if (!adminResult.ok) {
+    redirect(adminResult.error.code === "FORBIDDEN" ? "/dashboard" : "/sign-in");
   }
 
-  const user = sessionResult.value.user;
+  const user = adminResult.value.user;
 
   const [flags, overrides] = await Promise.all([
     getUserFeatureFlags(user.id),

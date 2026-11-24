@@ -240,6 +240,7 @@ export async function upsertCanonicalJobWithSimhashDedup(
           externalId: data.externalId || null,
           title: data.title,
           company: data.company,
+          location,
           url: data.url || null,
           description: data.description || "",
           postedAt: data.postedAt || null,
@@ -435,12 +436,54 @@ export async function restoreJob(
   return await upsertJob({ ...data, status: restoreStatus }, true);
 }
 
-export async function updateJobStatus(
+/**
+ * Restores a user's withdrawn pipeline entry without touching the shared canonical job table.
+ */
+export async function restorePipelineEntry(
   id: string,
-  status: pipelineDal.PipelineStatus | string
+  userId: string,
+  restoreStatus: pipelineDal.PipelineStatus = "saved"
 ): Promise<Result<JobSelect, AppError>> {
   try {
-    const pStatus =
+    const [entry] = await db
+      .select({ id: pipelineEntry.id })
+      .from(pipelineEntry)
+      .where(
+        and(
+          eq(pipelineEntry.userId, userId),
+          or(eq(pipelineEntry.id, id), eq(pipelineEntry.jobId, id))
+        )
+      )
+      .limit(1);
+
+    if (!entry) {
+      return err(new AppError("NOT_FOUND", "Pipeline entry not found"));
+    }
+
+    const updateRes = await pipelineDal.updatePipelineStatus(
+      entry.id,
+      userId,
+      restoreStatus
+    );
+    if (!updateRes.ok) {
+      return err(updateRes.error);
+    }
+
+    return await getJobById(entry.id, userId);
+  } catch (error) {
+    return err(
+      new AppError("DB_ERROR", `Failed to restore pipeline entry ${id}`, error)
+    );
+  }
+}
+
+export async function updateJobStatus(
+  id: string,
+  status: pipelineDal.PipelineStatus | string,
+  userId: string
+): Promise<Result<JobSelect, AppError>> {
+  try {
+    const pStatus: pipelineDal.PipelineStatus =
       status === "applied" ||
       status === "interviewing" ||
       status === "offer" ||
@@ -449,27 +492,161 @@ export async function updateJobStatus(
         ? status
         : "saved";
 
-    const [updatedEntry] = await db
-      .update(pipelineEntry)
-      .set({
-        status: pStatus,
-        updatedAt: new Date(),
-      })
-      .where(eq(pipelineEntry.id, id))
-      .returning();
+    const resolvedEntryId = await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select({ id: pipelineEntry.id })
+        .from(pipelineEntry)
+        .where(
+          and(
+            eq(pipelineEntry.userId, userId),
+            or(eq(pipelineEntry.id, id), eq(pipelineEntry.jobId, id))
+          )
+        )
+        .limit(1);
 
-    if (updatedEntry) {
-      await db.insert(pipelineStatusHistory).values({
-        pipelineEntryId: updatedEntry.id,
-        status: pStatus,
-      });
-      return await getJobById(updatedEntry.id, updatedEntry.userId);
+      if (existing) {
+        await tx
+          .update(pipelineEntry)
+          .set({
+            status: pStatus,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(pipelineEntry.id, existing.id),
+              eq(pipelineEntry.userId, userId)
+            )
+          );
+
+        await tx.insert(pipelineStatusHistory).values({
+          pipelineEntryId: existing.id,
+          status: pStatus,
+        });
+
+        return existing.id;
+      }
+
+      const canonicalRes = await getJobById(id, userId);
+      if (!canonicalRes.ok) {
+        return null;
+      }
+
+      const [inserted] = await tx
+        .insert(pipelineEntry)
+        .values({
+          userId,
+          jobId: id,
+          status: pStatus,
+        })
+        .onConflictDoUpdate({
+          target: [pipelineEntry.userId, pipelineEntry.jobId],
+          set: {
+            status: pStatus,
+            updatedAt: new Date(),
+          },
+        })
+        .returning({ id: pipelineEntry.id });
+
+      if (inserted) {
+        await tx.insert(pipelineStatusHistory).values({
+          pipelineEntryId: inserted.id,
+          status: pStatus,
+        });
+        return inserted.id;
+      }
+
+      return null;
+    });
+
+    if (!resolvedEntryId) {
+      return err(new AppError("NOT_FOUND", `Job with ID ${id} not found`));
     }
 
-    return await getJobById(id);
+    return await getJobById(resolvedEntryId, userId);
   } catch (error) {
     return err(
       new AppError("DB_ERROR", `Failed to update status for job ${id}`, error)
+    );
+  }
+}
+
+export interface InsertHybridScoreParams {
+  pipelineEntryId: string;
+  userId: string;
+  resumeId: string;
+  resumeVersion: number;
+  modelUsed: string;
+  finalScore: number;
+  cosineSimilarity: number | null;
+  bm25Rank: number | null;
+  matchedSkills: string[];
+  missingSkills: string[];
+  explanation: string | null;
+}
+
+export async function insertHybridScoreRecord(
+  params: InsertHybridScoreParams
+): Promise<Result<typeof score.$inferSelect, AppError>> {
+  try {
+    return await db.transaction(async (tx) => {
+      const [entry] = await tx
+        .select({ id: pipelineEntry.id })
+        .from(pipelineEntry)
+        .where(
+          and(
+            eq(pipelineEntry.id, params.pipelineEntryId),
+            eq(pipelineEntry.userId, params.userId)
+          )
+        )
+        .limit(1);
+
+      if (!entry) {
+        return err(
+          new AppError(
+            "NOT_FOUND",
+            `Pipeline entry ${params.pipelineEntryId} not found`
+          )
+        );
+      }
+
+      const [insertedScore] = await tx
+        .insert(score)
+        .values({
+          pipelineEntryId: params.pipelineEntryId,
+          resumeVersion: params.resumeVersion,
+          modelUsed: params.modelUsed,
+          finalScore: params.finalScore.toString(),
+          cosineSimilarity:
+            params.cosineSimilarity != null
+              ? params.cosineSimilarity.toString()
+              : null,
+          bm25Rank:
+            params.bm25Rank != null ? params.bm25Rank.toString() : null,
+          matchedSkills: params.matchedSkills,
+          missingSkills: params.missingSkills,
+          explanation: params.explanation,
+        })
+        .returning();
+
+      await tx
+        .update(pipelineEntry)
+        .set({ updatedAt: new Date(), resumeIdUsed: params.resumeId })
+        .where(
+          and(
+            eq(pipelineEntry.id, params.pipelineEntryId),
+            eq(pipelineEntry.userId, params.userId)
+          )
+        );
+
+      return ok(insertedScore);
+    });
+  } catch (error) {
+    return err(
+      new AppError(
+        "DB_ERROR",
+        `Failed to insert hybrid score for entry ${params.pipelineEntryId}`,
+        error
+      )
     );
   }
 }

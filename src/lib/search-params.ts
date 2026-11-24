@@ -9,9 +9,10 @@ export const searchParamsCache = createSearchParamsCache({
   source: parseAsStringEnum<
     | "all"
     | "reliefweb"
-    | "emploicd"
+    | "emploi_cd"
     | "congojob"
     | "unjobs"
+    | "fecrdc"
     | "greenhouse"
     | "remoteok"
     | "lever"
@@ -20,9 +21,10 @@ export const searchParamsCache = createSearchParamsCache({
   >([
     "all",
     "reliefweb",
-    "emploicd",
+    "emploi_cd",
     "congojob",
     "unjobs",
+    "fecrdc",
     "greenhouse",
     "remoteok",
     "lever",

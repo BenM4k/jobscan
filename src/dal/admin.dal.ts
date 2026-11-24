@@ -182,7 +182,7 @@ export async function getAdminUserDetails(userId: string): Promise<
     creditBalance: number;
     activeSubscription: (typeof subscriptionTable.$inferSelect & { planName?: string }) | null;
     recentLedger: (typeof creditLedgerTable.$inferSelect)[];
-    recentSessions: (typeof sessionTable.$inferSelect)[];
+    recentSessions: Omit<typeof sessionTable.$inferSelect, "token">[];
     aiCallsCount: number;
   } | null, AppError>
 > {
@@ -220,7 +220,16 @@ export async function getAdminUserDetails(userId: string): Promise<
         .orderBy(desc(creditLedgerTable.createdAt))
         .limit(20),
       db
-        .select()
+        .select({
+          id: sessionTable.id,
+          userId: sessionTable.userId,
+          expiresAt: sessionTable.expiresAt,
+          createdAt: sessionTable.createdAt,
+          updatedAt: sessionTable.updatedAt,
+          ipAddress: sessionTable.ipAddress,
+          userAgent: sessionTable.userAgent,
+          impersonatedBy: sessionTable.impersonatedBy,
+        })
         .from(sessionTable)
         .where(eq(sessionTable.userId, userId))
         .orderBy(desc(sessionTable.createdAt))
