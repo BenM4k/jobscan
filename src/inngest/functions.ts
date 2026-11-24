@@ -2,6 +2,7 @@ export {
   ingestAllSources,
   scheduledJobFetch,
   jobFetchRequested,
+  drcJobFetchRequested,
 } from "./functions/job-fetch";
 export {
   scheduledDigestCron,

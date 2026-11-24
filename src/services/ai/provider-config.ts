@@ -72,6 +72,16 @@ export async function setGlobalAiProvider(
     return err(new AppError("VALIDATION_ERROR", "Unsupported AI provider selected"));
   }
 
+  const configured = getConfiguredAiProviders();
+  if (!configured[provider]) {
+    return err(
+      new AppError(
+        "VALIDATION_ERROR",
+        `Cannot activate "${provider}": required server credentials are not configured.`
+      )
+    );
+  }
+
   const upsertRes = await opsDal.upsertAppSetting(
     AI_PROVIDER_SETTING_KEY,
     provider,

@@ -200,6 +200,15 @@ export async function giftSubscriptionToUser(
     return err(giftRes.error);
   }
 
+  // Record confirmed subscription grant before downstream activation steps can fail or return early.
+  await recordAdminAuditEvent({
+    adminUserId,
+    targetUserId,
+    action: "gift_subscription",
+    reason: reason ?? null,
+    metadata: { durationDays, planName: plan.name },
+  });
+
   // 1. Grant hybrid scoring feature flag override
   const flagRes = await setUserFeatureFlagOverride(
     targetUserId,
@@ -211,6 +220,17 @@ export async function giftSubscriptionToUser(
       `[Admin] Failed to set hybrid scoring flag for ${targetUserId}:`,
       flagRes.error
     );
+    await recordAdminAuditEvent({
+      adminUserId,
+      targetUserId,
+      action: "gift_subscription_activation_failed",
+      reason: reason ?? null,
+      metadata: {
+        stage: "feature_flag",
+        flag: FEATURE_FLAGS.HYBRID_SCORING,
+        error: flagRes.error || "Unknown error",
+      },
+    });
     return err(
       new AppError(
         "INTERNAL_ERROR",
@@ -228,6 +248,16 @@ export async function giftSubscriptionToUser(
       `[Admin] Failed to update user preferences for ${targetUserId}:`,
       prefRes.error
     );
+    await recordAdminAuditEvent({
+      adminUserId,
+      targetUserId,
+      action: "gift_subscription_activation_failed",
+      reason: reason ?? null,
+      metadata: {
+        stage: "user_preferences",
+        error: prefRes.error.message,
+      },
+    });
     return err(
       new AppError(
         "INTERNAL_ERROR",
@@ -235,14 +265,6 @@ export async function giftSubscriptionToUser(
       )
     );
   }
-
-  await recordAdminAuditEvent({
-    adminUserId,
-    targetUserId,
-    action: "gift_subscription",
-    reason: reason ?? null,
-    metadata: { durationDays, planName: plan.name },
-  });
 
   console.log(
     `[Admin] Admin ${adminUserId} gifted a ${durationDays}-day ${plan.name} subscription to user ${targetUserId}. Reason: ${reason || "none"}`

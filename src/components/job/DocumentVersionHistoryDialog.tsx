@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useTranslations, useFormatter } from "next-intl";
-import { History, Copy, Check, Loader2 } from "lucide-react";
+import { History, Copy, Check, Loader2, AlertTriangle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +34,8 @@ export function DocumentVersionHistoryDialog({
   const format = useFormatter();
   const [versions, setVersions] = useState<DocumentVersionItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -41,18 +43,26 @@ export function DocumentVersionHistoryDialog({
     let cancelled = false;
 
     const loadVersions = async () => {
+      setLoadError(null);
       setIsLoading(true);
       try {
         const res = await getDocumentVersionsAction({ pipelineEntryId, type });
         if (cancelled) return;
         if (!res.success) {
-          toast.error(res.error || "Failed to load version history");
+          const message = res.error || t("versionHistoryLoadError");
+          setVersions([]);
+          setLoadError(message);
+          toast.error(message);
           return;
         }
+        setLoadError(null);
         setVersions(res.versions ?? []);
       } catch {
         if (!cancelled) {
-          toast.error("Failed to load version history");
+          const message = t("versionHistoryLoadError");
+          setVersions([]);
+          setLoadError(message);
+          toast.error(message);
         }
       } finally {
         if (!cancelled) {
@@ -65,7 +75,7 @@ export function DocumentVersionHistoryDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, pipelineEntryId, type]);
+  }, [open, pipelineEntryId, type, retryCount, t]);
 
   const handleCopy = async (id: string, content: string) => {
     await navigator.clipboard.writeText(content);
@@ -94,6 +104,24 @@ export function DocumentVersionHistoryDialog({
           <div className="flex items-center justify-center py-10 text-xs text-muted-foreground gap-2">
             <Loader2 className="size-4 animate-spin" />
             <span>{tCommon("loading")}</span>
+          </div>
+        ) : loadError ? (
+          <div
+            role="alert"
+            className="flex flex-col items-center justify-center gap-3 py-8 text-center"
+          >
+            <div className="flex items-center gap-2 text-xs text-red-600 dark:text-red-400">
+              <AlertTriangle className="size-4 shrink-0" />
+              <span>{loadError}</span>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setRetryCount((c) => c + 1)}
+            >
+              {t("versionHistoryRetry")}
+            </Button>
           </div>
         ) : versions.length === 0 ? (
           <div className="py-8 text-center text-xs text-muted-foreground">

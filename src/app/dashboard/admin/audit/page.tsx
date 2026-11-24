@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, ScrollText } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, ScrollText } from "lucide-react";
 import { requireAdmin } from "@/lib/auth-guard";
 import { getAdminAuditLogPage } from "@/services/admin/admin.service";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -37,13 +37,38 @@ async function AuditLogContent({
     action: params.action || undefined,
   });
 
-  const data = res.ok
-    ? res.value
-    : { items: [], totalCount: 0, page: 1, totalPages: 1 };
-
   const actionQuery = params.action
     ? `&action=${encodeURIComponent(params.action)}`
     : "";
+
+  if (!res.ok) {
+    return (
+      <div
+        role="alert"
+        className="rounded-2xl border border-red-200 dark:border-red-900/60 bg-red-50/70 dark:bg-red-950/20 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+      >
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold text-red-900 dark:text-red-200">
+              Failed to load audit log
+            </h3>
+            <p className="text-xs text-red-700 dark:text-red-300">
+              {res.error.message || "Unable to retrieve administrative audit records."}
+            </p>
+          </div>
+        </div>
+        <Link
+          href={`/dashboard/admin/audit?page=${page}${actionQuery}`}
+          className={buttonVariants({ size: "sm", variant: "outline" })}
+        >
+          Retry
+        </Link>
+      </div>
+    );
+  }
+
+  const data = res.value;
 
   return (
     <div className="space-y-4">

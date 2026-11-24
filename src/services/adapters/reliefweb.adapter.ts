@@ -1,55 +1,64 @@
 import "server-only";
 
 import { BaseJobSourceAdapter } from "./base";
-import { fetchReliefWebJobs } from "@/services/crawler/sources/reliefweb";
-import type { CrawledJob } from "@/services/crawler/types";
+import {
+  fetchReliefWebJobs,
+  normalizeReliefWebRawItem,
+  type ReliefWebRawItem,
+} from "@/services/crawler/sources/reliefweb";
 import type { NormalizedJobInput, RawJobItem } from "./types";
 
-/** Fetches raw DRC-focused humanitarian/tech postings from ReliefWeb API v2. */
+/** Fetches untouched ReliefWeb API v2 items and propagates upstream errors for circuit breaking. */
 export async function fetchRaw(options?: {
   target?: string;
   keyword?: string;
 }): Promise<RawJobItem[]> {
   const keyword = options?.target || options?.keyword;
-  const { jobs } = await fetchReliefWebJobs(keyword);
-  return jobs.map((job) => ({
-    externalId: job.externalId,
-    payload: job,
+  const { items, result } = await fetchReliefWebJobs(keyword);
+  if (result.error) {
+    throw new Error(result.error);
+  }
+  return items.map((item) => ({
+    externalId: String(item.id),
+    payload: item,
   }));
 }
 
-/** Maps a ReliefWeb CrawledJob payload into canonical NormalizedJobInput. */
+/** Pure function: extracts fields, cleans HTML, and maps a raw ReliefWeb API item into canonical form. */
 export function normalize(raw: unknown): NormalizedJobInput {
-  const item = raw as CrawledJob;
+  const normalized = normalizeReliefWebRawItem(raw as ReliefWebRawItem);
   return {
-    externalId: String(item.externalId),
+    externalId: normalized.externalId,
     source: "reliefweb",
-    title: item.title || "Untitled Position",
-    company: item.company || "ReliefWeb Partner",
-    url: item.url,
-    description: item.description || "No description provided.",
-    postedAt: item.postedAt ? new Date(item.postedAt) : new Date(),
-    country: item.country ?? "Democratic Republic of the Congo",
-    countryCode: item.countryCode ?? "CD",
-    city: item.city,
-    workplaceType: item.workplaceType ?? "on-site",
+    title: normalized.title,
+    company: normalized.company,
+    url: normalized.url,
+    description: normalized.description,
+    postedAt: normalized.postedAt,
+    country: normalized.country,
+    countryCode: normalized.countryCode,
+    city: normalized.city,
+    workplaceType: normalized.workplaceType,
   };
 }
 
 /** Class-based ReliefWeb source adapter implementing BaseJobSourceAdapter. */
-export class ReliefWebAdapter extends BaseJobSourceAdapter<CrawledJob> {
+export class ReliefWebAdapter extends BaseJobSourceAdapter<ReliefWebRawItem> {
   readonly id = "reliefweb" as const;
 
-  extractExternalId(raw: CrawledJob): string {
-    return String(raw.externalId);
+  extractExternalId(raw: ReliefWebRawItem): string {
+    return String(raw.id);
   }
 
-  protected async fetchRawInternal(target?: string): Promise<CrawledJob[]> {
-    const { jobs } = await fetchReliefWebJobs(target);
-    return jobs;
+  protected async fetchRawInternal(target?: string): Promise<ReliefWebRawItem[]> {
+    const { items, result } = await fetchReliefWebJobs(target);
+    if (result.error) {
+      throw new Error(result.error);
+    }
+    return items;
   }
 
-  normalize(raw: CrawledJob): NormalizedJobInput {
+  normalize(raw: ReliefWebRawItem): NormalizedJobInput {
     return normalize(raw);
   }
 }

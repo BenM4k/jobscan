@@ -390,6 +390,8 @@
     "versionHistoryTitleCoverLetter": "Historique de la lettre de motivation",
     "versionHistoryDescription": "Consultez les versions générées ou modifiées précédemment pour cette candidature.",
     "versionHistoryEmpty": "Aucune version enregistrée pour le moment.",
+    "versionHistoryLoadError": "Échec du chargement de l'historique des versions.",
+    "versionHistoryRetry": "Réessayer",
     "versionLabel": "Version {number}",
     "timelineHeading": "Chronologie de candidature",
     "timelineSubtitle": "Historique chronologique des changements de statut pour cette offre.",

@@ -18,7 +18,7 @@ export type { InterviewQuestionItem };
 export async function getInterviewQuestionsForEntry(
   pipelineEntryId: string,
   userId: string
-): Promise<Result<{ id: string; questions: unknown } | null, AppError>> {
+): Promise<Result<{ id: string; questions: unknown; createdAt: Date } | null, AppError>> {
   return await interviewDal.getInterviewQuestionSetByEntryId(pipelineEntryId, userId);
 }
 
@@ -158,6 +158,7 @@ Generate 5 high-yield interview questions tailored to this role and this candida
     return ok({
       id: saveRes.value.id,
       questions: saveRes.value.questions,
+      createdAt: saveRes.value.createdAt,
     });
   } catch (error) {
     console.error("[Interview Service] Error generating questions:", error);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { JobSelect } from "@/dal/jobs.dal";
 import type { InterviewQuestionItem } from "@/dal/interview.dal";
@@ -10,6 +10,8 @@ interface UseInterviewPrepProps {
   job: JobSelect;
   selectedResumeId?: string;
   initialQuestions?: InterviewQuestionItem[];
+  initialQuestionSetId?: string;
+  initialQuestionsGeneratedAt?: string | Date | null;
   onPipelineEntryResolved?: (pipelineEntryId: string) => void;
 }
 
@@ -18,8 +20,11 @@ export function useInterviewPrep({
   job,
   selectedResumeId,
   initialQuestions = [],
+  initialQuestionSetId,
+  initialQuestionsGeneratedAt,
   onPipelineEntryResolved,
 }: UseInterviewPrepProps) {
+  const currentJobKey = job.canonicalJobId ?? job.id;
   const [questions, setQuestions] = useState<InterviewQuestionItem[]>(initialQuestions);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
@@ -28,16 +33,68 @@ export function useInterviewPrep({
     requiredCost?: number;
     currentBalance?: number;
   }>({});
-  const idempotencyKeyRef = useRef<string | null>(null);
+  const idempotencyRef = useRef<{
+    jobId: string;
+    resumeId: string | undefined;
+    key: string;
+  } | null>(null);
+  const localResultRef = useRef<{
+    jobId: string;
+    id?: string;
+    generatedAtMs: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const local = localResultRef.current;
+    if (local && local.jobId !== currentJobKey) {
+      localResultRef.current = null;
+      setQuestions(initialQuestions);
+      return;
+    }
+
+    if (!local) {
+      setQuestions(initialQuestions);
+      return;
+    }
+
+    const matchesLocalId = Boolean(
+      initialQuestionSetId && local.id && initialQuestionSetId === local.id
+    );
+    const incomingMs = initialQuestionsGeneratedAt
+      ? new Date(initialQuestionsGeneratedAt).getTime()
+      : NaN;
+    const isNewerServerSnapshot =
+      Number.isFinite(incomingMs) && incomingMs > local.generatedAtMs;
+
+    if (matchesLocalId || isNewerServerSnapshot) {
+      localResultRef.current = null;
+      setQuestions(initialQuestions);
+    }
+  }, [
+    currentJobKey,
+    initialQuestions,
+    initialQuestionSetId,
+    initialQuestionsGeneratedAt,
+  ]);
 
   const handleGenerate = async () => {
-    const key =
-      idempotencyKeyRef.current ?? (idempotencyKeyRef.current = crypto.randomUUID());
+    if (
+      !idempotencyRef.current ||
+      idempotencyRef.current.jobId !== currentJobKey ||
+      idempotencyRef.current.resumeId !== selectedResumeId
+    ) {
+      idempotencyRef.current = {
+        jobId: currentJobKey,
+        resumeId: selectedResumeId,
+        key: crypto.randomUUID(),
+      };
+    }
+    const key = idempotencyRef.current.key;
     setIsGenerating(true);
 
     try {
       const res = await generateInterviewQuestionsAction({
-        jobId: job.canonicalJobId ?? job.id,
+        jobId: currentJobKey,
         pipelineEntryId: job.pipelineEntryId,
         idempotencyKey: key,
         resumeId: selectedResumeId,
@@ -60,16 +117,26 @@ export function useInterviewPrep({
       }
 
       const payload = res.data as {
+        id?: string;
+        createdAt?: string | Date;
         questions?: InterviewQuestionItem[];
         pipelineEntryId?: string;
       };
       if (Array.isArray(payload.questions)) {
+        const generatedAtMs = payload.createdAt
+          ? new Date(payload.createdAt).getTime()
+          : Date.now();
+        localResultRef.current = {
+          jobId: currentJobKey,
+          id: payload.id,
+          generatedAtMs: Number.isFinite(generatedAtMs) ? generatedAtMs : Date.now(),
+        };
         setQuestions(payload.questions);
       }
       if (payload.pipelineEntryId) {
         onPipelineEntryResolved?.(payload.pipelineEntryId);
       }
-      idempotencyKeyRef.current = crypto.randomUUID();
+      idempotencyRef.current = null;
     } catch {
       toast.error("Failed to generate interview questions");
     } finally {

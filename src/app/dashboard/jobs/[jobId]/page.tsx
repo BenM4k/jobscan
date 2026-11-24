@@ -77,6 +77,13 @@ async function JobDetailContent({
     questionsRes?.ok && Array.isArray(questionsRes.value?.questions)
       ? (questionsRes.value.questions as InterviewQuestionItem[])
       : [];
+  const initialQuestionSetId = questionsRes?.ok
+    ? questionsRes.value?.id
+    : undefined;
+  const initialQuestionsGeneratedAt =
+    questionsRes?.ok && questionsRes.value?.createdAt
+      ? questionsRes.value.createdAt.toISOString()
+      : undefined;
   const initialTimeline = timelineRes?.ok ? timelineRes.value : [];
 
   return (
@@ -87,6 +94,8 @@ async function JobDetailContent({
         resumesResult.ok && resumesResult.value ? resumesResult.value : []
       }
       initialInterviewQuestions={initialInterviewQuestions}
+      initialQuestionSetId={initialQuestionSetId}
+      initialQuestionsGeneratedAt={initialQuestionsGeneratedAt}
       initialTimeline={initialTimeline}
     />
   );

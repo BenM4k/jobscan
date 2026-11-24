@@ -142,7 +142,11 @@ export async function getAppSetting(
     return ok(row?.value ?? null);
   } catch (error) {
     return err(
-      new AppError("DB_ERROR", "Failed to read application setting", error),
+      new AppError(
+        "DB_ERROR",
+        "Failed to read application setting",
+        error,
+      ),
     );
   }
 }
@@ -171,7 +175,11 @@ export async function upsertAppSetting(
     return ok(undefined);
   } catch (error) {
     return err(
-      new AppError("DB_ERROR", "Failed to save application setting", error),
+      new AppError(
+        "DB_ERROR",
+        "Failed to save application setting",
+        error,
+      ),
     );
   }
 }

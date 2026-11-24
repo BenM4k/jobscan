@@ -13,7 +13,12 @@ import { adminAuditLog, appSetting, creditLedgerActionEnum } from "@/services/db
 import {
   DEFAULT_AI_PROVIDER,
   SUPPORTED_AI_PROVIDERS,
+  setGlobalAiProvider,
 } from "@/services/ai/provider-config";
+import { normalize as normalizeReliefWeb } from "@/services/adapters/reliefweb.adapter";
+import { resolveSafeUnJobsUrl } from "@/services/adapters/unjobs.adapter";
+import { GET as unsubscribeGet } from "@/app/api/digest/unsubscribe/route";
+import { NextRequest } from "next/server";
 
 function assert(condition: boolean, message: string): asserts condition {
   if (!condition) {
@@ -114,8 +119,9 @@ async function runSprint4Tests() {
 
   const jobActionsSrc = readRepoFile("src/actions/job.actions.ts");
   assert(
-    !jobActionsSrc.includes("runDrcCrawler") && jobActionsSrc.includes('"job.fetch.requested"'),
-    "triggerDrcCrawlAction must enqueue background Inngest jobs instead of synchronous scraping"
+    !jobActionsSrc.includes("runDrcCrawler") &&
+      jobActionsSrc.includes('"job.drc.fetch.requested"'),
+    "triggerDrcCrawlAction must enqueue non-debounced job.drc.fetch.requested events instead of synchronous scraping"
   );
 
   // 4. Schema & Action Layering (Track 1, Track 2, Track 4)
@@ -168,6 +174,62 @@ async function runSprint4Tests() {
       `User-facing file ${userSurfacePath} must not expose AI provider or model names`
     );
   }
+
+  // 7. Review hardening contracts
+  const prevAnthropic = process.env.ANTHROPIC_API_KEY;
+  delete process.env.ANTHROPIC_API_KEY;
+  const missingCredRes = await setGlobalAiProvider("claude", "admin-test-id");
+  assert(
+    !missingCredRes.ok && missingCredRes.error.code === "VALIDATION_ERROR",
+    "setGlobalAiProvider must reject providers without configured credentials"
+  );
+  if (prevAnthropic !== undefined) {
+    process.env.ANTHROPIC_API_KEY = prevAnthropic;
+  }
+
+  const normalizedRw = normalizeReliefWeb({
+    id: 98765,
+    fields: {
+      title: "Project Officer",
+      body: "<p>Lead&nbsp;<strong>field</strong> operations.</p>",
+      url: "https://reliefweb.int/job/98765",
+      source: [{ name: "UNICEF" }],
+      city: [{ name: "Goma" }],
+    },
+  });
+  assert(
+    normalizedRw.externalId === "98765" &&
+      normalizedRw.company === "UNICEF" &&
+      normalizedRw.city === "Goma" &&
+      !normalizedRw.description.includes("<p>"),
+    "ReliefWeb normalize() must extract fields and strip HTML from raw upstream items"
+  );
+
+  assert(
+    resolveSafeUnJobsUrl(undefined) === "https://unjobs.org/duty_stations/fih",
+    "UNjobs must keep default duty station URL when target is omitted"
+  );
+  let blockedKeywordAsUrl = false;
+  try {
+    resolveSafeUnJobsUrl("software engineer");
+  } catch {
+    blockedKeywordAsUrl = true;
+  }
+  assert(blockedKeywordAsUrl, "Non-URL targets must still be rejected by UNjobs URL validator");
+
+  const validToken = createDigestUnsubscribeToken("user-confirm-check");
+  const getRes = await unsubscribeGet(
+    new NextRequest(
+      `http://localhost/api/digest/unsubscribe?token=${encodeURIComponent(validToken)}`
+    )
+  );
+  const getBody = await getRes.text();
+  assert(
+    getRes.status === 200 &&
+      getBody.includes('method="POST"') &&
+      getBody.includes("Confirm Unsubscribe"),
+    "GET /api/digest/unsubscribe must render confirmation form without mutating preferences"
+  );
 
   console.log("All Sprint 4 feature & integrity tests passed!");
 }

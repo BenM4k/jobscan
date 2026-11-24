@@ -64,7 +64,9 @@ export function AdminAiProviderCard({
         <Button
           type="button"
           size="sm"
-          disabled={isPending || selected === active}
+          disabled={
+            isPending || selected === active || !configuredProviders[selected]
+          }
           onClick={handleSave}
           className="shrink-0"
         >

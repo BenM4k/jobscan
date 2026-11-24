@@ -11,6 +11,13 @@ export const jobFetchRequestedEvent = eventType("job.fetch.requested", {
   }),
 });
 
+export const drcJobFetchRequestedEvent = eventType("job.drc.fetch.requested", {
+  schema: z.object({
+    keyword: z.string().optional(),
+    userId: z.string().optional(),
+  }),
+});
+
 export const digestEmailScheduledEvent = eventType("digest.email.scheduled", {
   schema: z.object({
     userId: z.string(),
@@ -44,6 +51,9 @@ export const resumeUpdatedEvent = eventType("resume.updated", {
 
 export type JobFetchRequestedInput = z.infer<
   typeof jobFetchRequestedEvent.schema
+>;
+export type DrcJobFetchRequestedInput = z.infer<
+  typeof drcJobFetchRequestedEvent.schema
 >;
 export type DigestEmailScheduledInput = z.infer<
   typeof digestEmailScheduledEvent.schema

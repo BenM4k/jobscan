@@ -35,7 +35,40 @@ interface JobDetailViewProps {
   initialResumes?: MasterResumeSelect[];
   sanitizedDescriptionHtml?: string;
   initialInterviewQuestions?: InterviewQuestionItem[];
+  initialQuestionSetId?: string;
+  initialQuestionsGeneratedAt?: string;
   initialTimeline?: PipelineTimelineItem[];
+}
+
+interface PendingTimelineItem extends PipelineTimelineItem {
+  jobId: string;
+}
+
+function isLocalTimelineConfirmed(
+  localEvent: PipelineTimelineItem,
+  serverEvents: PipelineTimelineItem[],
+): boolean {
+  const localMs = new Date(localEvent.changedAt).getTime();
+  return serverEvents.some(
+    (s) =>
+      s.status === localEvent.status &&
+      new Date(s.changedAt).getTime() >= localMs - 10_000,
+  );
+}
+
+function reconcileTimeline(
+  serverEvents: PipelineTimelineItem[],
+  localEvents: PendingTimelineItem[],
+  currentJobId: string,
+): PipelineTimelineItem[] {
+  const unconfirmed = localEvents
+    .filter(
+      (localEvent) =>
+        localEvent.jobId === currentJobId &&
+        !isLocalTimelineConfirmed(localEvent, serverEvents),
+    )
+    .map(({ id, status, changedAt }) => ({ id, status, changedAt }));
+  return unconfirmed.length > 0 ? [...unconfirmed, ...serverEvents] : serverEvents;
 }
 
 export function JobDetailView({
@@ -43,15 +76,20 @@ export function JobDetailView({
   initialResumes = [],
   sanitizedDescriptionHtml,
   initialInterviewQuestions = [],
+  initialQuestionSetId,
+  initialQuestionsGeneratedAt,
   initialTimeline = [],
 }: JobDetailViewProps) {
   const tCommon = useTranslations("common");
   const tDash = useTranslations("dashboard");
   const tJob = useTranslations("jobDetail");
   const [job, setJob] = useState<JobSelect>(initialJob);
-  const [timeline, setTimeline] =
-    useState<PipelineTimelineItem[]>(initialTimeline);
+  const [pendingTimeline, setPendingTimeline] = useState<PendingTimelineItem[]>(
+    [],
+  );
   const [resumes, setResumes] = useState<MasterResumeSelect[]>(initialResumes);
+
+  const timeline = reconcileTimeline(initialTimeline, pendingTimeline, job.id);
   const initialActive = initialResumes.find((r) => r.isActive);
   const [selectedResumeId, setSelectedResumeId] = useState<string | undefined>(
     initialActive?.id || initialResumes[0]?.id,
@@ -88,8 +126,13 @@ export function JobDetailView({
         status: newStatus,
         location: "detail",
       });
-      setTimeline((prev) => [
-        { id: `local-${Date.now()}`, status: newStatus, changedAt: new Date() },
+      setPendingTimeline((prev) => [
+        {
+          id: `local-${Date.now()}`,
+          status: newStatus,
+          changedAt: new Date(),
+          jobId: job.id,
+        },
         ...prev,
       ]);
       toast.success(`Status updated to ${newStatus}`);
@@ -141,6 +184,8 @@ export function JobDetailView({
         job={job}
         selectedResumeId={selectedResumeId}
         initialQuestions={initialInterviewQuestions}
+        initialQuestionSetId={initialQuestionSetId}
+        initialQuestionsGeneratedAt={initialQuestionsGeneratedAt}
         onPipelineEntryResolved={(pipelineEntryId) =>
           setJob((prev) => ({
             ...prev,

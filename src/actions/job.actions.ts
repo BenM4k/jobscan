@@ -682,12 +682,11 @@ export async function triggerDrcCrawlAction(keyword?: string) {
 
   try {
     const { inngest } = await import("@/inngest/client");
-    const target = keyword?.trim() || undefined;
+    const cleanKeyword = keyword?.trim() || undefined;
     await inngest.send({
-      name: "job.fetch.requested",
+      name: "job.drc.fetch.requested",
       data: {
-        source: "drc",
-        target,
+        keyword: cleanKeyword,
         userId: sessionResult.value.user.id,
       },
     });

@@ -2,6 +2,7 @@ import { inngest } from "@/inngest/client";
 import {
   scheduledJobFetch,
   jobFetchRequested,
+  drcJobFetchRequested,
   scheduledDigestCron,
   sendDigestEmail,
   scoreJobOnCreation,
@@ -40,6 +41,10 @@ async function runInngestUnitTests() {
     assert(Boolean(scheduledJobFetch), "scheduledJobFetch function must exist");
     assert(Boolean(jobFetchRequested), "jobFetchRequested function must exist");
     assert(
+      Boolean(drcJobFetchRequested),
+      "drcJobFetchRequested function must exist",
+    );
+    assert(
       Boolean(scheduledDigestCron),
       "scheduledDigestCron function must exist",
     );
@@ -75,6 +80,7 @@ async function runInngestUnitTests() {
     console.log("3. Verifying Inngest typed events...");
     const {
       jobFetchRequestedEvent,
+      drcJobFetchRequestedEvent,
       digestEmailScheduledEvent,
       jobCreatedEvent,
       resumeUpdatedEvent,
@@ -87,6 +93,15 @@ async function runInngestUnitTests() {
       userId: "user-123",
     });
     assert(fetchEvent.name === "job.fetch.requested", "Event name must match");
+
+    const drcFetchEvent = drcJobFetchRequestedEvent.create({
+      keyword: "engineer",
+      userId: "user-123",
+    });
+    assert(
+      drcFetchEvent.name === "job.drc.fetch.requested",
+      "DRC event name must match",
+    );
     assert(
       fetchEvent.data.source === "greenhouse",
       "Payload source must match",

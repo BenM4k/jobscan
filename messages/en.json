@@ -390,6 +390,8 @@
     "versionHistoryTitleCoverLetter": "Cover Letter Version History",
     "versionHistoryDescription": "Inspect previously generated or edited snapshots for this application.",
     "versionHistoryEmpty": "No saved snapshots yet.",
+    "versionHistoryLoadError": "Failed to load version history.",
+    "versionHistoryRetry": "Retry",
     "versionLabel": "Version {number}",
     "timelineHeading": "Application Timeline",
     "timelineSubtitle": "Chronological history of your pipeline status updates for this role.",

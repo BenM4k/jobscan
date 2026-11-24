@@ -1,5 +1,48 @@
 import { CrawledJob, CrawlSourceResult } from "../types";
 
+export interface ReliefWebRawItem {
+  id: string | number;
+  fields?: {
+    title?: string;
+    body?: string;
+    url?: string;
+    date?: {
+      created?: string;
+    };
+    source?: Array<{ name?: string }>;
+    country?: Array<{ name?: string; iso3?: string }>;
+    city?: Array<{ name?: string }>;
+  };
+  [key: string]: unknown;
+}
+
+export function normalizeReliefWebRawItem(item: ReliefWebRawItem): CrawledJob {
+  const fields = item.fields || {};
+  const companyName = fields.source?.[0]?.name || "ReliefWeb Partner";
+  const cityName = fields.city?.[0]?.name;
+  const countryName =
+    fields.country?.[0]?.name || "Democratic Republic of the Congo";
+
+  const cleanDescription = (fields.body || "No description provided.")
+    .replace(/<[^>]*>?/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return {
+    source: "reliefweb",
+    externalId: String(item.id),
+    title: fields.title || "Untitled Position",
+    company: companyName,
+    url: fields.url || `https://reliefweb.int/job/${item.id}`,
+    description: cleanDescription || "No description provided.",
+    postedAt: fields.date?.created ? new Date(fields.date.created) : new Date(),
+    country: countryName,
+    countryCode: "CD",
+    city: cityName,
+    workplaceType: "on-site",
+  };
+}
+
 export function escapeLuceneQuery(query: string): string {
   if (!query) return "";
   let escaped = query.replace(/([+\-!(){}\[\]^"~*?:\\\/]|&&|\|\|)/g, "\\$1");
@@ -7,7 +50,11 @@ export function escapeLuceneQuery(query: string): string {
   return escaped;
 }
 
-export async function fetchReliefWebJobs(keyword?: string): Promise<{ jobs: CrawledJob[]; result: CrawlSourceResult }> {
+export async function fetchReliefWebJobs(keyword?: string): Promise<{
+  items: ReliefWebRawItem[];
+  jobs: CrawledJob[];
+  result: CrawlSourceResult;
+}> {
   const appName = process.env.RELIEFWEB_APP_NAME || "jobpilot";
   const url = `https://api.reliefweb.int/v2/jobs?appname=${encodeURIComponent(appName)}&limit=100`;
 
@@ -56,35 +103,11 @@ export async function fetchReliefWebJobs(keyword?: string): Promise<{ jobs: Craw
     }
 
     const data = await res.json();
-    const items = data.data || [];
-    const jobs: CrawledJob[] = [];
-
-    for (const item of items) {
-      const fields = item.fields || {};
-      const companyName = fields.source?.[0]?.name || "ReliefWeb Partner";
-      const cityName = fields.city?.[0]?.name;
-
-      const cleanDescription = (fields.body || "No description provided.")
-        .replace(/<[^>]*>?/gm, "")
-        .replace(/\s+/g, " ")
-        .trim();
-
-      jobs.push({
-        source: "reliefweb",
-        externalId: String(item.id),
-        title: fields.title || "Untitled Position",
-        company: companyName,
-        url: fields.url || `https://reliefweb.int/job/${item.id}`,
-        description: cleanDescription,
-        postedAt: fields.date?.created ? new Date(fields.date.created) : new Date(),
-        country: "Democratic Republic of the Congo",
-        countryCode: "CD",
-        city: cityName,
-        workplaceType: "on-site",
-      });
-    }
+    const items: ReliefWebRawItem[] = Array.isArray(data?.data) ? data.data : [];
+    const jobs: CrawledJob[] = items.map(normalizeReliefWebRawItem);
 
     return {
+      items,
       jobs,
       result: {
         source: "reliefweb",
@@ -95,6 +118,7 @@ export async function fetchReliefWebJobs(keyword?: string): Promise<{ jobs: Craw
     };
   } catch (error: unknown) {
     return {
+      items: [],
       jobs: [],
       result: {
         source: "reliefweb",

@@ -36,8 +36,9 @@ export async function fetchAndUpsertJobs(
   sourceId: string,
   target?: string,
   userId?: string,
+  keyword?: string,
 ): Promise<Result<IngestResult, AppError>> {
-  return await ingestFromSource(sourceId, { target, userId });
+  return await ingestFromSource(sourceId, { target, keyword, userId });
 }
 
 export async function fetchAndUpsertJobsAcrossSources(

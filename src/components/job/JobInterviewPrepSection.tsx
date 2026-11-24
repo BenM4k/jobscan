@@ -12,6 +12,8 @@ interface JobInterviewPrepSectionProps {
   job: JobSelect;
   selectedResumeId?: string;
   initialQuestions?: InterviewQuestionItem[];
+  initialQuestionSetId?: string;
+  initialQuestionsGeneratedAt?: string;
   onPipelineEntryResolved?: (pipelineEntryId: string) => void;
 }
 
@@ -33,6 +35,8 @@ export function JobInterviewPrepSection({
   job,
   selectedResumeId,
   initialQuestions = [],
+  initialQuestionSetId,
+  initialQuestionsGeneratedAt,
   onPipelineEntryResolved,
 }: JobInterviewPrepSectionProps) {
   const t = useTranslations("jobDetail");
@@ -50,6 +54,8 @@ export function JobInterviewPrepSection({
     job,
     selectedResumeId,
     initialQuestions,
+    initialQuestionSetId,
+    initialQuestionsGeneratedAt,
     onPipelineEntryResolved,
   });
 
