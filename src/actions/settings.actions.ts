@@ -93,7 +93,11 @@ export async function updateDigestPreferencesAction(
   }
 
   const user = sessionResult.value.user;
-  if (parsed.data.digestEmailFrequency === "daily" && !isAdmin(user)) {
+  if (
+    parsed.data.digestEmailEnabled &&
+    parsed.data.digestEmailFrequency === "daily" &&
+    !isAdmin(user)
+  ) {
     const subRes = await billingDal.getUserSubscription(user.id);
     if (!subRes.ok || !hasProAccess(subRes.value)) {
       return {

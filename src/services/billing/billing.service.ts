@@ -329,6 +329,13 @@ export async function initiateSubscription(
     });
   }
 
+  if (isExistingIdempotent && !payment.providerReference && payment.status === "failed") {
+    const reopenRes = await billingDal.reopenFailedSubscriptionPayment(payment.id);
+    if (!reopenRes.ok) {
+      return err(reopenRes.error);
+    }
+  }
+
   let initiateRes;
   try {
     initiateRes = await provider.initiateSubscription({
@@ -344,7 +351,15 @@ export async function initiateSubscription(
       returnUrl: customerDetails?.returnUrl,
     });
   } catch (providerError) {
-    await billingDal.markSubscriptionPaymentFailed(payment.id);
+    const isInFlightConflict =
+      providerError instanceof AppError &&
+      (providerError.code === "OPERATION_IN_PROGRESS" ||
+        (providerError.code === "CONFLICT" &&
+          (providerError.details as { status?: number } | undefined)?.status === 409));
+
+    if (!isInFlightConflict) {
+      await billingDal.markSubscriptionPaymentFailed(payment.id);
+    }
     console.error(`[Billing Service] Provider subscription initiation failed for user ${userId}:`, providerError);
     const message =
       providerError instanceof AppError
@@ -359,6 +374,10 @@ export async function initiateSubscription(
     initiateRes.providerReference,
   );
   if (!updateRefRes.ok) {
+    console.error(
+      `[Billing Service] Failed to bind provider reference for payment ${payment.id}:`,
+      updateRefRes.error
+    );
     return err(updateRefRes.error);
   }
 
@@ -406,9 +425,12 @@ export async function initiateSubscription(
  */
 export async function confirmSubscription(
   providerReference: string,
+  options?: { verifiedProviderSuccess?: boolean }
 ): Promise<Result<{ alreadyConfirmed: boolean }, AppError>> {
-  const confirmRes =
-    await billingDal.confirmSubscriptionAtomic(providerReference);
+  const confirmRes = await billingDal.confirmSubscriptionAtomic(
+    providerReference,
+    options
+  );
   if (!confirmRes.ok) return err(confirmRes.error);
 
   revalidateTags([BILLING_TAG, NAVBAR_TAG]);

@@ -84,6 +84,9 @@ export function JobDetailView({
 
   const handleJobUpdated = (updated: JobSelect) => {
     setJob(updated);
+    if (updated.description !== initialJob.description) {
+      router.refresh();
+    }
   };
 
   return (
@@ -128,7 +131,11 @@ export function JobDetailView({
 
       <JobDescriptionSection
         description={job.description}
-        sanitizedHtml={sanitizedDescriptionHtml}
+        sanitizedHtml={
+          job.description === initialJob.description
+            ? sanitizedDescriptionHtml
+            : undefined
+        }
       />
 
       {/* Missing Master Resume Modal */}

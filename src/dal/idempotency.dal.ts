@@ -288,7 +288,7 @@ export async function reopenIdempotentAction(
         attemptId: nextAttemptId,
         targetId: targetId || undefined,
         resultRef: null,
-        createdAt: new Date(),
+        createdAt: sql`NOW()`,
       })
       .where(
         and(

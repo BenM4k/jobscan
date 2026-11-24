@@ -86,7 +86,9 @@ async function confirmVerifiedSubscription(
     );
   }
 
-  const confirmRes = await billingService.confirmSubscription(providerRef);
+  const confirmRes = await billingService.confirmSubscription(providerRef, {
+    verifiedProviderSuccess: true,
+  });
   if (!confirmRes.ok) {
     console.error(
       `[SasPay Webhook] Failed to confirm subscription for ${providerRef}:`,
@@ -321,25 +323,58 @@ export async function POST(req: NextRequest) {
 
         for (const ref of lookupRefs) {
           const purchaseRes = await billingDal.getCreditPurchaseByReference(ref);
-          if (
-            purchaseRes.ok &&
-            purchaseRes.value &&
-            purchaseRes.value.status === "pending"
-          ) {
-            await billingDal.updateCreditPurchaseStatus(
-              purchaseRes.value.id,
-              "failed"
+          if (!purchaseRes.ok) {
+            console.error(
+              `[SasPay Webhook] DB error querying purchase for failed ref ${ref}:`,
+              purchaseRes.error
             );
+            return NextResponse.json(
+              { error: "Database error during purchase lookup" },
+              { status: 500 }
+            );
+          }
+          if (purchaseRes.value && purchaseRes.value.status === "pending") {
+            const failPurchaseRes = await billingDal.markCreditPurchaseFailedIfPending(
+              purchaseRes.value.id
+            );
+            if (!failPurchaseRes.ok) {
+              console.error(
+                `[SasPay Webhook] Failed to mark purchase ${purchaseRes.value.id} failed:`,
+                failPurchaseRes.error
+              );
+              return NextResponse.json(
+                { error: "Failed to update purchase status" },
+                { status: 500 }
+              );
+            }
           }
 
           const subPayRes =
             await billingDal.getSubscriptionPaymentByReference(ref);
-          if (
-            subPayRes.ok &&
-            subPayRes.value &&
-            subPayRes.value.status === "pending"
-          ) {
-            await billingDal.markSubscriptionPaymentFailed(subPayRes.value.id);
+          if (!subPayRes.ok) {
+            console.error(
+              `[SasPay Webhook] DB error querying subscription payment for failed ref ${ref}:`,
+              subPayRes.error
+            );
+            return NextResponse.json(
+              { error: "Database error during subscription payment lookup" },
+              { status: 500 }
+            );
+          }
+          if (subPayRes.value && subPayRes.value.status === "pending") {
+            const failSubRes = await billingDal.markSubscriptionPaymentFailed(
+              subPayRes.value.id
+            );
+            if (!failSubRes.ok) {
+              console.error(
+                `[SasPay Webhook] Failed to mark subscription payment ${subPayRes.value.id} failed:`,
+                failSubRes.error
+              );
+              return NextResponse.json(
+                { error: "Failed to update subscription payment status" },
+                { status: 500 }
+              );
+            }
           }
         }
 

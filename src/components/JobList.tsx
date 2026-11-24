@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { JobSelect } from "@/dal/jobs.dal";
 import { JobStatus } from "@/services/db/schema";
@@ -39,8 +39,21 @@ export function JobList({
 }: JobListProps) {
   const router = useRouter();
   const [jobsList, setJobsList] = useState<JobSelect[]>(initialJobs);
+  const [prevInitialJobs, setPrevInitialJobs] = useState<JobSelect[]>(initialJobs);
   const [hasMore, setHasMore] = useState<boolean>(initialJobs.length >= 20);
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
+  const pendingStatusJobsRef = useRef<Set<string>>(new Set());
+
+  if (prevInitialJobs !== initialJobs) {
+    setPrevInitialJobs(initialJobs);
+    setJobsList((prev) => {
+      if (initialJobs.length === 0) return [];
+      if (prev.length <= initialJobs.length) return initialJobs;
+      const initialIds = new Set(initialJobs.map((j) => j.id));
+      return [...initialJobs, ...prev.filter((j) => !initialIds.has(j.id))];
+    });
+    setHasMore(initialJobs.length >= 20);
+  }
 
   const [jobToDelete, setJobToDelete] = useState<JobSelect | null>(null);
 
@@ -79,25 +92,43 @@ export function JobList({
   ]);
 
   const handleStatusChange = async (jobId: string, newStatus: JobStatus) => {
+    if (pendingStatusJobsRef.current.has(jobId)) {
+      return;
+    }
+
     const previousJob = jobsList.find((j) => j.id === jobId);
+    if (!previousJob || previousJob.status === newStatus) {
+      return;
+    }
+
+    pendingStatusJobsRef.current.add(jobId);
     setJobsList((prev) =>
       prev.map((j) => (j.id === jobId ? { ...j, status: newStatus } : j)),
     );
 
-    const res = await transitionJobStatusAction(jobId, newStatus);
-    if (res.success) {
-      posthog.capture("job_status_updated", { status: newStatus, location: "list" });
-      toast.success(`Status updated to ${newStatus}`);
-      router.refresh();
-    } else {
-      if (previousJob) {
+    try {
+      const res = await transitionJobStatusAction(jobId, newStatus);
+      if (res.success) {
+        posthog.capture("job_status_updated", { status: newStatus, location: "list" });
+        toast.success(`Status updated to ${newStatus}`);
+        router.refresh();
+      } else {
         setJobsList((prev) =>
           prev.map((j) =>
             j.id === jobId ? { ...j, status: previousJob.status } : j,
           ),
         );
+        toast.error(res.error || "Failed to update status");
       }
-      toast.error(res.error || "Failed to update status");
+    } catch {
+      setJobsList((prev) =>
+        prev.map((j) =>
+          j.id === jobId ? { ...j, status: previousJob.status } : j,
+        ),
+      );
+      toast.error("Failed to update status");
+    } finally {
+      pendingStatusJobsRef.current.delete(jobId);
     }
   };
 

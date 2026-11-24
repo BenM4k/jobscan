@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { eq } from "drizzle-orm";
-import { db } from "@/services/db";
+import { db, buildPoolConfig } from "@/services/db";
+import { parseSourceOption } from "@/components/filters/filter-options";
 import {
   user,
   job,
@@ -94,6 +95,44 @@ async function runSprint2IntegrityTests() {
       1500
     ).valid,
     "Missing currency must be rejected"
+  );
+
+  // 3b. Source filter parser legacy normalization
+  assert(parseSourceOption("emploicd") === "emploi_cd", "Legacy emploicd must normalize to emploi_cd");
+  assert(parseSourceOption("emploi_cd") === "emploi_cd", "Canonical emploi_cd must parse");
+  assert(parseSourceOption("unknown_board") === null, "Invalid source must return null");
+
+  // 3c. buildPoolConfig SSL behavior
+  const noVerifyCfg = buildPoolConfig(
+    "postgresql://user:pass@db.abc.supabase.co:5432/postgres?sslmode=require",
+    { DB_SSL_REJECT_UNAUTHORIZED: "false" }
+  );
+  assert(
+    typeof noVerifyCfg.ssl === "object" &&
+      noVerifyCfg.ssl !== null &&
+      noVerifyCfg.ssl.rejectUnauthorized === false &&
+      !noVerifyCfg.connectionString?.includes("sslmode"),
+    "DB_SSL_REJECT_UNAUTHORIZED=false must strip URL sslmode and disable rejectUnauthorized"
+  );
+
+  const remoteTlsCfg = buildPoolConfig(
+    "postgresql://user:pass@ep-cool.us-east-2.aws.neon.tech/neondb",
+    {}
+  );
+  assert(
+    typeof remoteTlsCfg.ssl === "object" &&
+      remoteTlsCfg.ssl !== null &&
+      remoteTlsCfg.ssl.rejectUnauthorized === true,
+    "Remote Neon host without params must enforce verified TLS"
+  );
+
+  const localPlainCfg = buildPoolConfig(
+    "postgresql://postgres:postgres@localhost:5432/jobscan",
+    {}
+  );
+  assert(
+    localPlainCfg.ssl === undefined,
+    "Localhost DB without SSL params must remain plaintext"
   );
 
   // 4. DB-backed tests: createMasterResume with omitted isActive & atomic tailoring upserts

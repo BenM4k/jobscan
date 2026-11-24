@@ -46,8 +46,15 @@ export function normalizePhoneNumber(
 
   if (preferredCountry) {
     const prefix = COUNTRY_DIAL_PREFIXES[preferredCountry];
-    if (prefix && digits.startsWith("0")) {
-      return `${prefix}${digits.slice(1)}`;
+    if (prefix) {
+      if (digits.startsWith("0")) {
+        // Burkina Faso local numbers retain their leading zero (e.g. 01/02/03...)
+        if (preferredCountry === "BF") {
+          return `${prefix}${digits}`;
+        }
+        return `${prefix}${digits.slice(1)}`;
+      }
+      return `${prefix}${digits}`;
     }
   }
 

@@ -13,6 +13,34 @@ const ALLOWED_TAGS = new Set([
   "br",
 ]);
 
+const BLOCK_TAGS = new Set([
+  "div",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "section",
+  "article",
+  "header",
+  "footer",
+  "aside",
+  "main",
+  "nav",
+  "blockquote",
+  "pre",
+  "hr",
+  "tr",
+  "td",
+  "th",
+  "dt",
+  "dd",
+  "figcaption",
+]);
+
+const SELF_BREAKING_TAGS = new Set(["p", "ul", "ol", "br"]);
+
 const STRIP_WITH_CONTENT = new Set([
   "script",
   "style",
@@ -28,6 +56,32 @@ const STRIP_WITH_CONTENT = new Set([
   "button",
   "noscript",
 ]);
+
+function isMeaningfulNode(node: { type?: string; data?: string }): boolean {
+  if (node.type === "text") {
+    return Boolean(node.data?.trim());
+  }
+  return node.type === "tag";
+}
+
+function getBoundaryTag(node: { type?: string; tagName?: string } | undefined): string | undefined {
+  if (!node || node.type !== "tag") return undefined;
+  return node.tagName?.toLowerCase();
+}
+
+function findMeaningfulSibling(
+  start: { prev?: unknown; next?: unknown; type?: string; data?: string } | null | undefined,
+  direction: "prev" | "next"
+): { type?: string; tagName?: string; data?: string } | undefined {
+  let cursor = start;
+  while (cursor) {
+    if (isMeaningfulNode(cursor)) {
+      return cursor as { type?: string; tagName?: string; data?: string };
+    }
+    cursor = cursor[direction] as typeof start;
+  }
+  return undefined;
+}
 
 function cleanElement(
   $: cheerio.CheerioAPI,
@@ -54,6 +108,50 @@ function cleanElement(
   }
 
   if (!ALLOWED_TAGS.has(tagName)) {
+    if (tagName === "hr") {
+      $el.replaceWith("<br>");
+      return;
+    }
+
+    if (BLOCK_TAGS.has(tagName)) {
+      const meaningful = $el
+        .contents()
+        .toArray()
+        .filter((node) => isMeaningfulNode(node as { type?: string; data?: string }));
+
+      if (meaningful.length > 0) {
+        const firstTag = getBoundaryTag(meaningful[0] as { type?: string; tagName?: string });
+        const lastTag = getBoundaryTag(
+          meaningful[meaningful.length - 1] as { type?: string; tagName?: string }
+        );
+
+        const rawEl = el as unknown as {
+          prev?: { prev?: unknown; type?: string; data?: string } | null;
+          next?: { next?: unknown; type?: string; data?: string } | null;
+        };
+        const prevMeaningful = findMeaningfulSibling(rawEl.prev, "prev");
+        const prevTag = getBoundaryTag(prevMeaningful);
+
+        const nextMeaningful = findMeaningfulSibling(rawEl.next, "next");
+        const nextTag = getBoundaryTag(nextMeaningful);
+
+        if (
+          prevMeaningful &&
+          (!firstTag || !SELF_BREAKING_TAGS.has(firstTag)) &&
+          (!prevTag || !SELF_BREAKING_TAGS.has(prevTag))
+        ) {
+          $el.prepend("<br>");
+        }
+        if (
+          nextMeaningful &&
+          (!lastTag || !SELF_BREAKING_TAGS.has(lastTag)) &&
+          (!nextTag || !SELF_BREAKING_TAGS.has(nextTag))
+        ) {
+          $el.append("<br>");
+        }
+      }
+    }
+
     $el.replaceWith($el.contents());
     return;
   }

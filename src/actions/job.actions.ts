@@ -32,6 +32,7 @@ const transitionStatusSchema = z.object({
     "interviewing",
     "rejected",
     "offer",
+    "withdrawn",
   ]),
 });
 

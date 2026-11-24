@@ -74,8 +74,9 @@ export type ScoreJobError = RateLimitedError | AppError;
 export async function scoreJobForResume(
   job: ScoreJobParams["job"],
   resume: ScoreJobParams["resume"],
-  pipelineEntryId: string,
-  userId: string
+  pipelineEntryId: string | null,
+  userId: string,
+  options?: { precomputedCosineSimilarity?: number }
 ): Promise<Result<ScoreResult, ScoreJobError>> {
   try {
     // 1. Rate-limit check at VERY TOP before cache check (Step 16 protection, fail-open if Redis unavailable)
@@ -88,7 +89,9 @@ export async function scoreJobForResume(
     }
 
     const isHybridEnabled = await isHybridScoringEnabled(userId);
-    const cacheModelKey = isHybridEnabled ? MODEL_USED : `${MODEL_USED}-semantic`;
+    const cacheModelKey = isHybridEnabled
+      ? `${MODEL_USED}-hybrid`
+      : `${MODEL_USED}-semantic`;
 
     // 2. Cache check
     const cached = await getCachedScore<CachedHybridScore>(
@@ -102,6 +105,7 @@ export async function scoreJobForResume(
       // 3. Cache HIT: A score row is STILL inserted via DAL so history/analytics stay complete
       const insertRes = await jobsDal.insertHybridScoreRecord({
         pipelineEntryId,
+        canonicalJobId: job.id,
         userId,
         resumeId: resume.id,
         resumeVersion: resume.version,
@@ -139,19 +143,28 @@ export async function scoreJobForResume(
 
     const skillsRes = await resumeDal.getResumeSkills(resume.id);
     const resumeSkills = skillsRes.ok ? skillsRes.value : [];
+    const expectsKeywordScore = isHybridEnabled && isLanguageMatch;
     const canComputeBm25 =
-      isLanguageMatch && isHybridEnabled && resumeSkills.length > 0;
+      expectsKeywordScore && skillsRes.ok && resumeSkills.length > 0;
     const queryTerms = resumeSkills.slice(0, 20).join(" or ");
 
     const [cosineRes, bm25Res] = await Promise.all([
-      jobsDal.getJobResumeSimilarity(job.id, resume.id),
+      options?.precomputedCosineSimilarity !== undefined
+        ? Promise.resolve(ok(options.precomputedCosineSimilarity))
+        : jobsDal.getJobResumeSimilarity(job.id, resume.id),
       canComputeBm25
         ? jobsDal.getJobResumeTsRank(job.id, queryTerms, jobLanguage)
         : Promise.resolve(ok(null)),
     ]);
 
-    const cosine = cosineRes.ok ? cosineRes.value : null;
+    if (!cosineRes.ok) {
+      return err(cosineRes.error);
+    }
+
+    const cosine = cosineRes.value;
     const bm25 = bm25Res.ok ? bm25Res.value : null;
+    const hasExpectedKeywordScore =
+      !expectsKeywordScore || (canComputeBm25 && bm25Res.ok && bm25 !== null);
 
     // B. Hybrid blend (undecayed)
     const finalScore = computeHybridScore(
@@ -205,6 +218,7 @@ export async function scoreJobForResume(
     // E. Persist to score table via DAL (undecayed raw score)
     const insertRes = await jobsDal.insertHybridScoreRecord({
       pipelineEntryId,
+      canonicalJobId: job.id,
       userId,
       resumeId: resume.id,
       resumeVersion: resume.version,
@@ -221,8 +235,8 @@ export async function scoreJobForResume(
       return err(insertRes.error);
     }
 
-    // F. Cache write only when skill/explanation analysis succeeded (never cache degraded fallbacks)
-    if (matchRes.ok) {
+    // F. Cache write only when skill/explanation analysis succeeded and expected keyword inputs were measured
+    if (matchRes.ok && hasExpectedKeywordScore) {
       const cachePayload: CachedHybridScore = {
         finalScore,
         cosineSimilarity: cosine,

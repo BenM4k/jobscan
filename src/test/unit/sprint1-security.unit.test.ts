@@ -75,6 +75,19 @@ async function runSprint1SecurityTests() {
   assert(cleanHtml.includes("<p>Hello <strong>world</strong>"), "Must preserve allowed <p>/<strong>");
   assert(cleanHtml.includes("<ul><li>Click me</li>"), "Must preserve <ul>/<li> and unwrap text");
 
+  const blockBoundaryHtml = sanitizeJobDescriptionHtml(
+    "<div>Alpha</div><div>Beta</div><div><p>Gamma</p></div>"
+  );
+  assert(!blockBoundaryHtml.includes("<div"), "Must unwrap disallowed <div> tags");
+  assert(
+    blockBoundaryHtml.includes("Alpha<br>Beta"),
+    `Adjacent unwrapped divs must preserve block boundary via <br>, got '${blockBoundaryHtml}'`
+  );
+  assert(
+    blockBoundaryHtml.includes("<p>Gamma</p>"),
+    "Allowed <p> inside unwrapped <div> should remain <p>Gamma</p>"
+  );
+
   // 3. buildDigestHtml escaping and safe URL fallback
   const digestHtml = buildDigestHtml(
     'Alice <script>alert("u")</script>',

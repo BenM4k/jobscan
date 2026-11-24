@@ -8,6 +8,8 @@ import {
   pipelineEntry,
   pipelineStatusHistory,
   score,
+  tailoredResume,
+  tailoredCoverLetter,
 } from "@/services/db/schema";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
@@ -24,6 +26,7 @@ import {
   JobStatus,
   RawJobPayloadSelect,
   DEFAULT_RAW_SCORE_MODEL,
+  pipelineEntryToJobSelect,
 } from "./types";
 import { getJobById } from "./queries";
 
@@ -445,32 +448,103 @@ export async function restorePipelineEntry(
   restoreStatus: pipelineDal.PipelineStatus = "saved"
 ): Promise<Result<JobSelect, AppError>> {
   try {
-    const [entry] = await db
-      .select({ id: pipelineEntry.id })
-      .from(pipelineEntry)
-      .where(
-        and(
-          eq(pipelineEntry.userId, userId),
-          or(eq(pipelineEntry.id, id), eq(pipelineEntry.jobId, id))
+    return await db.transaction(async (tx) => {
+      const [restored] = await tx
+        .update(pipelineEntry)
+        .set({
+          status: restoreStatus,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(pipelineEntry.userId, userId),
+            or(eq(pipelineEntry.id, id), eq(pipelineEntry.jobId, id)),
+            eq(pipelineEntry.status, "withdrawn")
+          )
         )
-      )
-      .limit(1);
+        .returning();
 
-    if (!entry) {
-      return err(new AppError("NOT_FOUND", "Pipeline entry not found"));
-    }
+      if (!restored) {
+        const [existing] = await tx
+          .select({ id: pipelineEntry.id })
+          .from(pipelineEntry)
+          .where(
+            and(
+              eq(pipelineEntry.userId, userId),
+              or(eq(pipelineEntry.id, id), eq(pipelineEntry.jobId, id))
+            )
+          )
+          .limit(1);
 
-    const updateRes = await pipelineDal.updatePipelineStatus(
-      entry.id,
-      userId,
-      restoreStatus
-    );
-    if (!updateRes.ok) {
-      return err(updateRes.error);
-    }
+        if (!existing) {
+          return err(new AppError("NOT_FOUND", "Pipeline entry not found"));
+        }
+        return err(
+          new AppError("CONFLICT", "Pipeline entry is no longer withdrawn")
+        );
+      }
 
-    return await getJobById(entry.id, userId);
+      await tx.insert(pipelineStatusHistory).values({
+        pipelineEntryId: restored.id,
+        status: restoreStatus,
+      });
+
+      const [canonicalJob] = await tx
+        .select()
+        .from(job)
+        .where(eq(job.id, restored.jobId))
+        .limit(1);
+
+      if (!canonicalJob) {
+        throw new AppError(
+          "NOT_FOUND",
+          `Canonical job ${restored.jobId} not found during restore`
+        );
+      }
+
+      const [latestScore] = await tx
+        .select()
+        .from(score)
+        .where(eq(score.pipelineEntryId, restored.id))
+        .orderBy(desc(score.createdAt))
+        .limit(1);
+
+      const [resumeRow] = await tx
+        .select()
+        .from(tailoredResume)
+        .where(eq(tailoredResume.pipelineEntryId, restored.id))
+        .limit(1);
+
+      const [letterRow] = await tx
+        .select()
+        .from(tailoredCoverLetter)
+        .where(eq(tailoredCoverLetter.pipelineEntryId, restored.id))
+        .limit(1);
+
+      const refs = await tx
+        .select({ source: jobSourceRef.source })
+        .from(jobSourceRef)
+        .where(eq(jobSourceRef.jobId, canonicalJob.id));
+
+      const alsoPostedOn = Array.from(
+        new Set(
+          refs.map((r) => r.source).filter((s) => s !== canonicalJob.source)
+        )
+      );
+
+      return ok(
+        pipelineEntryToJobSelect({
+          ...restored,
+          job: canonicalJob,
+          score: latestScore || null,
+          tailoredResume: resumeRow || null,
+          tailoredCoverLetter: letterRow || null,
+          alsoPostedOn,
+        })
+      );
+    });
   } catch (error) {
+    if (error instanceof AppError) return err(error);
     return err(
       new AppError("DB_ERROR", `Failed to restore pipeline entry ${id}`, error)
     );
@@ -480,7 +554,8 @@ export async function restorePipelineEntry(
 export async function updateJobStatus(
   id: string,
   status: pipelineDal.PipelineStatus | string,
-  userId: string
+  userId: string,
+  options?: { expectedCurrentStatus?: pipelineDal.PipelineStatus | null }
 ): Promise<Result<JobSelect, AppError>> {
   try {
     const pStatus: pipelineDal.PipelineStatus =
@@ -492,77 +567,163 @@ export async function updateJobStatus(
         ? status
         : "saved";
 
-    const resolvedEntryId = await db.transaction(async (tx) => {
-      const [existing] = await tx
-        .select({ id: pipelineEntry.id })
-        .from(pipelineEntry)
-        .where(
-          and(
-            eq(pipelineEntry.userId, userId),
-            or(eq(pipelineEntry.id, id), eq(pipelineEntry.jobId, id))
+    const txResult = await db.transaction(
+      async (tx): Promise<Result<string, AppError>> => {
+        const [existing] = await tx
+          .select({ id: pipelineEntry.id, status: pipelineEntry.status })
+          .from(pipelineEntry)
+          .where(
+            and(
+              eq(pipelineEntry.userId, userId),
+              or(eq(pipelineEntry.id, id), eq(pipelineEntry.jobId, id))
+            )
           )
-        )
-        .limit(1);
+          .for("update")
+          .limit(1);
 
-      if (existing) {
+        if (existing) {
+          if (
+            options?.expectedCurrentStatus !== undefined &&
+            existing.status !== options.expectedCurrentStatus
+          ) {
+            return err(
+              new AppError(
+                "VALIDATION_ERROR",
+                `Job status changed concurrently from '${options.expectedCurrentStatus ?? "none"}' to '${existing.status}'`
+              )
+            );
+          }
+
+          const whereConditions = [
+            eq(pipelineEntry.id, existing.id),
+            eq(pipelineEntry.userId, userId),
+          ];
+          if (options?.expectedCurrentStatus) {
+            whereConditions.push(
+              eq(pipelineEntry.status, options.expectedCurrentStatus)
+            );
+          }
+
+          const [updated] = await tx
+            .update(pipelineEntry)
+            .set({
+              status: pStatus,
+              updatedAt: new Date(),
+            })
+            .where(and(...whereConditions))
+            .returning({ id: pipelineEntry.id });
+
+          if (!updated) {
+            return err(
+              new AppError(
+                "VALIDATION_ERROR",
+                "Job status changed concurrently; transition aborted"
+              )
+            );
+          }
+
+          await tx.insert(pipelineStatusHistory).values({
+            pipelineEntryId: updated.id,
+            status: pStatus,
+          });
+
+          return ok(updated.id);
+        }
+
+        if (
+          options?.expectedCurrentStatus !== undefined &&
+          options.expectedCurrentStatus !== null
+        ) {
+          return err(
+            new AppError("VALIDATION_ERROR", "Pipeline entry no longer exists")
+          );
+        }
+
+        const [canonical] = await tx
+          .select({
+            id: job.id,
+            source: job.source,
+            addedByUserId: job.addedByUserId,
+          })
+          .from(job)
+          .where(eq(job.id, id))
+          .limit(1);
+
+        if (
+          !canonical ||
+          (canonical.source === "manual" && canonical.addedByUserId !== userId)
+        ) {
+          return err(new AppError("NOT_FOUND", `Job with ID ${id} not found`));
+        }
+
+        const [inserted] = await tx
+          .insert(pipelineEntry)
+          .values({
+            userId,
+            jobId: canonical.id,
+            status: pStatus,
+          })
+          .onConflictDoNothing({
+            target: [pipelineEntry.userId, pipelineEntry.jobId],
+          })
+          .returning({ id: pipelineEntry.id });
+
+        if (inserted) {
+          await tx.insert(pipelineStatusHistory).values({
+            pipelineEntryId: inserted.id,
+            status: pStatus,
+          });
+          return ok(inserted.id);
+        }
+
+        if (options?.expectedCurrentStatus === null) {
+          return err(
+            new AppError(
+              "VALIDATION_ERROR",
+              "Pipeline entry was created concurrently; transition aborted"
+            )
+          );
+        }
+
+        const [concurrentEntry] = await tx
+          .select({ id: pipelineEntry.id })
+          .from(pipelineEntry)
+          .where(
+            and(
+              eq(pipelineEntry.userId, userId),
+              eq(pipelineEntry.jobId, canonical.id)
+            )
+          )
+          .limit(1);
+
+        if (!concurrentEntry) {
+          return err(
+            new AppError("DB_ERROR", `Failed to resolve pipeline entry for ${id}`)
+          );
+        }
+
         await tx
           .update(pipelineEntry)
           .set({
             status: pStatus,
             updatedAt: new Date(),
           })
-          .where(
-            and(
-              eq(pipelineEntry.id, existing.id),
-              eq(pipelineEntry.userId, userId)
-            )
-          );
+          .where(eq(pipelineEntry.id, concurrentEntry.id));
 
         await tx.insert(pipelineStatusHistory).values({
-          pipelineEntryId: existing.id,
+          pipelineEntryId: concurrentEntry.id,
           status: pStatus,
         });
 
-        return existing.id;
+        return ok(concurrentEntry.id);
       }
+    );
 
-      const canonicalRes = await getJobById(id, userId);
-      if (!canonicalRes.ok) {
-        return null;
-      }
-
-      const [inserted] = await tx
-        .insert(pipelineEntry)
-        .values({
-          userId,
-          jobId: id,
-          status: pStatus,
-        })
-        .onConflictDoUpdate({
-          target: [pipelineEntry.userId, pipelineEntry.jobId],
-          set: {
-            status: pStatus,
-            updatedAt: new Date(),
-          },
-        })
-        .returning({ id: pipelineEntry.id });
-
-      if (inserted) {
-        await tx.insert(pipelineStatusHistory).values({
-          pipelineEntryId: inserted.id,
-          status: pStatus,
-        });
-        return inserted.id;
-      }
-
-      return null;
-    });
-
-    if (!resolvedEntryId) {
-      return err(new AppError("NOT_FOUND", `Job with ID ${id} not found`));
+    if (!txResult.ok) {
+      return err(txResult.error);
     }
 
-    return await getJobById(resolvedEntryId, userId);
+    return await getJobById(txResult.value, userId);
   } catch (error) {
     return err(
       new AppError("DB_ERROR", `Failed to update status for job ${id}`, error)
@@ -571,7 +732,8 @@ export async function updateJobStatus(
 }
 
 export interface InsertHybridScoreParams {
-  pipelineEntryId: string;
+  pipelineEntryId: string | null;
+  canonicalJobId?: string;
   userId: string;
   resumeId: string;
   resumeVersion: number;
@@ -589,30 +751,78 @@ export async function insertHybridScoreRecord(
 ): Promise<Result<typeof score.$inferSelect, AppError>> {
   try {
     return await db.transaction(async (tx) => {
-      const [entry] = await tx
-        .select({ id: pipelineEntry.id })
-        .from(pipelineEntry)
-        .where(
-          and(
-            eq(pipelineEntry.id, params.pipelineEntryId),
-            eq(pipelineEntry.userId, params.userId)
-          )
-        )
-        .limit(1);
+      let resolvedEntryId = params.pipelineEntryId;
 
-      if (!entry) {
-        return err(
-          new AppError(
-            "NOT_FOUND",
-            `Pipeline entry ${params.pipelineEntryId} not found`
+      if (resolvedEntryId) {
+        const [entry] = await tx
+          .select({ id: pipelineEntry.id })
+          .from(pipelineEntry)
+          .where(
+            and(
+              eq(pipelineEntry.id, resolvedEntryId),
+              eq(pipelineEntry.userId, params.userId)
+            )
           )
-        );
+          .limit(1);
+
+        if (!entry) {
+          return err(
+            new AppError(
+              "NOT_FOUND",
+              `Pipeline entry ${resolvedEntryId} not found`
+            )
+          );
+        }
+      } else if (params.canonicalJobId) {
+        const [insertedEntry] = await tx
+          .insert(pipelineEntry)
+          .values({
+            userId: params.userId,
+            jobId: params.canonicalJobId,
+            status: "saved",
+            resumeIdUsed: params.resumeId,
+          })
+          .onConflictDoNothing({
+            target: [pipelineEntry.userId, pipelineEntry.jobId],
+          })
+          .returning({ id: pipelineEntry.id });
+
+        if (insertedEntry) {
+          await tx.insert(pipelineStatusHistory).values({
+            pipelineEntryId: insertedEntry.id,
+            status: "saved",
+          });
+          resolvedEntryId = insertedEntry.id;
+        } else {
+          const [existingEntry] = await tx
+            .select({ id: pipelineEntry.id })
+            .from(pipelineEntry)
+            .where(
+              and(
+                eq(pipelineEntry.userId, params.userId),
+                eq(pipelineEntry.jobId, params.canonicalJobId)
+              )
+            )
+            .limit(1);
+
+          if (!existingEntry) {
+            return err(
+              new AppError(
+                "NOT_FOUND",
+                `Pipeline entry for job ${params.canonicalJobId} not found`
+              )
+            );
+          }
+          resolvedEntryId = existingEntry.id;
+        }
+      } else {
+        return err(new AppError("NOT_FOUND", "Pipeline entry not found"));
       }
 
       const [insertedScore] = await tx
         .insert(score)
         .values({
-          pipelineEntryId: params.pipelineEntryId,
+          pipelineEntryId: resolvedEntryId,
           resumeVersion: params.resumeVersion,
           modelUsed: params.modelUsed,
           finalScore: params.finalScore.toString(),
@@ -633,7 +843,7 @@ export async function insertHybridScoreRecord(
         .set({ updatedAt: new Date(), resumeIdUsed: params.resumeId })
         .where(
           and(
-            eq(pipelineEntry.id, params.pipelineEntryId),
+            eq(pipelineEntry.id, resolvedEntryId),
             eq(pipelineEntry.userId, params.userId)
           )
         );
@@ -644,7 +854,7 @@ export async function insertHybridScoreRecord(
     return err(
       new AppError(
         "DB_ERROR",
-        `Failed to insert hybrid score for entry ${params.pipelineEntryId}`,
+        `Failed to insert hybrid score for entry ${params.pipelineEntryId ?? params.canonicalJobId ?? "unknown"}`,
         error
       )
     );

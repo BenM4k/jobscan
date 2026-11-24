@@ -169,7 +169,7 @@ export async function claimHalfOpenProbe(
         // Stale probe lease expired: reclaim and permit a new probe
         await tx
           .update(adapterCircuitBreaker)
-          .set({ updatedAt: sql`NOW()` })
+          .set({ updatedAt: sql`clock_timestamp()` })
           .where(eq(adapterCircuitBreaker.source, source));
         return ok({ allowed: true });
       }
@@ -178,7 +178,7 @@ export async function claimHalfOpenProbe(
         if (!row.openedAt || row.backoffExpired) {
           await tx
             .update(adapterCircuitBreaker)
-            .set({ state: "half_open", updatedAt: sql`NOW()` })
+            .set({ state: "half_open", updatedAt: sql`clock_timestamp()` })
             .where(eq(adapterCircuitBreaker.source, source));
           return ok({ allowed: true });
         }

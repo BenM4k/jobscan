@@ -5,6 +5,7 @@ import {
   InitiateCreditPurchaseParams,
   InitiateSubscriptionParams,
   PaymentInitiateResult,
+  VerifiedPaymentDetails,
 } from "../payment-provider.interface";
 import { AppError } from "@/lib/errors";
 import { SasPayClient, formatDecimalAmount } from "./saspay-client";
@@ -193,24 +194,34 @@ export class SasPayProvider implements PaymentProvider {
   }
 
   /**
-   * Checks the status of a payment with GET /payments/{payment_id}/verify/.
-   * Strictly enforces that ONLY status === 'SUCCESS' confirms delivery.
+   * Verifies a payment with GET /payments/{payment_id}/verify/ and returns
+   * normalized status alongside verified amount and currency details.
    */
-  async checkPurchaseStatus(
+  async verifyPaymentDetails(
     providerReference: string
-  ): Promise<"pending" | "confirmed" | "failed"> {
+  ): Promise<VerifiedPaymentDetails> {
     try {
       const verify = await this.client.verifyPayment(providerReference);
 
       if (verify.status === "SUCCESS") {
-        return "confirmed";
+        return {
+          status: "confirmed",
+          currency: verify.currency,
+          requestedAmount: verify.requested_amount,
+          debitedAmount: verify.debited_amount,
+        };
       }
 
       if (verify.status === "FAILED" || verify.status === "CANCELLED") {
-        return "failed";
+        return {
+          status: "failed",
+          currency: verify.currency,
+          requestedAmount: verify.requested_amount,
+          debitedAmount: verify.debited_amount,
+        };
       }
 
-      return "pending";
+      return { status: "pending" };
     } catch (error) {
       console.error(
         `[SasPayProvider] Failed to check purchase status for ${providerReference}:`,
@@ -222,8 +233,19 @@ export class SasPayProvider implements PaymentProvider {
       ) {
         throw error;
       }
-      return "pending";
+      return { status: "pending" };
     }
+  }
+
+  /**
+   * Checks the status of a payment with GET /payments/{payment_id}/verify/.
+   * Strictly enforces that ONLY status === 'SUCCESS' confirms delivery.
+   */
+  async checkPurchaseStatus(
+    providerReference: string
+  ): Promise<"pending" | "confirmed" | "failed"> {
+    const details = await this.verifyPaymentDetails(providerReference);
+    return details.status;
   }
 }
 

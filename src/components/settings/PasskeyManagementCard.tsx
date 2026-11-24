@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useState, useTransition, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Fingerprint, Key, Trash2, Plus, Loader2, ShieldCheck } from "lucide-react";
 import { authClient } from "@/services/auth/auth-client";
@@ -19,14 +20,81 @@ interface PasskeyManagementCardProps {
   initialPasskeys?: PasskeyItem[];
 }
 
+const PENDING_PASSKEY_STORAGE_KEY = "jobpilot:pending-passkey-name";
+
+function isSessionNotFreshError(error: { code?: string; message?: string }): boolean {
+  if (error.code === "SESSION_NOT_FRESH") {
+    return true;
+  }
+  const msg = (error.message || "").toLowerCase();
+  return msg.includes("session") && msg.includes("fresh");
+}
+
 export function PasskeyManagementCard({
   initialPasskeys = [],
 }: PasskeyManagementCardProps) {
+  const router = useRouter();
   const t = useTranslations("settings");
   const [passkeys, setPasskeys] = useState<PasskeyItem[]>(initialPasskeys);
   const [isAdding, setIsAdding] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+
+  const registerPasskey = useCallback(
+    async (passkeyName: string, allowReauthRedirect: boolean) => {
+      setIsAdding(true);
+      try {
+        const res = await authClient.passkey.addPasskey({
+          name: passkeyName,
+        });
+
+        if (res?.error) {
+          if (allowReauthRedirect && isSessionNotFreshError(res.error)) {
+            if (typeof window !== "undefined") {
+              window.sessionStorage.setItem(
+                PENDING_PASSKEY_STORAGE_KEY,
+                passkeyName
+              );
+            }
+            toast.info(t("passkeySessionNotFresh"));
+            router.push(
+              `/sign-in?redirect=${encodeURIComponent("/dashboard/settings?retryPasskey=1")}`
+            );
+            return;
+          }
+          toast.error(res.error.message || t("passkeyAddedError"));
+        } else {
+          toast.success(t("passkeyAddedSuccess"));
+          const refreshed = await authClient.passkey.listUserPasskeys();
+          if (refreshed.data) {
+            startTransition(() => {
+              setPasskeys(refreshed.data as unknown as PasskeyItem[]);
+            });
+          }
+        }
+      } catch {
+        toast.error(t("passkeyAddedError"));
+      } finally {
+        setIsAdding(false);
+      }
+    },
+    [router, t]
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("retryPasskey") !== "1") return;
+
+    url.searchParams.delete("retryPasskey");
+    window.history.replaceState({}, "", url.pathname + url.search);
+
+    const savedName = window.sessionStorage.getItem(PENDING_PASSKEY_STORAGE_KEY);
+    if (!savedName) return;
+    window.sessionStorage.removeItem(PENDING_PASSKEY_STORAGE_KEY);
+
+    void Promise.resolve().then(() => registerPasskey(savedName, false));
+  }, [registerPasskey]);
 
   const handleAddPasskey = async () => {
     const defaultName =
@@ -39,28 +107,7 @@ export function PasskeyManagementCard({
     const name = window.prompt(t("passkeyNamePrompt"), defaultName);
     if (name === null) return; // cancelled
 
-    setIsAdding(true);
-    try {
-      const res = await authClient.passkey.addPasskey({
-        name: name.trim() || defaultName,
-      });
-
-      if (res?.error) {
-        toast.error(res.error.message || t("passkeyAddedError"));
-      } else {
-        toast.success(t("passkeyAddedSuccess"));
-        const refreshed = await authClient.passkey.listUserPasskeys();
-        if (refreshed.data) {
-          startTransition(() => {
-            setPasskeys(refreshed.data as unknown as PasskeyItem[]);
-          });
-        }
-      }
-    } catch {
-      toast.error(t("passkeyAddedError"));
-    } finally {
-      setIsAdding(false);
-    }
+    await registerPasskey(name.trim() || defaultName, true);
   };
 
   const handleDeletePasskey = async (id: string) => {

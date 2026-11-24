@@ -6,6 +6,7 @@ import * as billingDal from "@/dal/billing.dal";
 import { seedBillingDefaultsIfEmpty } from "@/dal/billing-seed.dal";
 import * as billingService from "@/services/billing/billing.service";
 import { getPaymentProvider } from "@/services/billing/provider-factory";
+import { verifySasPayAmountAndCurrency } from "@/services/billing/saspay/saspay-provider";
 import { BILLING_TAG, NAVBAR_TAG, revalidateTags } from "@/lib/cache-tags";
 
 const initiatePurchaseSchema = z.object({
@@ -175,12 +176,36 @@ export async function checkPurchaseStatusAction(providerReference: string) {
       if (ownerPurchase && ownerPurchase.status === "pending") {
         const elapsed = Date.now() - new Date(ownerPurchase.createdAt).getTime();
         if (elapsed >= 2000) {
-          await billingService.confirmCreditPurchase(parsed.data.providerReference);
+          const mockConfirmRes = await billingService.confirmCreditPurchase(
+            parsed.data.providerReference
+          );
+          if (!mockConfirmRes.ok) {
+            console.error(
+              `[Billing Action] Mock credit purchase confirmation failed:`,
+              mockConfirmRes.error
+            );
+            return {
+              success: false,
+              error: "Unable to confirm credit purchase right now. Please retry.",
+            };
+          }
         }
       } else if (ownerSubPayment && ownerSubPayment.status === "pending") {
         const elapsed = Date.now() - new Date(ownerSubPayment.createdAt).getTime();
         if (elapsed >= 2000) {
-          await billingService.confirmSubscription(parsed.data.providerReference);
+          const mockSubConfirmRes = await billingService.confirmSubscription(
+            parsed.data.providerReference
+          );
+          if (!mockSubConfirmRes.ok) {
+            console.error(
+              `[Billing Action] Mock subscription confirmation failed:`,
+              mockSubConfirmRes.error
+            );
+            return {
+              success: false,
+              error: "Unable to confirm subscription right now. Please retry.",
+            };
+          }
         }
       } else if (
         ownerLegacySub &&
@@ -188,24 +213,123 @@ export async function checkPurchaseStatusAction(providerReference: string) {
       ) {
         const elapsed = Date.now() - new Date(ownerLegacySub.createdAt).getTime();
         if (elapsed >= 2000) {
-          await billingService.confirmSubscription(parsed.data.providerReference);
+          const mockLegacyConfirmRes = await billingService.confirmSubscription(
+            parsed.data.providerReference
+          );
+          if (!mockLegacyConfirmRes.ok) {
+            console.error(
+              `[Billing Action] Mock legacy subscription confirmation failed:`,
+              mockLegacyConfirmRes.error
+            );
+            return {
+              success: false,
+              error: "Unable to confirm subscription right now. Please retry.",
+            };
+          }
         }
       }
     }
 
     const provider = getPaymentProvider();
-    const status = await provider.checkPurchaseStatus(parsed.data.providerReference);
+    const verified = provider.verifyPaymentDetails
+      ? await provider.verifyPaymentDetails(parsed.data.providerReference)
+      : { status: await provider.checkPurchaseStatus(parsed.data.providerReference) };
+    const status = verified.status;
 
     if (status === "confirmed") {
+      if (provider.name === "saspay") {
+        if (ownerPurchase) {
+          const packRes = await billingDal.getCreditPackById(ownerPurchase.creditPackId);
+          if (!packRes.ok || !packRes.value) {
+            return { success: false, error: "Credit pack not found for verification" };
+          }
+          const amountCheck = verifySasPayAmountAndCurrency(
+            {
+              currency: verified.currency ?? "",
+              requested_amount: verified.requestedAmount ?? "",
+              debited_amount: verified.debitedAmount ?? "",
+            },
+            packRes.value.priceCents
+          );
+          if (!amountCheck.valid) {
+            console.warn(
+              `[Billing Action] Rejecting polled purchase ${parsed.data.providerReference}: ${amountCheck.reason}`
+            );
+            return { success: false, error: "Verified payment amount or currency mismatch" };
+          }
+        } else {
+          const planId = ownerSubPayment?.planId ?? ownerLegacySub?.planId ?? "";
+          const plansRes = await billingDal.getSubscriptionPlans(false);
+          const plan = plansRes.ok
+            ? plansRes.value.find((p) => p.id === planId)
+            : undefined;
+          if (!plan) {
+            return { success: false, error: "Subscription plan not found for verification" };
+          }
+          const amountCheck = verifySasPayAmountAndCurrency(
+            {
+              currency: verified.currency ?? "",
+              requested_amount: verified.requestedAmount ?? "",
+              debited_amount: verified.debitedAmount ?? "",
+            },
+            plan.priceCentsMonthly
+          );
+          if (!amountCheck.valid) {
+            console.warn(
+              `[Billing Action] Rejecting polled subscription ${parsed.data.providerReference}: ${amountCheck.reason}`
+            );
+            return { success: false, error: "Verified payment amount or currency mismatch" };
+          }
+        }
+      }
+
       if (ownerPurchase && ownerPurchase.status !== "confirmed") {
-        await billingService.confirmCreditPurchase(parsed.data.providerReference);
-      } else if (ownerSubPayment && ownerSubPayment.status === "pending") {
-        await billingService.confirmSubscription(parsed.data.providerReference);
+        const confirmRes = await billingService.confirmCreditPurchase(
+          parsed.data.providerReference
+        );
+        if (!confirmRes.ok) {
+          console.error(
+            `[Billing Action] Failed to confirm polled purchase ${parsed.data.providerReference}:`,
+            confirmRes.error
+          );
+          return {
+            success: false,
+            error: "Unable to confirm credit purchase right now. Please retry.",
+          };
+        }
+      } else if (ownerSubPayment && ownerSubPayment.status !== "confirmed") {
+        const confirmRes = await billingService.confirmSubscription(
+          parsed.data.providerReference,
+          { verifiedProviderSuccess: provider.name === "saspay" }
+        );
+        if (!confirmRes.ok) {
+          console.error(
+            `[Billing Action] Failed to confirm polled subscription ${parsed.data.providerReference}:`,
+            confirmRes.error
+          );
+          return {
+            success: false,
+            error: "Unable to confirm subscription right now. Please retry.",
+          };
+        }
       } else if (
         ownerLegacySub &&
         (ownerLegacySub.status !== "active" || ownerLegacySub.provider === "admin_gift")
       ) {
-        await billingService.confirmSubscription(parsed.data.providerReference);
+        const confirmRes = await billingService.confirmSubscription(
+          parsed.data.providerReference,
+          { verifiedProviderSuccess: provider.name === "saspay" }
+        );
+        if (!confirmRes.ok) {
+          console.error(
+            `[Billing Action] Failed to confirm polled legacy subscription ${parsed.data.providerReference}:`,
+            confirmRes.error
+          );
+          return {
+            success: false,
+            error: "Unable to confirm subscription right now. Please retry.",
+          };
+        }
       }
 
       revalidateTags([BILLING_TAG, NAVBAR_TAG]);

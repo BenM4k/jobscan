@@ -15,6 +15,26 @@ export type Source =
 export type SourceOption = "all" | Source;
 export type StatusOption = "all" | PipelineStatus;
 
+const VALID_SOURCE_OPTIONS = new Set<SourceOption>([
+  "all",
+  "reliefweb",
+  "emploi_cd",
+  "congojob",
+  "unjobs",
+  "fecrdc",
+  "greenhouse",
+  "remoteok",
+  "lever",
+  "ashby",
+  "manual",
+]);
+
+/** Parses source filter query param while normalizing legacy `emploicd` to `emploi_cd`. */
+export function parseSourceOption(raw: string): SourceOption | null {
+  const normalized = (raw === "emploicd" ? "emploi_cd" : raw) as SourceOption;
+  return VALID_SOURCE_OPTIONS.has(normalized) ? normalized : null;
+}
+
 export const SOURCE_OPTIONS: { value: Source; label: string }[] = [
   { value: "reliefweb", label: "🇨🇩 ReliefWeb" },
   { value: "emploi_cd", label: "🇨🇩 Emploi.cd" },
