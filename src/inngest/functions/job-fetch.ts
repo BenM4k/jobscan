@@ -67,9 +67,24 @@ export const ingestAllSources = inngest.createFunction(
  */
 export const scheduledJobFetch = ingestAllSources;
 
+interface DrcSourceStepResult {
+  source: string;
+  success: boolean;
+  fetched?: number;
+  upserted?: number;
+  failed?: number;
+  skipped?: boolean;
+  reason?: string;
+  message?: string;
+  error?: string;
+}
+
 async function runDrcSourcesFetch(
   step: {
-    run: <T>(id: string, fn: () => Promise<T>) => Promise<T>;
+    run: (
+      id: string,
+      fn: () => Promise<DrcSourceStepResult>,
+    ) => Promise<DrcSourceStepResult>;
   },
   keyword?: string,
   userId?: string,
@@ -77,14 +92,7 @@ async function runDrcSourcesFetch(
   let totalUpserted = 0;
   let totalFetched = 0;
   let totalFailed = 0;
-  const results: Array<{
-    source: string;
-    success: boolean;
-    fetched?: number;
-    upserted?: number;
-    failed?: number;
-    error?: string;
-  }> = [];
+  const results: DrcSourceStepResult[] = [];
 
   for (const s of DRC_JOB_SOURCES) {
     const stepRes = await step.run(`fetch-drc-${s}`, async () => {
