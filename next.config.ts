@@ -21,6 +21,11 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   cacheComponents: true,
   serverExternalPackages: ["unpdf", "mammoth"],
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "6mb",
+    },
+  },
   async headers() {
     const securityHeaders = [
       { key: "X-Frame-Options", value: "DENY" },

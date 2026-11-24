@@ -33,16 +33,28 @@ export const requireAdmin = cache(
   async (): Promise<
     Result<NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>>
   > => {
-    const sessionResult = await requireSession();
-    if (!sessionResult.ok) {
-      return err(sessionResult.error);
+    try {
+      await connection();
+      const session = await auth.api.getSession({
+        headers: await headers(),
+        query: { disableCookieCache: true },
+      });
+      if (!session) {
+        return err(new AppError("UNAUTHORIZED", "No active session found"));
+      }
+      if ((session.user as { banned?: boolean | null }).banned) {
+        return err(new AppError("FORBIDDEN", "Account has been suspended"));
+      }
+      if (!isAdmin(session.user)) {
+        return err(
+          new AppError("FORBIDDEN", "Administrator privileges required")
+        );
+      }
+      return ok(session);
+    } catch (error) {
+      return err(
+        new AppError("UNAUTHORIZED", "Failed to verify admin session", error)
+      );
     }
-    if (!sessionResult.value) {
-      return err(new AppError("UNAUTHORIZED", "No active session found"));
-    }
-    if (!isAdmin(sessionResult.value.user)) {
-      return err(new AppError("FORBIDDEN", "Administrator privileges required"));
-    }
-    return ok(sessionResult.value);
   }
 );

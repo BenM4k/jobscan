@@ -16,6 +16,7 @@ export type AiRateLimitFeature =
   | "tailored_resume"
   | "tailored_cover_letter"
   | "interview_prep"
+  | "job_extraction"
   | "explanation";
 
 /**
@@ -43,6 +44,11 @@ export const DEFAULT_AI_RATE_LIMITS: Record<AiFeature, RateLimitConfig> = {
   interview_prep: {
     capacity: 5,
     refillRatePerSec: 0.1,
+    cost: 1,
+  },
+  job_extraction: {
+    capacity: 10,
+    refillRatePerSec: 0.2,
     cost: 1,
   },
   explanation: {

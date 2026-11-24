@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import type { JobSelect } from "@/dal/jobs.dal";
 import type { InterviewQuestionItem } from "@/dal/interview.dal";
 import { generateInterviewQuestionsAction } from "@/actions/interview.actions";
+import { notifyCreditsUpdated } from "@/hooks/useLiveCreditBalance";
 
 interface UseInterviewPrepProps {
   job: JobSelect;
@@ -137,6 +138,7 @@ export function useInterviewPrep({
         onPipelineEntryResolved?.(payload.pipelineEntryId);
       }
       idempotencyRef.current = null;
+      notifyCreditsUpdated();
     } catch {
       toast.error("Failed to generate interview questions");
     } finally {

@@ -5,9 +5,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Menu } from "lucide-react";
-import { PreferencesWidget } from "@/components/PreferencesWidget";
 import { useSignOut } from "@/hooks/useSignOut";
+import { useLiveCreditBalance } from "@/hooks/useLiveCreditBalance";
 import { NavLinkItem } from "@/components/layout/NavLinks";
+import { CreditBalanceIndicator } from "@/components/billing/CreditBalanceIndicator";
 import { isNavActive } from "@/lib/nav";
 import {
   Dialog,
@@ -18,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 
 interface NavbarMobileProps {
-  navLinks: NavLinkItem[];
+  navLinks?: NavLinkItem[];
   userEmail?: string | null;
   creditBalance?: number;
   isAdmin?: boolean;
@@ -35,6 +36,7 @@ export function NavbarMobile({
   const pathname = usePathname();
   const t = useTranslations("nav");
   const handleSignOut = useSignOut();
+  const liveCreditBalance = useLiveCreditBalance(creditBalance);
 
   const closeMenu = () => setOpen(false);
 
@@ -43,9 +45,15 @@ export function NavbarMobile({
     await handleSignOut();
   };
 
+  const resolvedNavLinks: NavLinkItem[] = navLinks ?? [
+    { href: "/dashboard", label: t("pipeline"), icon: "📊" },
+    { href: "/dashboard/resumes", label: t("resumes"), icon: "📄" },
+    { href: "/dashboard/add-job", label: t("addJob"), icon: "➕" },
+  ];
+
   const accountLinks = [
     { href: "/dashboard/settings", label: t("settings"), icon: "⚙️", badge: "Flags" },
-    { href: "/dashboard/billing", label: t("billing"), icon: "💳", badge: `${creditBalance} credits` },
+    { href: "/dashboard/billing", label: t("billing"), icon: "💳", badge: `${liveCreditBalance} credits` },
     { href: "/dashboard/profile", label: t("profile"), icon: "👤" },
     ...(isAdmin
       ? [{ href: "/dashboard/admin", label: t("admin"), icon: "🛡️", badge: "Console", highlight: true }]
@@ -53,9 +61,7 @@ export function NavbarMobile({
   ];
 
   return (
-    <div className="flex items-center gap-2 md:hidden">
-      <PreferencesWidget />
-
+    <>
       <button
         type="button"
         onClick={() => setOpen(true)}
@@ -88,17 +94,15 @@ export function NavbarMobile({
                     {userEmail}
                   </div>
                 </div>
-                <Link
-                  href="/dashboard/billing"
-                  onClick={closeMenu}
-                  className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 shrink-0"
-                >
-                  ⚡ {creditBalance}
-                </Link>
+                <CreditBalanceIndicator
+                  balance={creditBalance}
+                  variant="compact"
+                  onNavigate={closeMenu}
+                />
               </div>
 
               <nav aria-label={t("menu")} className="flex flex-col space-y-1">
-                {navLinks.map((link) => {
+                {resolvedNavLinks.map((link) => {
                   const isActive = isNavActive(link.href, pathname);
                   return (
                     <Link
@@ -182,6 +186,6 @@ export function NavbarMobile({
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

@@ -8,7 +8,7 @@
 
 Jobpilot employs a **two-layer monetization system**:
 
-1. **Credits (Consumption Layer):** A spendable integer balance, deducted per AI generative mutation (`tailored_resume` = 5 credits, `tailored_cover_letter` = 5 credits, `interview_prep` = 3 credits). Purchased in predefined packs. Fast hybrid job scoring is completely **unmetered and free** ($0$ credits).
+1. **Credits (Consumption Layer):** A spendable integer balance, deducted per AI generative mutation (`tailored_resume` = 5 credits, `tailored_cover_letter` = 5 credits, `interview_prep` = 3 credits, `job_extraction` = 1 credit). Purchased in predefined packs. Fast hybrid job scoring and deterministic JSON / `schema.org/JobPosting` URL imports are completely **unmetered and free** ($0$ credits).
 2. **Subscriptions (Capability & Feature Gating Layer):** A recurring monthly plan ($15/mo "Jobpilot Pro") that unlocks structural platform capabilities independently of the credit balance:
    - **Multi-Persona Resumes:** More than 1 active master resume persona (`master_resume`).
    - **Daily Email Digest:** Automated daily matching dispatch (vs. weekly default).

@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { NavbarSkeleton } from "@/components/layout/Navbar";
 import { PublicNavbar } from "@/components/layout/PublicNavbar";
 import { DashboardFooter } from "@/components/layout/DashboardFooter";
 import { Suspense } from "react";
@@ -149,9 +148,7 @@ export default function PrivacyPolicyPage() {
         }}
       />
 
-      <Suspense fallback={<NavbarSkeleton />}>
-        <PublicNavbar />
-      </Suspense>
+      <PublicNavbar />
 
       <Suspense fallback={<main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-12 sm:py-16 z-10" />}>
         <PrivacyContent />

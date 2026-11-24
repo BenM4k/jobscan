@@ -26,6 +26,8 @@ export function CreditLedgerHistory({ entries }: CreditLedgerHistoryProps) {
         return t("actionTailoredCoverLetter");
       case "interview_prep":
         return t("actionInterviewPrep");
+      case "job_extraction":
+        return t("actionJobExtraction");
       case "refund":
         return t("actionRefund");
       case "admin_grant":

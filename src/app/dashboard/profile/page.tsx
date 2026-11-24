@@ -5,8 +5,12 @@ import { requireSession } from "@/lib/auth-guard";
 import { redirect } from "next/navigation";
 import { ProfileForm } from "@/components/ProfileForm";
 import { parseResumeContent } from "@/lib/resume-format";
-import { getCachedActiveResume, getCachedResumeSkills, getCachedAiUsage } from "@/lib/cached-data";
+import { getCachedActiveResume, getCachedResumeSkills } from "@/lib/cached-data";
 import { ProfileSkeleton } from "@/components/profile/ProfileSkeleton";
+import {
+  AiUsageSidebarSkeleton,
+  ProfileAiUsageSlot,
+} from "@/components/profile/ProfileAiUsageSlot";
 
 
 function ProfileErrorState({
@@ -56,10 +60,7 @@ async function ProfileFormContent() {
 
   const userId = sessionResult.value.user.id;
 
-  const [activeResumeResult, aiUsageResult] = await Promise.all([
-    getCachedActiveResume(userId),
-    getCachedAiUsage(userId),
-  ]);
+  const activeResumeResult = await getCachedActiveResume(userId);
 
   if (!activeResumeResult.ok) {
     return (
@@ -71,8 +72,6 @@ async function ProfileFormContent() {
   }
 
   const activeResume = activeResumeResult.value;
-  const aiUsage = aiUsageResult.ok ? aiUsageResult.value : null;
-  const aiUsageError = !aiUsageResult.ok;
 
   let skills: string[] = [];
   if (activeResume) {
@@ -107,8 +106,11 @@ async function ProfileFormContent() {
       initialSummary={parsed.summary}
       initialEducation={parsed.education}
       initialExperience={parsed.experience}
-      initialAiUsage={aiUsage}
-      aiUsageError={aiUsageError}
+      aiUsageSlot={
+        <Suspense key="profile-ai-usage" fallback={<AiUsageSidebarSkeleton />}>
+          <ProfileAiUsageSlot userId={userId} />
+        </Suspense>
+      }
       resumeLabel={activeResume?.label || "Primary Persona"}
       resumeVersion={activeResume?.version || 1}
       resumeLanguage={activeResume?.language || "en"}

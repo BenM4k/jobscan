@@ -6,6 +6,7 @@ import { admin } from "better-auth/plugins";
 import { db } from "@/services/db";
 import * as schema from "@/services/db/schema";
 import { Resend } from "resend";
+import { resolvePasskeyAndAuthConfig } from "./passkey-config";
 
 const resendApiKey = process.env.RESEND_API_KEY?.trim();
 if (!resendApiKey) {
@@ -23,6 +24,7 @@ if (
 }
 
 const resend = new Resend(resendApiKey);
+const authUrls = resolvePasskeyAndAuthConfig(process.env);
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -37,14 +39,22 @@ export const auth = betterAuth({
   }),
   plugins: [
     passkey({
-      rpID: process.env.NEXT_PUBLIC_APP_DOMAIN || "localhost",
+      rpID: authUrls.rpID,
       rpName: "Jobpilot",
-      origin: process.env.BETTER_AUTH_URL || "http://localhost:3000",
+      origin: authUrls.passkeyOrigins,
+      authenticatorSelection: {
+        residentKey: "required",
+        userVerification: "preferred",
+      },
     }),
     admin(),
   ],
   session: {
-    freshAge: 60 * 15,
+    freshAge: 60 * 60,
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60, // 5 minutes
+    },
   },
   databaseHooks: {
     user: {
@@ -63,22 +73,7 @@ export const auth = betterAuth({
   advanced: {
     database: { generateId: "uuid" },
   },
-  trustedOrigins: [
-    ...(process.env.BETTER_AUTH_URL ? [process.env.BETTER_AUTH_URL] : []),
-    ...(process.env.NEXT_PUBLIC_APP_DOMAIN
-      ? [`https://${process.env.NEXT_PUBLIC_APP_DOMAIN}`]
-      : []),
-    ...(process.env.NODE_ENV !== "production"
-      ? [
-          "http://localhost:3000",
-          "http://localhost:3001",
-          "http://localhost:3002",
-          "http://127.0.0.1:3000",
-          "http://127.0.0.1:3001",
-          "http://127.0.0.1:3002",
-        ]
-      : []),
-  ],
+  trustedOrigins: authUrls.trustedOrigins,
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
@@ -120,5 +115,5 @@ export const auth = betterAuth({
   },
   secret:
     authSecret || "dev-only-fallback-secret-do-not-use-in-prod",
-  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
+  baseURL: authUrls.baseURL,
 });

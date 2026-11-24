@@ -1,42 +1,8 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
-import { hasLocale } from "next-intl";
 import { requireSession } from "@/lib/auth-guard";
-import { isAdmin } from "@/services/auth/admin";
-import { Navbar, NavbarSkeleton } from "@/components/layout/Navbar";
+import { Navbar } from "@/components/layout/Navbar";
 import { DashboardFooter } from "@/components/layout/DashboardFooter";
-import { routing } from "@/i18n/routing";
-
-/** Resolves the authenticated user data needed by the dashboard navigation. */
-async function DashboardNavbar() {
-  const sessionResult = await requireSession();
-
-  if (!sessionResult.ok || !sessionResult.value) {
-    redirect("/sign-in");
-  }
-
-  const session = sessionResult.value;
-
-  // Resolve locale outside the cache boundary so the cached Navbar
-  // never calls cookies() itself (forbidden inside "use cache").
-  const cookieStore = await cookies();
-  const cookieLocale = cookieStore.get("NEXT_LOCALE")?.value;
-  const locale =
-    cookieLocale && hasLocale(routing.locales, cookieLocale)
-      ? cookieLocale
-      : routing.defaultLocale;
-
-  return (
-    <Navbar
-      userId={session.user.id}
-      userEmail={session.user.email}
-      userName={session.user.name}
-      isAdmin={isAdmin(session.user)}
-      locale={locale}
-    />
-  );
-}
 
 /** Verifies session inside Suspense so the outer dashboard shell stays static/prerenderable. */
 async function DashboardAuthGate({ children }: { children: React.ReactNode }) {
@@ -65,9 +31,7 @@ export default function DashboardLayout({
         }}
       />
 
-      <Suspense fallback={<NavbarSkeleton />}>
-        <DashboardNavbar />
-      </Suspense>
+      <Navbar mode="dashboard" />
 
       <div className="flex-1 flex flex-col z-10">
         <Suspense fallback={<div className="flex-1" />}>

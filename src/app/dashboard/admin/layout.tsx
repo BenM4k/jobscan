@@ -1,6 +1,5 @@
 import { Suspense } from "react";
-import { requireSession } from "@/lib/auth-guard";
-import { isAdmin } from "@/services/auth/admin";
+import { requireAdmin } from "@/lib/auth-guard";
 import { redirect } from "next/navigation";
 import { Shield, ShieldAlert } from "lucide-react";
 import Link from "next/link";
@@ -14,25 +13,23 @@ export const metadata = {
 
 function AdminLayoutSkeleton() {
   return (
-    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 w-full space-y-6 animate-pulse">
+    <div className="space-y-6 animate-pulse">
       <div className="h-16 border-b border-slate-200 dark:border-zinc-800 pb-5" />
       <div className="h-10 bg-slate-100 dark:bg-zinc-800/50 rounded-xl" />
       <div className="h-96 bg-slate-100 dark:bg-zinc-800/50 rounded-2xl" />
-    </main>
+    </div>
   );
 }
 
 async function AdminGuard({ children }: { children: React.ReactNode }) {
-  const sessionResult = await requireSession();
-  if (!sessionResult.ok || !sessionResult.value) {
-    redirect("/sign-in");
-  }
+  const adminResult = await requireAdmin();
+  if (!adminResult.ok) {
+    if (adminResult.error.code === "UNAUTHORIZED") {
+      redirect("/sign-in");
+    }
 
-  const user = sessionResult.value.user;
-
-  if (!isAdmin(user)) {
     return (
-      <main className="max-w-4xl mx-auto px-4 py-20 text-center space-y-4">
+      <div className="max-w-4xl mx-auto px-4 py-20 text-center space-y-4">
         <div className="w-14 h-14 rounded-2xl bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 mx-auto flex items-center justify-center border border-red-200 dark:border-red-900/50">
           <ShieldAlert className="w-7 h-7" />
         </div>
@@ -50,12 +47,12 @@ async function AdminGuard({ children }: { children: React.ReactNode }) {
             Return to Dashboard
           </Link>
         </div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 w-full space-y-6">
+    <>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-zinc-800 pb-5">
         <div className="space-y-1">
@@ -73,10 +70,8 @@ async function AdminGuard({ children }: { children: React.ReactNode }) {
       <AdminNav />
 
       {/* Child route content */}
-      <div className="pt-2">
-        {children}
-      </div>
-    </main>
+      <div className="pt-2">{children}</div>
+    </>
   );
 }
 
@@ -86,8 +81,10 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <Suspense fallback={<AdminLayoutSkeleton />}>
-      <AdminGuard>{children}</AdminGuard>
-    </Suspense>
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 w-full space-y-6">
+      <Suspense fallback={<AdminLayoutSkeleton />}>
+        <AdminGuard>{children}</AdminGuard>
+      </Suspense>
+    </main>
   );
 }

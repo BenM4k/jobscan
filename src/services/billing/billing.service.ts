@@ -30,7 +30,7 @@ export interface InitiateSubscriptionResult {
  */
 export async function spendCredits(
   userId: string,
-  action: "tailored_resume" | "tailored_cover_letter" | "interview_prep",
+  action: "tailored_resume" | "tailored_cover_letter" | "interview_prep" | "job_extraction",
   relatedId?: string | null,
 ): Promise<Result<{ balanceAfter: number; cost: number }, AppError>> {
   const costRes = await billingDal.getCreditCost(action);

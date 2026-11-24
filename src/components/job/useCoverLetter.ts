@@ -2,11 +2,13 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { JobSelect } from "@/dal/jobs.dal";
 import { toast } from "sonner";
 import posthog from "posthog-js";
 import { downloadTextAsPdf } from "@/lib/pdf-export";
 import { useAsyncJobWithRetry } from "@/hooks/useAsyncJobWithRetry";
+import { notifyCreditsUpdated } from "@/hooks/useLiveCreditBalance";
 
 interface UseCoverLetterProps {
   job: JobSelect;
@@ -14,16 +16,21 @@ interface UseCoverLetterProps {
   selectedResumeId?: string;
 }
 
-interface GenerateCoverLetterOptions {
+export interface GenerateCoverLetterOptions {
   regenerate?: boolean;
   instructions?: string;
   tone?: string;
   resumeId?: string;
 }
 
-/** Manages cover-letter generation, persistence, clipboard state, and credit errors. */
-export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCoverLetterProps) {
+/** Manages cover-letter streaming, editing, version restore, PDF export, and credits. */
+export function useCoverLetter({
+  job,
+  onJobUpdated,
+  selectedResumeId,
+}: UseCoverLetterProps) {
   const router = useRouter();
+  const t = useTranslations("jobDetail");
   const [coverLetter, setCoverLetter] = useState(job.coverLetterDraft || "");
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -36,6 +43,7 @@ export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCover
   const abortControllerRef = useRef<AbortController | null>(null);
   const pendingIdempotencyKeyRef = useRef<string | null>(null);
   const pendingResumeIdRef = useRef<string | undefined>(undefined);
+  const previousDraftRef = useRef<string>("");
 
   const retryRunner = useAsyncJobWithRetry<string>({
     jobName: "Cover Letter Generation",
@@ -51,6 +59,9 @@ export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCover
     }
     pendingIdempotencyKeyRef.current = null;
     pendingResumeIdRef.current = undefined;
+    if (previousDraftRef.current) {
+      setCoverLetter(previousDraftRef.current);
+    }
     retryRunner.cancelRetry();
   }, [retryRunner]);
 
@@ -81,6 +92,12 @@ export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCover
     setIsEditing(false);
   };
 
+  const handleRestoreVersion = (content: string) => {
+    setCoverLetter(content);
+    setIsEditing(true);
+    toast.info(t("restoredToEditor"));
+  };
+
   const handleGenerateStream = async (options?: GenerateCoverLetterOptions) => {
     const isOptionsObj =
       options && typeof options === "object" && !("nativeEvent" in options);
@@ -92,9 +109,9 @@ export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCover
       Boolean(coverLetter);
 
     const targetResumeId = safeOptions?.resumeId || selectedResumeId;
+    previousDraftRef.current = coverLetter || job.coverLetterDraft || "";
 
     if (isRegeneration) {
-      // Always mint a fresh idempotency key when regenerating
       pendingIdempotencyKeyRef.current = crypto.randomUUID();
       pendingResumeIdRef.current = targetResumeId;
     } else if (
@@ -136,7 +153,8 @@ export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCover
             currentBalance: errJson.details?.currentBalance ?? 0,
           });
         }
-        const msg = errJson.error || `Failed to generate cover letter (${res.status})`;
+        const msg =
+          errJson.error || `Failed to generate cover letter (${res.status})`;
         const errorObj = new Error(msg) as Error & {
           status?: number;
           code?: string;
@@ -171,9 +189,14 @@ export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCover
     if (result) {
       pendingIdempotencyKeyRef.current = null;
       pendingResumeIdRef.current = undefined;
+      previousDraftRef.current = "";
+      setIsEditing(false);
       posthog.capture("cover_letter_generated");
       onJobUpdated({ ...job, coverLetterDraft: result });
+      notifyCreditsUpdated();
       router.refresh();
+    } else if (previousDraftRef.current) {
+      setCoverLetter(previousDraftRef.current);
     }
   };
 
@@ -194,17 +217,17 @@ export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCover
 
       if (!res.ok) {
         const errJson = await res.json();
-        throw new Error(errJson.error || "Failed to save cover letter");
+        throw new Error(errJson.error || t("saveLetterError"));
       }
 
       const { data } = await res.json();
       posthog.capture("cover_letter_saved");
       onJobUpdated(data);
       setIsEditing(false);
-      toast.success("Cover letter saved");
+      toast.success(t("saveLetterSuccess"));
     } catch (err) {
       console.error(err);
-      toast.error(err instanceof Error ? err.message : "Save failed");
+      toast.error(err instanceof Error ? err.message : t("saveLetterError"));
     } finally {
       setIsSaving(false);
     }
@@ -214,11 +237,14 @@ export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCover
     try {
       const content = coverLetter || job.coverLetterDraft;
       if (!content) return;
-      await downloadTextAsPdf(`${job.company || "Company"}-Cover-Letter.pdf`, content);
-      toast.success("Downloaded cover letter PDF");
+      await downloadTextAsPdf(
+        `${job.company || "Company"}-Cover-Letter.pdf`,
+        content
+      );
+      toast.success(t("downloadPdfSuccess"));
     } catch (err) {
       console.error(err);
-      toast.error("Failed to download PDF");
+      toast.error(t("downloadPdfError"));
     }
   };
 
@@ -227,13 +253,15 @@ export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCover
       const textToCopy = coverLetter || job.coverLetterDraft || "";
       await navigator.clipboard.writeText(textToCopy);
       setIsCopied(true);
-      toast.success("Copied to clipboard");
+      toast.success(t("copiedClipboard"));
       setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
       console.error("Failed to copy:", err);
-      toast.error("Failed to copy to clipboard");
+      toast.error(t("copyError"));
     }
   };
+
+  const isDirty = coverLetter !== (job.coverLetterDraft || "");
 
   return {
     isStreaming: retryRunner.isLoading,
@@ -248,9 +276,11 @@ export function useCoverLetter({ job, onJobUpdated, selectedResumeId }: UseCover
     setCoverLetter,
     isSaving,
     isEditing,
+    isDirty,
     setIsEditing,
     handleStartEditing,
     handleCancelEdit,
+    handleRestoreVersion,
     isCopied,
     hasCoverLetter: Boolean(job.coverLetterDraft),
     handleGenerateStream,

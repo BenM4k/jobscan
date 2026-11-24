@@ -29,6 +29,12 @@ function isSessionNotFreshError(error: { code?: string; message?: string }): boo
   return msg.includes("session") && msg.includes("fresh");
 }
 
+function isVerifyRegistrationError(error: { code?: string; message?: string }): boolean {
+  if (error.code === "FAILED_TO_VERIFY_REGISTRATION") return true;
+  const msg = (error.message || "").toLowerCase();
+  return msg.includes("verify") && msg.includes("registration");
+}
+
 function getDefaultPasskeyName(): string {
   if (typeof navigator === "undefined") return "Security Key";
   if (/Mac|iPhone|iPad/i.test(navigator.userAgent)) return "Apple Touch ID / Face ID";
@@ -44,38 +50,51 @@ export function PasskeyManagementCard({
   const [passkeys, setPasskeys] = useState<PasskeyItem[]>(initialPasskeys);
   const [isAdding, setIsAdding] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [pendingReauthName, setPendingReauthName] = useState<string | undefined>(undefined);
+  const [reauthReady, setReauthReady] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   const registerPasskey = useCallback(
-    async (passkeyName: string, allowReauthRedirect: boolean) => {
+    async (passkeyName: string, allowReauthRedirect: boolean): Promise<boolean> => {
       setIsAdding(true);
       try {
         const res = await authClient.passkey.addPasskey({ name: passkeyName });
         if (res?.error) {
+          console.error("[Passkey] Registration failed:", res.error);
           if (allowReauthRedirect && isSessionNotFreshError(res.error)) {
             if (typeof window !== "undefined") {
               window.sessionStorage.setItem(PENDING_PASSKEY_STORAGE_KEY, passkeyName);
             }
             toast.info(t("passkeySessionNotFresh"));
             router.push("/sign-in?redirect=%2Fdashboard%2Fsettings%3FretryPasskey%3D1");
-            return;
+            return true;
           }
-          toast.error(res.error.message || t("passkeyAddedError"));
-        } else {
-          toast.success(t("passkeyAddedSuccess"));
-          if (res?.data) {
-            setPasskeys((prev) => [
-              { id: res.data.id, name: res.data.name || passkeyName, createdAt: res.data.createdAt || new Date() },
-              ...prev,
-            ]);
+          if (isVerifyRegistrationError(res.error)) {
+            toast.error(t("passkeyVerifyFailedHint"), { duration: 7000 });
           } else {
-            router.refresh();
+            toast.error(res.error.message || t("passkeyAddedError"));
           }
+          return false;
         }
+
+        setReauthReady(false);
+        setPendingReauthName(undefined);
+        toast.success(t("passkeyAddedSuccess"));
+        if (res?.data) {
+          setPasskeys((prev) => [
+            { id: res.data.id, name: res.data.name || passkeyName, createdAt: res.data.createdAt || new Date() },
+            ...prev,
+          ]);
+        } else {
+          router.refresh();
+        }
+        return true;
       } catch (err: unknown) {
-        if (err instanceof Error && err.name === "NotAllowedError") return;
+        if (err instanceof Error && err.name === "NotAllowedError") return false;
+        console.error("[Passkey] Unexpected registration error:", err);
         toast.error(t("passkeyAddedError"));
+        return false;
       } finally {
         setIsAdding(false);
       }
@@ -83,6 +102,7 @@ export function PasskeyManagementCard({
     [router, t]
   );
 
+  // After re-auth redirect, reopen dialog so the user taps once to satisfy iOS Safari's user-gesture rule.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
@@ -93,8 +113,13 @@ export function PasskeyManagementCard({
     const savedName = window.sessionStorage.getItem(PENDING_PASSKEY_STORAGE_KEY);
     if (!savedName) return;
     window.sessionStorage.removeItem(PENDING_PASSKEY_STORAGE_KEY);
-    void Promise.resolve().then(() => registerPasskey(savedName, false));
-  }, [registerPasskey]);
+
+    void Promise.resolve().then(() => {
+      setPendingReauthName(savedName);
+      setReauthReady(true);
+      setDialogOpen(true);
+    });
+  }, []);
 
   const handleDeletePasskey = async (id: string) => {
     setDeletingId(id);
@@ -126,7 +151,11 @@ export function PasskeyManagementCard({
           </div>
         </div>
         <Button
-          onClick={() => setDialogOpen(true)}
+          onClick={() => {
+            setReauthReady(false);
+            setPendingReauthName(undefined);
+            setDialogOpen(true);
+          }}
           disabled={isAdding}
           size="sm"
           className="text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
@@ -137,11 +166,20 @@ export function PasskeyManagementCard({
       </div>
 
       <AddPasskeyDialog
+        key={dialogOpen ? (pendingReauthName || "open") : "closed"}
         open={dialogOpen}
-        onOpenChange={setDialogOpen}
+        onOpenChange={(nextOpen) => {
+          setDialogOpen(nextOpen);
+          if (!nextOpen) {
+            setReauthReady(false);
+            setPendingReauthName(undefined);
+          }
+        }}
         defaultName={getDefaultPasskeyName()}
+        initialName={pendingReauthName}
+        reauthReady={reauthReady}
         isSubmitting={isAdding}
-        onConfirm={(name) => registerPasskey(name, true)}
+        onConfirm={(name) => registerPasskey(name, !reauthReady)}
       />
 
       {passkeys.length === 0 ? (

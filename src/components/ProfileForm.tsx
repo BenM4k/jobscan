@@ -24,6 +24,7 @@ export interface ProfileFormProps {
   initialExperience?: ExperienceItem[];
   initialAiUsage?: UserAiUsage | null;
   aiUsageError?: boolean;
+  aiUsageSlot?: React.ReactNode;
   resumeLabel?: string;
   resumeVersion?: number;
   resumeLanguage?: string;
@@ -40,6 +41,7 @@ export function ProfileForm({
   initialExperience = [],
   initialAiUsage,
   aiUsageError = false,
+  aiUsageSlot,
   resumeLabel = "Default",
   resumeVersion = 1,
   resumeLanguage = "en",
@@ -145,6 +147,7 @@ export function ProfileForm({
           parsedSkillsList={parsedSkillsList}
           aiUsage={initialAiUsage}
           aiUsageError={aiUsageError}
+          aiUsageSlot={aiUsageSlot}
           resumeLabel={resumeLabel}
           resumeVersion={resumeVersion}
           resumeLanguage={resumeLanguage}

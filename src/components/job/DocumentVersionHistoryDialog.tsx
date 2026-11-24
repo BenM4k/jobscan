@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useTranslations, useFormatter } from "next-intl";
-import { History, Copy, Check, Loader2, AlertTriangle } from "lucide-react";
+import { History, Copy, Check, Loader2, AlertTriangle, RotateCcw } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,7 @@ interface DocumentVersionHistoryDialogProps {
   onOpenChange: (open: boolean) => void;
   pipelineEntryId: string;
   type: "resume" | "cover_letter";
+  onRestore?: (content: string) => void;
 }
 
 /** Displays previously saved tailored resume or cover-letter versions in a shadcn Dialog. */
@@ -28,6 +29,7 @@ export function DocumentVersionHistoryDialog({
   onOpenChange,
   pipelineEntryId,
   type,
+  onRestore,
 }: DocumentVersionHistoryDialogProps) {
   const t = useTranslations("jobDetail");
   const tCommon = useTranslations("common");
@@ -148,22 +150,39 @@ export function DocumentVersionHistoryDialog({
                         })}
                       </span>
                     </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => void handleCopy(ver.id, ver.content)}
-                      className="h-7 px-2 text-xs gap-1"
-                    >
-                      {copiedId === ver.id ? (
-                        <Check className="size-3.5" />
-                      ) : (
-                        <Copy className="size-3.5" />
+                    <div className="flex items-center gap-1.5">
+                      {onRestore && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            onRestore(ver.content);
+                            onOpenChange(false);
+                          }}
+                          className="h-7 px-2 text-xs gap-1 cursor-pointer"
+                        >
+                          <RotateCcw className="size-3.5" />
+                          <span>{t("restoreVersion")}</span>
+                        </Button>
                       )}
-                      <span>
-                        {copiedId === ver.id ? tCommon("copied") : tCommon("copy")}
-                      </span>
-                    </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => void handleCopy(ver.id, ver.content)}
+                        className="h-7 px-2 text-xs gap-1 cursor-pointer"
+                      >
+                        {copiedId === ver.id ? (
+                          <Check className="size-3.5" />
+                        ) : (
+                          <Copy className="size-3.5" />
+                        )}
+                        <span>
+                          {copiedId === ver.id ? tCommon("copied") : tCommon("copy")}
+                        </span>
+                      </Button>
+                    </div>
                   </div>
                   <pre className="whitespace-pre-wrap text-xs text-gray-700 dark:text-zinc-300 font-sans leading-relaxed max-h-48 overflow-y-auto">
                     {ver.content}

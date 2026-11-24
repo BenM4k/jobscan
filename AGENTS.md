@@ -102,14 +102,17 @@ src/
         audit/              # Administrative audit log console
     api/
       auth/[...all]/        # better-auth route handler
+      billing/balance/      # Live uncached credit balance endpoint
       digest/unsubscribe/   # Signed one-click email digest unsubscribe endpoint
       inngest/              # Inngest background function serve endpoint
 
   components/               # React UI components
     ui/                     # Official shadcn/ui primitives (dropdown-menu, dialog, button, sonner)
     shared/                 # Reusable domain components composed from ui/
-    layout/                 # App navigation (Navbar, PublicNavbar, NavbarMobile, NavbarUserDropdown)
-    job/                    # JobScoreSection, MatchExplanation, SkillGapBreakdown, JobCard, JobDescriptionSection, JobInterviewPrepSection, DocumentVersionHistoryDialog, PipelineTimelineSection
+    layout/                 # App navigation (Navbar static shell, NavbarSlots, PublicNavbar, NavbarMobile, NavbarUserDropdown)
+    job/                    # JobScoreSection, MatchExplanation, SkillGapBreakdown, JobCard, JobDescriptionSection, JobInterviewPrepSection, TailoredResumeEditor, TailoredResumeStructuredForm, TailoredResumePreview, CoverLetterEditor, CoverLetterOptionsBar, AtsKeywordBar, ConfirmRegenerateDialog, DocumentVersionHistoryDialog, PipelineTimelineSection
+    add-job/                # QuickImportPanel, AddJobFormFields (composed by AddJobForm)
+    profile/                # ProfileSidebar, ProfileViewMode, ProfileAiUsageSlot, MasterResumeUpload & editor sections
     billing/                # CreditBalanceIndicator, CreditPurchaseCard, CreditPackGrid, SubscriptionCard, SubscriptionActionArea, InsufficientCreditsDialog
     settings/               # Settings, AddPasskeyDialog, PasskeyManagementCard & feature flag cards
     admin/                  # AdminNav, AdminStatCard, AdminUsersTable, AdminUserRow, AiUsageTable, AdminAiProviderCard, GrantCreditsDialog, GiftSubscriptionDialog, BanUserDialog, AdminFeatureFlagsManager, GlobalFlagsCard, UserFlagOverrideForm, ActiveOverridesTable
@@ -119,18 +122,20 @@ src/
     admin-management.actions.ts # Admin user role, ban, credit grant, and subscription gift actions
     interview.actions.ts    # Interview question generation actions
     job-history.actions.ts  # Document version history server actions
+    job-import.actions.ts   # Smart paste (URL/JSON/text) & PDF/DOCX job extraction actions
   services/                 # Service layer (business logic, orchestration, external integrations)
     admin/                  # Admin business logic & metrics orchestration
     billing/                # Payment provider abstraction, mock mobile money, credit & subscription business logic
     adapters/               # Unified job adapters (Ashby, Greenhouse, Lever, RemoteOK, CongoJob, Emploi.cd, FECRDC, UNJobs, ReliefWeb)
     crawler/sources/        # Regional & scraper fetch helpers (CongoJob, Emploi.cd, FECRDC, UNJobs, ReliefWeb)
+    job-import/             # URL/JSON/PDF/DOCX/AI job extraction & SSRF-guarded page fetcher
     ai/                     # Vercel AI SDK clients, embeddings, score-cache, rate-limiting, tracker, global admin AI provider config (provider-config.ts)
     scoring/                # Scoring factory, hybrid match calculator, scoreJobForResume orchestrator
     ranking/                # Display ranking recency exponential decay
     flags/                  # Feature flags service with 60s Redis caching
     reliability/            # Adapter circuit breaker with exponential backoff
     cache/                  # Redis client (sole importer of @upstash/redis)
-    auth/                   # better-auth configuration, auth.service.ts & admin role verification
+    auth/                   # better-auth configuration, passkey-config.ts, auth.service.ts & admin role verification
     db/schema/              # Modular Drizzle schemas (pipeline, resume, scoring, ops, auth, billing)
 
   dal/                      # Data Access Layer (the ONLY layer calling Drizzle directly: jobs, billing, growth, admin, etc.)
