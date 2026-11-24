@@ -20,7 +20,7 @@ import {
 
 export const DRC_ONLY_SOURCES = new Set([
   "reliefweb",
-  "emploicd",
+  "emploi_cd",
   "congojob",
   "unjobs",
   "fecrdc",
@@ -32,7 +32,7 @@ const SOURCE_FETCHERS = [
   { name: "greenhouse", fetcher: fetchGreenhouseJobs },
   { name: "lever", fetcher: fetchLeverJobs },
   { name: "ashby", fetcher: fetchAshbyJobs },
-  { name: "emploicd", fetcher: fetchEmploiCdJobs },
+  { name: "emploi_cd", fetcher: fetchEmploiCdJobs },
   { name: "congojob", fetcher: fetchCongoJobJobs },
   { name: "unjobs", fetcher: fetchUnJobsJobs },
   { name: "fecrdc", fetcher: fetchFecRdcJobs },

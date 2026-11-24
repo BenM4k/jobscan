@@ -4,6 +4,7 @@ import { Resend } from "resend";
 import * as growthDal from "@/dal/growth.dal";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
+import { sanitizeExternalUrl } from "@/lib/safe-url";
 
 const resendApiKey = process.env.RESEND_API_KEY;
 const resend = resendApiKey ? new Resend(resendApiKey) : null;
@@ -15,42 +16,61 @@ export interface DispatchDigestResult {
   reason?: string;
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export function buildDigestHtml(
   userName: string,
   jobs: growthDal.DigestJobSummary[],
   appUrl: string
 ): string {
+  const safeBaseUrl = (
+    sanitizeExternalUrl(appUrl) || "http://localhost:3000"
+  ).replace(/\/+$/, "");
+  const escapedBaseUrl = escapeHtml(safeBaseUrl);
+  const escapedUserName = escapeHtml(userName);
+
   const jobItemsHtml = jobs
-    .map(
-      (j) => `
+    .map((j) => {
+      const safeJobUrl =
+        sanitizeExternalUrl(j.url) ||
+        `${safeBaseUrl}/dashboard/jobs/${encodeURIComponent(j.id)}`;
+
+      return `
     <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 12px; background: #ffffff;">
       <h3 style="margin: 0 0 6px 0; font-size: 16px; color: #0f172a;">
-        <a href="${j.url || `${appUrl}/dashboard/jobs/${j.id}`}" style="color: #2563eb; text-decoration: none;">
-          ${j.title}
+        <a href="${escapeHtml(safeJobUrl)}" style="color: #2563eb; text-decoration: none;">
+          ${escapeHtml(j.title)}
         </a>
       </h3>
       <p style="margin: 0 0 6px 0; font-size: 14px; color: #475569;">
-        <strong>${j.company}</strong> ${j.location ? `• ${j.location}` : ""}
+        <strong>${escapeHtml(j.company)}</strong> ${j.location ? `• ${escapeHtml(j.location)}` : ""}
       </p>
       <span style="display: inline-block; font-size: 12px; background: #f1f5f9; color: #64748b; padding: 2px 8px; border-radius: 4px; text-transform: uppercase;">
-        ${j.source}
+        ${escapeHtml(j.source)}
       </span>
     </div>
-  `
-    )
+  `;
+    })
     .join("");
 
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1e293b; background: #f8fafc;">
       <div style="text-align: center; margin-bottom: 24px;">
         <h1 style="color: #0f172a; font-size: 24px; margin-bottom: 8px;">JobPilot Opportunity Digest</h1>
-        <p style="color: #64748b; margin: 0; font-size: 14px;">Here are the latest curated job opportunities matching your profile, ${userName}.</p>
+        <p style="color: #64748b; margin: 0; font-size: 14px;">Here are the latest curated job opportunities matching your profile, ${escapedUserName}.</p>
       </div>
       <div style="margin-bottom: 24px;">
         ${jobItemsHtml}
       </div>
       <div style="text-align: center; margin-top: 32px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
-        <a href="${appUrl}/dashboard" style="background: #0f172a; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 500; font-size: 14px; display: inline-block;">
+        <a href="${escapedBaseUrl}/dashboard" style="background: #0f172a; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 500; font-size: 14px; display: inline-block;">
           View All Opportunities
         </a>
       </div>

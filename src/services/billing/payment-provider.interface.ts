@@ -30,6 +30,13 @@ export interface PaymentInitiateResult {
   checkoutUrl?: string;
 }
 
+export interface VerifiedPaymentDetails {
+  status: "pending" | "confirmed" | "failed";
+  currency?: string;
+  requestedAmount?: string;
+  debitedAmount?: string;
+}
+
 export interface PaymentProvider {
   readonly name: string;
 
@@ -44,4 +51,8 @@ export interface PaymentProvider {
   checkPurchaseStatus(
     providerReference: string
   ): Promise<"pending" | "confirmed" | "failed">;
+
+  verifyPaymentDetails?(
+    providerReference: string
+  ): Promise<VerifiedPaymentDetails>;
 }

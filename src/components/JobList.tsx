@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { JobSelect } from "@/dal/jobs.dal";
 import { JobStatus } from "@/services/db/schema";
 import {
@@ -36,9 +37,23 @@ export function JobList({
   endDate,
   queryFilter,
 }: JobListProps) {
+  const router = useRouter();
   const [jobsList, setJobsList] = useState<JobSelect[]>(initialJobs);
+  const [prevInitialJobs, setPrevInitialJobs] = useState<JobSelect[]>(initialJobs);
   const [hasMore, setHasMore] = useState<boolean>(initialJobs.length >= 20);
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
+  const pendingStatusJobsRef = useRef<Set<string>>(new Set());
+
+  if (prevInitialJobs !== initialJobs) {
+    setPrevInitialJobs(initialJobs);
+    setJobsList((prev) => {
+      if (initialJobs.length === 0) return [];
+      if (prev.length <= initialJobs.length) return initialJobs;
+      const initialIds = new Set(initialJobs.map((j) => j.id));
+      return [...initialJobs, ...prev.filter((j) => !initialIds.has(j.id))];
+    });
+    setHasMore(initialJobs.length >= 20);
+  }
 
   const [jobToDelete, setJobToDelete] = useState<JobSelect | null>(null);
 
@@ -77,24 +92,68 @@ export function JobList({
   ]);
 
   const handleStatusChange = async (jobId: string, newStatus: JobStatus) => {
-    const res = await transitionJobStatusAction(jobId, newStatus);
-    if (res.success) {
-      posthog.capture("job_status_updated", { status: newStatus, location: "list" });
+    if (pendingStatusJobsRef.current.has(jobId)) {
+      return;
     }
-    window.location.reload();
+
+    const previousJob = jobsList.find((j) => j.id === jobId);
+    if (!previousJob || previousJob.status === newStatus) {
+      return;
+    }
+
+    pendingStatusJobsRef.current.add(jobId);
+    setJobsList((prev) =>
+      prev.map((j) => (j.id === jobId ? { ...j, status: newStatus } : j)),
+    );
+
+    try {
+      const res = await transitionJobStatusAction(jobId, newStatus);
+      if (res.success) {
+        posthog.capture("job_status_updated", { status: newStatus, location: "list" });
+        toast.success(`Status updated to ${newStatus}`);
+        router.refresh();
+      } else {
+        setJobsList((prev) =>
+          prev.map((j) =>
+            j.id === jobId ? { ...j, status: previousJob.status } : j,
+          ),
+        );
+        toast.error(res.error || "Failed to update status");
+      }
+    } catch {
+      setJobsList((prev) =>
+        prev.map((j) =>
+          j.id === jobId ? { ...j, status: previousJob.status } : j,
+        ),
+      );
+      toast.error("Failed to update status");
+    } finally {
+      pendingStatusJobsRef.current.delete(jobId);
+    }
   };
 
   const confirmDeleteJob = async () => {
     if (!jobToDelete) return;
     const targetJob = jobToDelete;
+    const targetIndex = jobsList.findIndex((j) => j.id === targetJob.id);
     setJobToDelete(null);
 
     setJobsList((prev) => prev.filter((j) => j.id !== targetJob.id));
 
     const deleteResult = await deleteJobAction(targetJob.id);
-    if (deleteResult.success) {
-      posthog.capture("job_deleted", { location: "list" });
+    if (!deleteResult.success) {
+      setJobsList((prev) => {
+        if (prev.some((j) => j.id === targetJob.id)) return prev;
+        const next = [...prev];
+        next.splice(Math.max(0, targetIndex), 0, targetJob);
+        return next;
+      });
+      toast.error(deleteResult.error || `Failed to remove "${targetJob.title}"`);
+      return;
     }
+
+    posthog.capture("job_deleted", { location: "list" });
+    router.refresh();
 
     toast.success(`Deleted "${targetJob.title}"`, {
       duration: 5000,
@@ -102,12 +161,23 @@ export function JobList({
       action: {
         label: "Undo",
         onClick: async () => {
-          setJobsList((prev) => [targetJob, ...prev]);
+          setJobsList((prev) => {
+            if (prev.some((j) => j.id === targetJob.id)) return prev;
+            const next = [...prev];
+            next.splice(Math.max(0, targetIndex), 0, targetJob);
+            return next;
+          });
           const restoreResult = await restoreJobAction(targetJob);
           if (restoreResult.success) {
             posthog.capture("job_restored", { location: "list" });
+            toast.info(`Restored "${targetJob.title}"`);
+            router.refresh();
+          } else {
+            setJobsList((prev) => prev.filter((j) => j.id !== targetJob.id));
+            toast.error(
+              restoreResult.error || `Failed to restore "${targetJob.title}"`,
+            );
           }
-          toast.info(`Restored "${targetJob.title}"`);
         },
       },
     });

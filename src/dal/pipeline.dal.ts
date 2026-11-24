@@ -406,6 +406,54 @@ export async function upsertPipelineEntry(
   }
 }
 
+export async function ensurePipelineEntry(
+  userId: string,
+  jobId: string,
+  status: PipelineStatus = "saved",
+  resumeIdUsed?: string
+): Promise<Result<PipelineEntrySelect, AppError>> {
+  try {
+    return await db.transaction(async (tx) => {
+      const [inserted] = await tx
+        .insert(pipelineEntry)
+        .values({
+          userId,
+          jobId,
+          status,
+          resumeIdUsed: resumeIdUsed || null,
+        })
+        .onConflictDoNothing({
+          target: [pipelineEntry.userId, pipelineEntry.jobId],
+        })
+        .returning();
+
+      if (inserted) {
+        await tx.insert(pipelineStatusHistory).values({
+          pipelineEntryId: inserted.id,
+          status,
+        });
+        return ok(inserted);
+      }
+
+      const [existing] = await tx
+        .select()
+        .from(pipelineEntry)
+        .where(and(eq(pipelineEntry.userId, userId), eq(pipelineEntry.jobId, jobId)))
+        .limit(1);
+
+      if (!existing) {
+        return err(new AppError("DB_ERROR", "Failed to ensure pipeline entry"));
+      }
+
+      return ok(existing);
+    });
+  } catch (error) {
+    return err(
+      new AppError("DB_ERROR", "Failed to ensure pipeline entry", error)
+    );
+  }
+}
+
 export async function updatePipelineStatus(
   id: string,
   userId: string,

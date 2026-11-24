@@ -519,7 +519,8 @@
     "deletePasskey": "Supprimer",
     "deleting": "Suppression...",
     "passkeyDeletedSuccess": "Clé d'accès supprimée.",
-    "passkeyDeletedError": "Échec de la suppression de la clé d'accès."
+    "passkeyDeletedError": "Échec de la suppression de la clé d'accès.",
+    "passkeySessionNotFresh": "Veuillez confirmer votre connexion pour ajouter une clé d'accès."
   },
   "billing": {
     "credits": "Crédits",
@@ -576,6 +577,8 @@
     "subFailed": "Échec du paiement de l'abonnement. Veuillez réessayer.",
     "subCanceled": "Abonnement annulé. L'accès continue jusqu'à la fin de la période.",
     "subCancelError": "Échec de l'annulation de l'abonnement",
-    "balanceAriaLabel": "Solde de crédits : {balance}"
+    "balanceAriaLabel": "Solde de crédits : {balance}",
+    "paymentTimedOut": "La confirmation du paiement a expiré. Vous pouvez revérifier le statut ci-dessous.",
+    "checkPaymentStatus": "Vérifier le statut"
   }
 }

@@ -6,6 +6,7 @@ const SOURCE_NAME_MAP: Record<string, string> = {
   emploi_cd: "Emploi.cd",
   congojob: "CongoJob",
   unjobs: "UNJobs",
+  fecrdc: "FEC-RDC",
   ashby: "Ashby",
   lever: "Lever",
   manual: "Manual",

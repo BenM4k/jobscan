@@ -175,6 +175,39 @@ export const subscription = pgTable(
   ]
 );
 
+// ─────────────────────────────────────────────────────────────
+// Subscription Payment (Per-attempt payment tracking & replay protection)
+// ─────────────────────────────────────────────────────────────
+
+export const subscriptionPayment = pgTable(
+  "subscription_payment",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => user.id, { onDelete: "cascade" })
+      .notNull(),
+    planId: uuid("plan_id")
+      .references(() => subscriptionPlan.id)
+      .notNull(),
+    status: creditPurchaseStatusEnum("status").default("pending").notNull(),
+    provider: text("provider").notNull(),
+    providerReference: text("provider_reference"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    ...timestamps,
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("subscription_payment_user_idempotency_idx").on(
+      t.userId,
+      t.idempotencyKey
+    ),
+    uniqueIndex("subscription_payment_provider_ref_idx").on(
+      t.providerReference
+    ),
+    index("subscription_payment_user_status_idx").on(t.userId, t.status),
+  ]
+);
+
 // Types
 export type CreditBalanceSelect = typeof creditBalance.$inferSelect;
 export type CreditBalanceInsert = typeof creditBalance.$inferInsert;
@@ -196,3 +229,6 @@ export type SubscriptionPlanInsert = typeof subscriptionPlan.$inferInsert;
 
 export type SubscriptionSelect = typeof subscription.$inferSelect;
 export type SubscriptionInsert = typeof subscription.$inferInsert;
+
+export type SubscriptionPaymentSelect = typeof subscriptionPayment.$inferSelect;
+export type SubscriptionPaymentInsert = typeof subscriptionPayment.$inferInsert;

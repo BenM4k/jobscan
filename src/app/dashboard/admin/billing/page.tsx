@@ -1,4 +1,6 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
+import { requireAdmin } from "@/lib/auth-guard";
 import { getAdminLedger } from "@/services/admin/admin.service";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Coins } from "lucide-react";
@@ -22,6 +24,11 @@ async function LedgerContent({
 }: {
   searchParams: Promise<{ page?: string; userId?: string }>;
 }) {
+  const adminResult = await requireAdmin();
+  if (!adminResult.ok) {
+    redirect(adminResult.error.code === "FORBIDDEN" ? "/dashboard" : "/sign-in");
+  }
+
   const params = await searchParams;
   const page = parseInt(params.page || "1", 10) || 1;
 

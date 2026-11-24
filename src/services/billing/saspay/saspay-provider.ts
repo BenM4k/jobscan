@@ -5,9 +5,11 @@ import {
   InitiateCreditPurchaseParams,
   InitiateSubscriptionParams,
   PaymentInitiateResult,
+  VerifiedPaymentDetails,
 } from "../payment-provider.interface";
 import { AppError } from "@/lib/errors";
 import { SasPayClient, formatDecimalAmount } from "./saspay-client";
+import type { SasPayVerifyPaymentResponse } from "./saspay.types";
 import { resolveNetworkFromPhone } from "./network-helper";
 
 export const USD_TO_CFA_RATE = 600; // Peg for converting catalog USD prices to XOF/XAF
@@ -25,6 +27,46 @@ export function calculatePaymentAmount(amountCents: number, currency: string): s
     return `${cfaAmount}.00`;
   }
   return formatDecimalAmount(amountCents);
+}
+
+/**
+ * Verifies that the verified SasPay transaction amount and currency match the expected catalog price.
+ */
+export function verifySasPayAmountAndCurrency(
+  verify: Pick<
+    SasPayVerifyPaymentResponse,
+    "currency" | "requested_amount" | "debited_amount"
+  >,
+  expectedAmountCents: number
+): { valid: boolean; reason?: string } {
+  const currency = (verify.currency || "").trim().toUpperCase();
+  if (!currency) {
+    return { valid: false, reason: "Missing currency in verification response" };
+  }
+
+  const expectedStr = calculatePaymentAmount(expectedAmountCents, currency);
+  const expectedMinor = Math.round(Number(expectedStr) * 100);
+  const actualRaw = verify.requested_amount ?? verify.debited_amount;
+  const actualNum = Number(actualRaw);
+
+  if (
+    actualRaw === undefined ||
+    actualRaw === null ||
+    actualRaw === "" ||
+    !Number.isFinite(actualNum)
+  ) {
+    return { valid: false, reason: "Missing payment amount in verification response" };
+  }
+
+  const actualMinor = Math.round(actualNum * 100);
+  if (actualMinor < expectedMinor) {
+    return {
+      valid: false,
+      reason: `Amount mismatch: expected at least ${expectedStr} ${currency}, got ${actualRaw} ${currency}`,
+    };
+  }
+
+  return { valid: true };
 }
 
 /**
@@ -152,27 +194,58 @@ export class SasPayProvider implements PaymentProvider {
   }
 
   /**
+   * Verifies a payment with GET /payments/{payment_id}/verify/ and returns
+   * normalized status alongside verified amount and currency details.
+   */
+  async verifyPaymentDetails(
+    providerReference: string
+  ): Promise<VerifiedPaymentDetails> {
+    try {
+      const verify = await this.client.verifyPayment(providerReference);
+
+      if (verify.status === "SUCCESS") {
+        return {
+          status: "confirmed",
+          currency: verify.currency,
+          requestedAmount: verify.requested_amount,
+          debitedAmount: verify.debited_amount,
+        };
+      }
+
+      if (verify.status === "FAILED" || verify.status === "CANCELLED") {
+        return {
+          status: "failed",
+          currency: verify.currency,
+          requestedAmount: verify.requested_amount,
+          debitedAmount: verify.debited_amount,
+        };
+      }
+
+      return { status: "pending" };
+    } catch (error) {
+      console.error(
+        `[SasPayProvider] Failed to check purchase status for ${providerReference}:`,
+        error
+      );
+      if (
+        error instanceof AppError &&
+        (error.code === "UNAUTHORIZED" || error.code === "RATE_LIMITED")
+      ) {
+        throw error;
+      }
+      return { status: "pending" };
+    }
+  }
+
+  /**
    * Checks the status of a payment with GET /payments/{payment_id}/verify/.
    * Strictly enforces that ONLY status === 'SUCCESS' confirms delivery.
    */
   async checkPurchaseStatus(
     providerReference: string
   ): Promise<"pending" | "confirmed" | "failed"> {
-    try {
-      const verify = await this.client.verifyPayment(providerReference);
-
-      if (verify.status === "SUCCESS") {
-        return "confirmed";
-      }
-
-      if (verify.status === "FAILED") {
-        return "failed";
-      }
-
-      return "pending";
-    } catch {
-      return "pending";
-    }
+    const details = await this.verifyPaymentDetails(providerReference);
+    return details.status;
   }
 }
 

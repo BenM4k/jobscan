@@ -46,8 +46,15 @@ export function normalizePhoneNumber(
 
   if (preferredCountry) {
     const prefix = COUNTRY_DIAL_PREFIXES[preferredCountry];
-    if (prefix && digits.startsWith("0")) {
-      return `${prefix}${digits.slice(1)}`;
+    if (prefix) {
+      if (digits.startsWith("0")) {
+        // Burkina Faso local numbers retain their leading zero (e.g. 01/02/03...)
+        if (preferredCountry === "BF") {
+          return `${prefix}${digits}`;
+        }
+        return `${prefix}${digits.slice(1)}`;
+      }
+      return `${prefix}${digits}`;
     }
   }
 
@@ -140,6 +147,57 @@ export function resolveNetworkFromPhone(
     if (local.startsWith("67") || local.startsWith("68") || local.startsWith("650")) network = "mtn_cm";
     else if (local.startsWith("69") || local.startsWith("655")) network = "orange_cm";
     return { country: "CM", network, currency: "XAF", formattedPhone: phone };
+  }
+
+  // Senegal (+221)
+  if (phone.startsWith("+221")) {
+    const local = phone.slice(4);
+    let network = "wave_sn";
+    if (local.startsWith("77") || local.startsWith("78")) network = "orange_sn";
+    else if (local.startsWith("76")) network = "free_sn";
+    return { country: "SN", network, currency: "XOF", formattedPhone: phone };
+  }
+
+  // Togo (+228)
+  if (phone.startsWith("+228")) {
+    const local = phone.slice(4);
+    let network = "tmoney_tg";
+    if (
+      local.startsWith("96") ||
+      local.startsWith("97") ||
+      local.startsWith("98") ||
+      local.startsWith("99") ||
+      local.startsWith("79")
+    ) {
+      network = "moov_tg";
+    }
+    return { country: "TG", network, currency: "XOF", formattedPhone: phone };
+  }
+
+  // Burkina Faso (+226)
+  if (phone.startsWith("+226")) {
+    const local = phone.slice(4);
+    let network = "orange_bf";
+    if (
+      local.startsWith("01") ||
+      local.startsWith("02") ||
+      local.startsWith("03") ||
+      local.startsWith("50") ||
+      local.startsWith("51") ||
+      local.startsWith("52") ||
+      local.startsWith("53") ||
+      local.startsWith("60") ||
+      local.startsWith("61") ||
+      local.startsWith("62") ||
+      local.startsWith("63") ||
+      local.startsWith("70") ||
+      local.startsWith("71") ||
+      local.startsWith("72") ||
+      local.startsWith("73")
+    ) {
+      network = "moov_bf";
+    }
+    return { country: "BF", network, currency: "XOF", formattedPhone: phone };
   }
 
   // Default fallback for Jobpilot users

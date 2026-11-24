@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
 import { JobSelect } from "@/dal/jobs.dal";
 import { JobStatus } from "@/services/db/schema";
 import { JobCardBadges } from "@/components/job/JobCardBadges";
 import { JobCardActions } from "@/components/job/JobCardActions";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { Bookmark, X } from "lucide-react";
 
 interface JobCardItemProps {
@@ -91,19 +91,20 @@ export function JobCardItem({
   onStatusChange,
   onDeleteJob,
 }: JobCardItemProps) {
-  const [isBookmarked, setIsBookmarked] = useState(false);
   const t = useTranslations("dashboard");
+  const locale = useLocale();
+  const isSaved = job.status === "saved";
 
   const descriptionSnippet = extractRoleSnippet(job.description, job.company);
 
-  const locationText = [job.city, job.countryCode || job.country || "DRC"]
+  const locationText = [job.city, job.countryCode || job.country]
     .filter(Boolean)
     .join(", ");
 
   const companyInitials = getCompanyInitials(job.company);
 
   const postedDate = job.postedAt
-    ? new Date(job.postedAt).toLocaleDateString("en-US", {
+    ? new Date(job.postedAt).toLocaleDateString(locale, {
         month: "short",
         day: "numeric",
         timeZone: "UTC",
@@ -156,15 +157,18 @@ export function JobCardItem({
             <div className="flex items-center gap-1 shrink-0 -mt-1">
               <button
                 type="button"
-                onClick={() => setIsBookmarked(!isBookmarked)}
-                aria-label={
-                  isBookmarked ? "Remove saved opportunity" : "Save opportunity"
-                }
+                onClick={() => {
+                  if (!isSaved) {
+                    onStatusChange(job.id, "saved");
+                  }
+                }}
+                aria-pressed={isSaved}
+                aria-label={isSaved ? "Saved opportunity" : "Save opportunity"}
                 className="size-8 min-w-8 min-h-8 flex items-center justify-center text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400 hover:bg-slate-200/50 dark:hover:bg-zinc-800/60 rounded-lg transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
               >
                 <Bookmark
                   className={`size-4 transition-colors ${
-                    isBookmarked ? "fill-amber-500 text-amber-500" : ""
+                    isSaved ? "fill-amber-500 text-amber-500" : ""
                   }`}
                 />
               </button>

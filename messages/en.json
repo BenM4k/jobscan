@@ -519,7 +519,8 @@
     "deletePasskey": "Delete",
     "deleting": "Deleting...",
     "passkeyDeletedSuccess": "Passkey removed.",
-    "passkeyDeletedError": "Failed to remove passkey."
+    "passkeyDeletedError": "Failed to remove passkey.",
+    "passkeySessionNotFresh": "Please confirm your sign-in to add a passkey."
   },
   "billing": {
     "credits": "Credits",
@@ -576,6 +577,8 @@
     "subFailed": "Subscription payment failed. Please try again.",
     "subCanceled": "Subscription canceled. Access continues until period end.",
     "subCancelError": "Failed to cancel subscription",
-    "balanceAriaLabel": "Credit balance: {balance}"
+    "balanceAriaLabel": "Credit balance: {balance}",
+    "paymentTimedOut": "Payment confirmation timed out. You can re-check the status below.",
+    "checkPaymentStatus": "Check Payment Status"
   }
 }

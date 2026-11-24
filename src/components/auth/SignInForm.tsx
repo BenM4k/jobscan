@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { signIn, authClient } from "@/services/auth/auth-client";
 import { PasswordInput } from "@/components/ui/PasswordInput";
@@ -11,7 +11,11 @@ import posthog from "posthog-js";
 
 export function SignInForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const t = useTranslations("auth");
+  const rawRedirect = searchParams.get("redirect");
+  const safeRedirect =
+    rawRedirect && /^\/(?!\/)/.test(rawRedirect) ? rawRedirect : "/dashboard";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,7 +38,7 @@ export function SignInForm() {
               fetchOptions: {
                 onSuccess() {
                   posthog.capture("user_signed_in_passkey_autofill");
-                  router.push("/dashboard");
+                  router.push(safeRedirect);
                   router.refresh();
                 },
               },
@@ -45,7 +49,7 @@ export function SignInForm() {
           // Conditional mediation not supported or dismissed
         });
     }
-  }, [router]);
+  }, [router, safeRedirect]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,7 +67,7 @@ export function SignInForm() {
         setErrorMsg(res.error.message || t("signInError"));
       } else {
         posthog.capture("user_signed_in");
-        router.push("/dashboard");
+        router.push(safeRedirect);
         router.refresh();
       }
     } catch {
@@ -82,7 +86,7 @@ export function SignInForm() {
         fetchOptions: {
           onSuccess() {
             posthog.capture("user_signed_in_passkey");
-            router.push("/dashboard");
+            router.push(safeRedirect);
             router.refresh();
           },
           onError(ctx) {

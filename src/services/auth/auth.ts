@@ -12,6 +12,16 @@ if (!resendApiKey) {
   throw new Error("RESEND_API_KEY environment variable is required");
 }
 
+const authSecret = process.env.BETTER_AUTH_SECRET?.trim();
+if (
+  process.env.NODE_ENV === "production" &&
+  (!authSecret || authSecret.length < 32)
+) {
+  throw new Error(
+    "BETTER_AUTH_SECRET environment variable (min 32 chars) is required in production"
+  );
+}
+
 const resend = new Resend(resendApiKey);
 
 export const auth = betterAuth({
@@ -34,7 +44,7 @@ export const auth = betterAuth({
     admin(),
   ],
   session: {
-    freshAge: 0,
+    freshAge: 60 * 15,
   },
   databaseHooks: {
     user: {
@@ -55,13 +65,19 @@ export const auth = betterAuth({
   },
   trustedOrigins: [
     ...(process.env.BETTER_AUTH_URL ? [process.env.BETTER_AUTH_URL] : []),
-    ...(process.env.NEXT_PUBLIC_APP_DOMAIN ? [`https://${process.env.NEXT_PUBLIC_APP_DOMAIN}`] : []),
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "http://localhost:3002",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:3001",
-    "http://127.0.0.1:3002",
+    ...(process.env.NEXT_PUBLIC_APP_DOMAIN
+      ? [`https://${process.env.NEXT_PUBLIC_APP_DOMAIN}`]
+      : []),
+    ...(process.env.NODE_ENV !== "production"
+      ? [
+          "http://localhost:3000",
+          "http://localhost:3001",
+          "http://localhost:3002",
+          "http://127.0.0.1:3000",
+          "http://127.0.0.1:3001",
+          "http://127.0.0.1:3002",
+        ]
+      : []),
   ],
   emailAndPassword: {
     enabled: true,
@@ -103,7 +119,6 @@ export const auth = betterAuth({
     },
   },
   secret:
-    process.env.BETTER_AUTH_SECRET ||
-    "fallback-secret-for-development-min-32-chars",
+    authSecret || "dev-only-fallback-secret-do-not-use-in-prod",
   baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
 });

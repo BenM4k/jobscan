@@ -1,4 +1,6 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
+import { requireAdmin } from "@/lib/auth-guard";
 import { getCachedAdminOverview } from "@/lib/cached-data";
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import {
@@ -27,6 +29,11 @@ function OverviewSkeleton() {
 }
 
 async function OverviewContent() {
+  const adminResult = await requireAdmin();
+  if (!adminResult.ok) {
+    redirect(adminResult.error.code === "FORBIDDEN" ? "/dashboard" : "/sign-in");
+  }
+
   const statsRes = await getCachedAdminOverview();
   const stats = statsRes.ok
     ? statsRes.value

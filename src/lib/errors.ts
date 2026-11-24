@@ -3,6 +3,7 @@ export type AppErrorCode =
   | "NO_MASTER_RESUME"
   | "NOT_FOUND"
   | "UNAUTHORIZED"
+  | "FORBIDDEN"
   | "EXTERNAL_API_ERROR"
   | "DB_ERROR"
   | "RATE_LIMITED"

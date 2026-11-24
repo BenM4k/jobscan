@@ -33,12 +33,12 @@ export function JobCardActions({
           title={t("status")}
           value={status}
           options={[
-            { id: "new", label: t("statusNew") },
-            { id: "scored", label: t("statusScored") },
+            { id: "saved", label: t("statusSaved") },
             { id: "applied", label: t("statusApplied") },
             { id: "interviewing", label: t("statusInterviewing") },
-            { id: "rejected", label: t("statusRejected") },
             { id: "offer", label: t("statusOffer") },
+            { id: "rejected", label: t("statusRejected") },
+            { id: "withdrawn", label: t("statusWithdrawn") },
           ]}
           onChange={(val) => onStatusChange(jobId, val as JobStatus)}
           accentColor="blue"

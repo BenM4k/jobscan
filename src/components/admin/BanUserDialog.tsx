@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +25,7 @@ export function BanUserDialog({
   isOpen,
   onClose,
 }: BanUserDialogProps) {
+  const router = useRouter();
   const [reason, setReason] = useState<string>("");
   const [isPending, startTransition] = useTransition();
 
@@ -44,6 +46,7 @@ export function BanUserDialog({
         );
         onClose();
         setReason("");
+        router.refresh();
       } else {
         toast.error(res.error || "Failed to update ban status");
       }

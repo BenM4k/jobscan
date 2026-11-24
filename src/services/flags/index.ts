@@ -36,6 +36,18 @@ export type { UserFeatureFlagView, FeatureFlagAssignmentWithUser };
 export const isEnabled = isFeatureEnabled;
 
 /**
+ * Checks whether hybrid scoring is enabled for a user via either the canonical
+ * `"hybrid_scoring"` flag or the legacy `"hybrid-scoring-v1"` alias.
+ */
+export async function isHybridScoringEnabled(userId: string): Promise<boolean> {
+  const [canonical, legacy] = await Promise.all([
+    isFeatureEnabled(userId, FEATURE_FLAGS.HYBRID_SCORING),
+    isFeatureEnabled(userId, FEATURE_FLAGS.HYBRID_SCORING_V1),
+  ]);
+  return canonical || legacy;
+}
+
+/**
  * Get all available feature flags with the user's specific state for the settings UI.
  */
 export async function getUserFeatureFlags(

@@ -29,11 +29,13 @@ import { CreateResumeModal } from "@/components/resumes/CreateResumeModal";
 interface JobDetailViewProps {
   initialJob: JobSelect;
   initialResumes?: MasterResumeSelect[];
+  sanitizedDescriptionHtml?: string;
 }
 
 export function JobDetailView({
   initialJob,
   initialResumes = [],
+  sanitizedDescriptionHtml,
 }: JobDetailViewProps) {
   const tCommon = useTranslations("common");
   const tDash = useTranslations("dashboard");
@@ -82,6 +84,9 @@ export function JobDetailView({
 
   const handleJobUpdated = (updated: JobSelect) => {
     setJob(updated);
+    if (updated.description !== initialJob.description) {
+      router.refresh();
+    }
   };
 
   return (
@@ -124,7 +129,14 @@ export function JobDetailView({
         <span>{tCommon("aiNotice")}</span>
       </div>
 
-      <JobDescriptionSection description={job.description} />
+      <JobDescriptionSection
+        description={job.description}
+        sanitizedHtml={
+          job.description === initialJob.description
+            ? sanitizedDescriptionHtml
+            : undefined
+        }
+      />
 
       {/* Missing Master Resume Modal */}
       <Dialog open={scoring.missingResumeOpen} onOpenChange={scoring.setMissingResumeOpen}>

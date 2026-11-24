@@ -9,7 +9,7 @@ import {
 } from "@/services/db/schema";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, ne, isNull } from "drizzle-orm";
 
 export interface DigestUser {
   id: string;
@@ -117,6 +117,13 @@ export async function getRecentDigestJobs(
         createdAt: job.createdAt,
       })
       .from(job)
+      .where(
+        and(
+          ne(job.source, "manual"),
+          isNull(job.addedByUserId),
+          eq(job.status, "active")
+        )
+      )
       .orderBy(desc(job.createdAt))
       .limit(limit);
 

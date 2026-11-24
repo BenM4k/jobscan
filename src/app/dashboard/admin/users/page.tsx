@@ -1,4 +1,6 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
+import { requireAdmin } from "@/lib/auth-guard";
 import { getCachedAdminUsers } from "@/lib/cached-data";
 import { AdminUsersTable } from "@/components/admin/AdminUsersTable";
 
@@ -24,6 +26,11 @@ async function UsersContent({
 }: {
   searchParams: Promise<{ page?: string; search?: string; role?: string }>;
 }) {
+  const adminResult = await requireAdmin();
+  if (!adminResult.ok) {
+    redirect(adminResult.error.code === "FORBIDDEN" ? "/dashboard" : "/sign-in");
+  }
+
   const params = await searchParams;
   const page = parseInt(params.page || "1", 10) || 1;
   const search = params.search || "";

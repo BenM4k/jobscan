@@ -13,7 +13,6 @@ import type {
 } from "./saspay.types";
 
 export const SASPAY_LIVE_BASE_URL = "https://api.saspay.me/api/v1";
-export const SASPAY_SANDBOX_BASE_URL = "https://sandbox-api.saspay.me/api/v1";
 export const SASPAY_DEFAULT_BASE_URL = SASPAY_LIVE_BASE_URL;
 export const WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS = 300;
 
@@ -25,7 +24,7 @@ export function formatDecimalAmount(amountCents: number): string {
   if (!Number.isInteger(amountCents) || amountCents < 0) {
     throw new AppError(
       "VALIDATION_ERROR",
-      `Invalid amount in cents: must be a non-negative integer, got ${amountCents}`
+      `Invalid amount in cents: must be a non-negative integer, got ${amountCents}`,
     );
   }
   return (amountCents / 100).toFixed(2);
@@ -53,8 +52,13 @@ export function verifySasPayWebhookSignature(params: {
     return false;
   }
 
-  const timestampNum = Number(timestamp);
-  if (!Number.isFinite(timestampNum)) {
+  const trimmedTimestamp = timestamp.trim();
+  if (!/^\d+$/.test(trimmedTimestamp)) {
+    return false;
+  }
+
+  const timestampNum = Number(trimmedTimestamp);
+  if (!Number.isSafeInteger(timestampNum)) {
     return false;
   }
 
@@ -90,33 +94,25 @@ export class SasPayClient {
     if (!key) {
       throw new AppError(
         "INTERNAL_ERROR",
-        "SASPAY_API_KEY environment variable is not configured"
+        "SASPAY_API_KEY environment variable is not configured",
       );
     }
 
     if (!key.startsWith("sk_test_") && !key.startsWith("sk_live_")) {
       throw new AppError(
         "VALIDATION_ERROR",
-        "SASPAY_API_KEY must start with 'sk_test_' in development or 'sk_live_' in production"
+        "SASPAY_API_KEY must start with 'sk_test_' in development or 'sk_live_' in production",
       );
     }
 
     this.apiKey = key;
 
-    // Resolve base URL: custom options > environment variable (if not mismatching test key) > auto-detect
-    if (options?.baseUrl) {
-      this.baseUrl = options.baseUrl.replace(/\/+$/, "");
-    } else if (
-      process.env.SASPAY_BASE_URL &&
-      !(key.startsWith("sk_test_") && process.env.SASPAY_BASE_URL === SASPAY_LIVE_BASE_URL)
-    ) {
-      this.baseUrl = process.env.SASPAY_BASE_URL.replace(/\/+$/, "");
-    } else {
-      // Auto-select sandbox endpoint for test keys, live endpoint for production keys
-      this.baseUrl = key.startsWith("sk_test_")
-        ? SASPAY_SANDBOX_BASE_URL
-        : SASPAY_LIVE_BASE_URL;
-    }
+    // Both sk_test_ and sk_live_ use the unified SasPay API v1 base URL
+    const resolvedBaseUrl =
+      options?.baseUrl ||
+      process.env.SASPAY_BASE_URL ||
+      SASPAY_DEFAULT_BASE_URL;
+    this.baseUrl = resolvedBaseUrl.replace(/\/+$/, "");
   }
 
   /**
@@ -135,7 +131,7 @@ export class SasPayClient {
       method?: "GET" | "POST" | "DELETE";
       body?: unknown;
       idempotencyKey?: string;
-    } = {}
+    } = {},
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
     const headers: Record<string, string> = {
@@ -153,6 +149,7 @@ export class SasPayClient {
       headers,
       body: options.body ? JSON.stringify(options.body) : undefined,
       cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
     });
 
     const text = await res.text();
@@ -164,7 +161,15 @@ export class SasPayClient {
     }
 
     if (!res.ok) {
-      this.handleHttpError(res.status, parsed, endpoint);
+      const retryAfterRaw = res.headers.get("retry-after");
+      const retryAfterParsed = retryAfterRaw
+        ? parseInt(retryAfterRaw, 10)
+        : NaN;
+      const retryAfterSeconds =
+        Number.isFinite(retryAfterParsed) && retryAfterParsed > 0
+          ? retryAfterParsed
+          : undefined;
+      this.handleHttpError(res.status, parsed, endpoint, retryAfterSeconds);
     }
 
     // Unbox SasPay response envelope { success: true, data: {...}, code: 200 }
@@ -191,7 +196,12 @@ export class SasPayClient {
     return parsed as T;
   }
 
-  private handleHttpError(status: number, body: unknown, endpoint: string): never {
+  private handleHttpError(
+    status: number,
+    body: unknown,
+    endpoint: string,
+    retryAfterSeconds?: number,
+  ): never {
     const errorRecord =
       typeof body === "object" && body !== null
         ? (body as Record<string, unknown>)
@@ -214,23 +224,29 @@ export class SasPayClient {
     // Log the full technical diagnostic error on the server
     console.error(
       `[SasPayClient] HTTP ${status} from ${endpoint} (code: ${errorCode || "unknown"}):`,
-      errorMessage
+      errorMessage,
     );
 
-    const errorDetails = { status, errorCode, endpoint, raw: errorMessage };
+    const errorDetails = {
+      status,
+      errorCode,
+      endpoint,
+      raw: errorMessage,
+      ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
+    };
 
     switch (status) {
       case 400:
         throw new AppError(
           "VALIDATION_ERROR",
           "Invalid payment details. Please check your phone number and try again.",
-          errorDetails
+          errorDetails,
         );
       case 401:
         throw new AppError(
           "UNAUTHORIZED",
           "Payment gateway authentication failed. Please contact support.",
-          errorDetails
+          errorDetails,
         );
       case 403: {
         const isIpNotWhitelisted =
@@ -241,31 +257,33 @@ export class SasPayClient {
           isIpNotWhitelisted
             ? "Payment service access restriction. Please contact support."
             : "Payment service access denied. Please contact support.",
-          errorDetails
+          errorDetails,
         );
       }
       case 404:
         throw new AppError(
           "NOT_FOUND",
           "Payment resource was not found. Please try again.",
-          errorDetails
+          errorDetails,
         );
       case 409:
         throw new AppError(
-          "CONFLICT",
+          "OPERATION_IN_PROGRESS",
           "A transaction is already in progress. Please wait a moment before trying again.",
-          errorDetails
+          errorDetails,
         );
       case 410:
         throw new AppError(
           "CONFLICT",
           "The payment session has expired. Please initiate a new transaction.",
-          errorDetails
+          errorDetails,
         );
       case 422: {
-        let msg = "Payment could not be processed with this operator or phone number. Please check your details or try another payment method.";
+        let msg =
+          "Payment could not be processed with this operator or phone number. Please check your details or try another payment method.";
         if (errorCode === "prepayment_otp_missing") {
-          msg = "Pre-payment authorization code (OTP) required for this network. Please generate your code and try again.";
+          msg =
+            "Pre-payment authorization code (OTP) required for this network. Please generate your code and try again.";
         } else if (errorCode === "currency_country_mismatch") {
           msg = "Currency mismatch for the selected country. Please try again.";
         }
@@ -275,13 +293,13 @@ export class SasPayClient {
         throw new AppError(
           "RATE_LIMITED",
           "Too many payment requests. Please wait a moment before trying again.",
-          errorDetails
+          errorDetails,
         );
       default:
         throw new AppError(
           "EXTERNAL_API_ERROR",
           "Payment service is temporarily unavailable. Please try again shortly.",
-          errorDetails
+          errorDetails,
         );
     }
   }
@@ -292,12 +310,12 @@ export class SasPayClient {
    */
   async softpay(
     params: SasPaySoftpayRequest,
-    idempotencyKey: string
+    idempotencyKey: string,
   ): Promise<SasPaySoftpayResponse> {
     if (!idempotencyKey) {
       throw new AppError(
         "VALIDATION_ERROR",
-        "Idempotency-Key is required for POST /payments/softpay/"
+        "Idempotency-Key is required for POST /payments/softpay/",
       );
     }
     return this.request<SasPaySoftpayResponse>("/payments/softpay/", {
@@ -311,7 +329,7 @@ export class SasPayClient {
    * Creates a hosted checkout session.
    */
   async createCheckoutSession(
-    params: SasPayCheckoutSessionRequest
+    params: SasPayCheckoutSessionRequest,
   ): Promise<SasPayCheckoutSessionResponse> {
     return this.request<SasPayCheckoutSessionResponse>("/checkout-sessions/", {
       method: "POST",
@@ -325,11 +343,14 @@ export class SasPayClient {
    */
   async verifyPayment(paymentId: string): Promise<SasPayVerifyPaymentResponse> {
     if (!paymentId) {
-      throw new AppError("VALIDATION_ERROR", "Payment ID is required to verify");
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Payment ID is required to verify",
+      );
     }
     return this.request<SasPayVerifyPaymentResponse>(
       `/payments/${encodeURIComponent(paymentId)}/verify/`,
-      { method: "GET" }
+      { method: "GET" },
     );
   }
 
@@ -339,7 +360,7 @@ export class SasPayClient {
    */
   async retryPayment(
     paymentId: string,
-    idempotencyKey: string
+    idempotencyKey: string,
   ): Promise<SasPaySoftpayResponse> {
     if (!paymentId) {
       throw new AppError("VALIDATION_ERROR", "Payment ID is required to retry");
@@ -347,12 +368,12 @@ export class SasPayClient {
     if (!idempotencyKey) {
       throw new AppError(
         "VALIDATION_ERROR",
-        "Idempotency-Key is required for POST /payments/{payment_id}/retry/"
+        "Idempotency-Key is required for POST /payments/{payment_id}/retry/",
       );
     }
     return this.request<SasPaySoftpayResponse>(
       `/payments/${encodeURIComponent(paymentId)}/retry/`,
-      { method: "POST", idempotencyKey }
+      { method: "POST", idempotencyKey },
     );
   }
 
@@ -362,12 +383,12 @@ export class SasPayClient {
    */
   async initializePayout(
     params: SasPayPayoutRequest,
-    idempotencyKey: string
+    idempotencyKey: string,
   ): Promise<SasPayPayoutResponse> {
     if (!idempotencyKey) {
       throw new AppError(
         "VALIDATION_ERROR",
-        "Idempotency-Key is required for POST /payouts/initialize/"
+        "Idempotency-Key is required for POST /payouts/initialize/",
       );
     }
     return this.request<SasPayPayoutResponse>("/payouts/initialize/", {
@@ -386,7 +407,7 @@ export class SasPayClient {
     }
     return this.request<SasPayPayoutResponse>(
       `/payouts/${encodeURIComponent(payoutId)}/verify/`,
-      { method: "GET" }
+      { method: "GET" },
     );
   }
 

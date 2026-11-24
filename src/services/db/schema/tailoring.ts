@@ -5,6 +5,7 @@ import {
   timestamp,
   jsonb,
   index,
+  uniqueIndex,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { timestamps } from "./common";
@@ -28,7 +29,7 @@ export const tailoredResume = pgTable(
     ...timestamps,
   },
   (t) => [
-    index("tailored_resume_pipeline_entry_idx").on(t.pipelineEntryId),
+    uniqueIndex("tailored_resume_pipeline_entry_idx").on(t.pipelineEntryId),
   ]
 );
 
@@ -59,7 +60,7 @@ export const tailoredCoverLetter = pgTable(
     ...timestamps,
   },
   (t) => [
-    index("tailored_cover_letter_pipeline_entry_idx").on(t.pipelineEntryId),
+    uniqueIndex("tailored_cover_letter_pipeline_entry_idx").on(t.pipelineEntryId),
   ]
 );
 

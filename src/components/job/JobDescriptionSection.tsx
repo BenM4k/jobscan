@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 
 interface JobDescriptionSectionProps {
   description?: string | null;
+  sanitizedHtml?: string;
 }
 
 const ALLOWED_TAGS = new Set([
@@ -15,38 +16,55 @@ const ALLOWED_TAGS = new Set([
   "I",
   "EM",
   "STRONG",
-  "A",
   "UL",
   "OL",
   "LI",
+]);
+
+const BLOCK_TAGS = new Set([
+  "DIV",
   "H1",
   "H2",
   "H3",
   "H4",
   "H5",
   "H6",
+  "SECTION",
+  "ARTICLE",
+  "HEADER",
+  "FOOTER",
+  "ASIDE",
+  "MAIN",
+  "NAV",
   "BLOCKQUOTE",
-  "CODE",
   "PRE",
-  "SPAN",
-  "DIV",
   "HR",
-  "TABLE",
-  "THEAD",
-  "TBODY",
   "TR",
-  "TH",
   "TD",
+  "TH",
+  "DT",
+  "DD",
+  "FIGCAPTION",
 ]);
 
-const ALLOWED_ATTRS: Record<string, Set<string>> = {
-  A: new Set(["href", "target", "rel", "title"]),
-};
+const SELF_BREAKING_TAGS = new Set(["P", "UL", "OL", "BR"]);
 
-function sanitizeDescription(rawHtml?: string | null): string {
+function isMeaningfulDomNode(node: Node): boolean {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return Boolean(node.textContent?.trim());
+  }
+  return node.nodeType === Node.ELEMENT_NODE;
+}
+
+function getDomTag(node: Node | undefined): string | undefined {
+  if (!node || node.nodeType !== Node.ELEMENT_NODE) return undefined;
+  return (node as HTMLElement).tagName.toUpperCase();
+}
+
+function sanitizeDescriptionClientFallback(rawHtml?: string | null): string {
   if (!rawHtml) return "";
   if (typeof window === "undefined") {
-    return rawHtml.replace(/<[^>]*>?/gm, "");
+    return "";
   }
 
   try {
@@ -56,6 +74,10 @@ function sanitizeDescription(rawHtml?: string | null): string {
     const cleanNode = (node: Node) => {
       const children = Array.from(node.childNodes);
       for (const child of children) {
+        if (child.nodeType === Node.COMMENT_NODE) {
+          node.removeChild(child);
+          continue;
+        }
         if (child.nodeType === Node.ELEMENT_NODE) {
           const el = child as HTMLElement;
           const tagName = el.tagName.toUpperCase();
@@ -72,41 +94,72 @@ function sanitizeDescription(rawHtml?: string | null): string {
                 "MATH",
                 "FORM",
                 "INPUT",
+                "TEXTAREA",
+                "SELECT",
+                "BUTTON",
+                "NOSCRIPT",
               ].includes(tagName)
             ) {
               el.remove();
               continue;
             }
+            if (tagName === "HR") {
+              node.replaceChild(doc.createElement("br"), el);
+              continue;
+            }
+
+            const prevNodes: Node[] = [];
+            for (let p = el.previousSibling; p; p = p.previousSibling) {
+              if (isMeaningfulDomNode(p)) {
+                prevNodes.push(p);
+                break;
+              }
+            }
+            const nextNodes: Node[] = [];
+            for (let n = el.nextSibling; n; n = n.nextSibling) {
+              if (isMeaningfulDomNode(n)) {
+                nextNodes.push(n);
+                break;
+              }
+            }
+
             const frag = doc.createDocumentFragment();
             while (el.firstChild) {
               frag.appendChild(el.firstChild);
             }
             cleanNode(frag);
+
+            if (BLOCK_TAGS.has(tagName)) {
+              const meaningful = Array.from(frag.childNodes).filter(isMeaningfulDomNode);
+              if (meaningful.length > 0) {
+                const firstTag = getDomTag(meaningful[0]);
+                const lastTag = getDomTag(meaningful[meaningful.length - 1]);
+                const prevTag = getDomTag(prevNodes[0]);
+                const nextTag = getDomTag(nextNodes[0]);
+
+                if (
+                  prevNodes.length > 0 &&
+                  (!firstTag || !SELF_BREAKING_TAGS.has(firstTag)) &&
+                  (!prevTag || !SELF_BREAKING_TAGS.has(prevTag))
+                ) {
+                  frag.insertBefore(doc.createElement("br"), frag.firstChild);
+                }
+                if (
+                  nextNodes.length > 0 &&
+                  (!lastTag || !SELF_BREAKING_TAGS.has(lastTag)) &&
+                  (!nextTag || !SELF_BREAKING_TAGS.has(nextTag))
+                ) {
+                  frag.appendChild(doc.createElement("br"));
+                }
+              }
+            }
+
             node.replaceChild(frag, el);
             continue;
           }
 
-          const allowedAttrs = ALLOWED_ATTRS[tagName] || new Set();
-          const attrs = Array.from(el.attributes);
-          for (const attr of attrs) {
-            const attrName = attr.name.toLowerCase();
-            if (attrName.startsWith("on") || !allowedAttrs.has(attrName)) {
-              el.removeAttribute(attr.name);
-            } else if (attrName === "href") {
-              const normalizedVal = attr.value
-                .replace(/[\u0000-\u001F\u007F\s]+/g, "")
-                .toLowerCase();
-              if (
-                normalizedVal.startsWith("javascript:") ||
-                normalizedVal.startsWith("data:") ||
-                normalizedVal.startsWith("vbscript:")
-              ) {
-                el.removeAttribute(attr.name);
-              } else {
-                el.setAttribute("rel", "noopener noreferrer");
-                el.setAttribute("target", "_blank");
-              }
-            }
+          for (const attr of Array.from(el.attributes)) {
+            el.removeAttribute(attr.name);
           }
 
           cleanNode(el);
@@ -117,19 +170,23 @@ function sanitizeDescription(rawHtml?: string | null): string {
     cleanNode(doc.body);
     return doc.body.innerHTML;
   } catch {
-    return rawHtml.replace(/<[^>]*>?/gm, "");
+    return "";
   }
 }
 
 export function JobDescriptionSection({
   description,
+  sanitizedHtml: serverSanitizedHtml,
 }: JobDescriptionSectionProps) {
   const t = useTranslations("jobDetail");
-  const isHtml = description && description.includes("<");
-  const sanitizedHtml = useMemo(
-    () => (isHtml ? sanitizeDescription(description) : ""),
-    [description, isHtml],
-  );
+  const isHtml = Boolean(description && description.includes("<"));
+  const sanitizedHtml = useMemo(() => {
+    if (!isHtml) return "";
+    if (serverSanitizedHtml !== undefined) {
+      return serverSanitizedHtml;
+    }
+    return sanitizeDescriptionClientFallback(description);
+  }, [description, isHtml, serverSanitizedHtml]);
 
   return (
     <section aria-label={t("jobDescription")} className="py-4 space-y-3">

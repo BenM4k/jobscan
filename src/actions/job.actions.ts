@@ -32,6 +32,7 @@ const transitionStatusSchema = z.object({
     "interviewing",
     "rejected",
     "offer",
+    "withdrawn",
   ]),
 });
 
@@ -594,9 +595,23 @@ export async function deleteJobAction(jobId: string) {
   return { success: true };
 }
 
-import { JobSelect } from "@/dal/jobs.dal";
+const restoreJobInputSchema = z.object({
+  id: z.string().uuid("Invalid job identifier"),
+  status: z.string().optional(),
+});
 
-export async function restoreJobAction(jobData: JobSelect) {
+const RESTORABLE_PIPELINE_STATUSES = new Set([
+  "saved",
+  "applied",
+  "interviewing",
+  "offer",
+  "rejected",
+]);
+
+export async function restoreJobAction(jobData: {
+  id: string;
+  status?: string;
+}) {
   const sessionResult = await requireSession();
   if (!sessionResult.ok || !sessionResult.value)
     return {
@@ -604,19 +619,30 @@ export async function restoreJobAction(jobData: JobSelect) {
       error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message,
     };
 
+  const parsed = restoreJobInputSchema.safeParse(jobData);
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: parsed.error.issues[0]?.message || "Invalid restore parameters",
+    };
+  }
+
+  const normalizedStatus =
+    parsed.data.status && RESTORABLE_PIPELINE_STATUSES.has(parsed.data.status)
+      ? (parsed.data.status as "saved" | "applied" | "interviewing" | "offer" | "rejected")
+      : "saved";
+
   const jobsDal = await import("@/dal/jobs.dal");
-  const restoreStatus =
-    jobData.status && jobData.status !== "withdrawn" ? jobData.status : "saved";
-  const result = await jobsDal.restoreJob({
-    ...jobData,
-    userId: sessionResult.value.user.id,
-    status: restoreStatus,
-  });
+  const result = await jobsDal.restorePipelineEntry(
+    parsed.data.id,
+    sessionResult.value.user.id,
+    normalizedStatus
+  );
   if (!result.ok) {
     return { success: false, error: result.error.message };
   }
 
-  revalidateTags([DASHBOARD_FEED_TAG, jobTag(jobData.id)]);
+  revalidateTags([DASHBOARD_FEED_TAG, jobTag(parsed.data.id)]);
   return { success: true, data: result.value };
 }
 

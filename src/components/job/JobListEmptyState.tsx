@@ -7,6 +7,7 @@ import { RefreshCw, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RetryProgressBadge } from "@/components/ui/RetryProgressBadge";
 import { useAsyncJobWithRetry } from "@/hooks/useAsyncJobWithRetry";
+import { fetchMoreJobsAction } from "@/actions/job.actions";
 
 export function JobListEmptyState() {
   const t = useTranslations("dashboard");
@@ -22,17 +23,12 @@ export function JobListEmptyState() {
 
   const handleManualCheck = async () => {
     const found = await checkSyncRunner.execute(async () => {
-      // Refresh Next.js server components to check for ingested jobs
-      router.refresh();
-
-      // Check current window location with cache-busting fetch to verify if new jobs arrived
-      const res = await fetch(`/api/jobs/more?offset=0&limit=1&_t=${Date.now()}`);
-      if (!res.ok) {
-        throw new Error(`Sync check returned status ${res.status}`);
+      const res = await fetchMoreJobsAction(undefined, undefined, 0, 1);
+      if (!res.success) {
+        throw new Error(res.error || "Sync check failed");
       }
-      const data = await res.json().catch(() => ({}));
-      const jobCount = Array.isArray(data?.data) ? data.data.length : 0;
 
+      const jobCount = Array.isArray(res.data) ? res.data.length : 0;
       if (jobCount === 0) {
         throw new Error("Background search in progress. No jobs ready yet.");
       }
@@ -42,7 +38,7 @@ export function JobListEmptyState() {
 
     if (found) {
       setBgSyncActive(false);
-      window.location.reload();
+      router.refresh();
     }
   };
 

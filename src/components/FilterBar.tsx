@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { useQueryState, parseAsString, parseAsStringEnum } from "nuqs";
+import {
+  useQueryState,
+  parseAsString,
+  parseAsStringEnum,
+  createParser,
+} from "nuqs";
 import { pipelineStatusEnum } from "@/services/db/schema";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { useTranslations } from "next-intl";
@@ -9,6 +14,7 @@ import { Search, X, RotateCcw, Loader2 } from "lucide-react";
 import {
   SOURCE_OPTIONS,
   STATUS_OPTIONS,
+  parseSourceOption,
   type SourceOption,
   type StatusOption,
 } from "./filters/filter-options";
@@ -55,18 +61,10 @@ export function FilterBar() {
 
   const [sourceFilter, setSourceFilter] = useQueryState(
     "source",
-    parseAsStringEnum<SourceOption>([
-      "all",
-      "reliefweb",
-      "emploicd",
-      "congojob",
-      "unjobs",
-      "greenhouse",
-      "remoteok",
-      "lever",
-      "ashby",
-      "manual",
-    ])
+    createParser<SourceOption>({
+      parse: parseSourceOption,
+      serialize: (value) => value,
+    })
       .withDefault("all")
       .withOptions({ shallow: false }),
   );

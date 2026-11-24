@@ -13,7 +13,11 @@ interface AuthViewProps {
 export function AuthView({ mode }: AuthViewProps) {
   return (
     <AuthLayout>
-      {mode === "sign-in" && <SignInForm />}
+      {mode === "sign-in" && (
+        <Suspense fallback={<AuthLoadingFallback />}>
+          <SignInForm />
+        </Suspense>
+      )}
       {mode === "sign-up" && <SignUpForm />}
       {mode === "forgot-password" && <ForgotPasswordForm />}
       {mode === "reset-password" && (

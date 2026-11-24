@@ -46,3 +46,10 @@ export function getPaymentProvider(): PaymentProvider {
 
   return providerInstance;
 }
+
+/** Overrides the singleton payment provider instance for unit testing. */
+export function setPaymentProviderForTesting(
+  provider: PaymentProvider | null
+): void {
+  providerInstance = provider;
+}
