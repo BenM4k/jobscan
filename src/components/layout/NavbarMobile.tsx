@@ -52,11 +52,29 @@ export function NavbarMobile({
   ];
 
   const accountLinks = [
-    { href: "/dashboard/settings", label: t("settings"), icon: "⚙️", badge: "Flags" },
-    { href: "/dashboard/billing", label: t("billing"), icon: "💳", badge: `${liveCreditBalance} credits` },
+    {
+      href: "/dashboard/settings",
+      label: t("settings"),
+      icon: "⚙️",
+      badge: "Flags",
+    },
+    {
+      href: "/dashboard/billing",
+      label: t("billing"),
+      icon: "💳",
+      badge: `${liveCreditBalance} credits`,
+    },
     { href: "/dashboard/profile", label: t("profile"), icon: "👤" },
     ...(isAdmin
-      ? [{ href: "/dashboard/admin", label: t("admin"), icon: "🛡️", badge: "Console", highlight: true }]
+      ? [
+          {
+            href: "/dashboard/admin",
+            label: t("admin"),
+            icon: "🛡️",
+            badge: "Console",
+            highlight: true,
+          },
+        ]
       : []),
   ];
 
@@ -95,7 +113,7 @@ export function NavbarMobile({
                   </div>
                 </div>
                 <CreditBalanceIndicator
-                  balance={creditBalance}
+                  balance={liveCreditBalance}
                   variant="compact"
                   onNavigate={closeMenu}
                 />

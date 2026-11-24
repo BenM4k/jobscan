@@ -72,7 +72,21 @@ async function runTests() {
     "Both apex and www origins included for NEXT_PUBLIC_APP_DOMAIN"
   );
 
-  // 5. Vercel fallback without BETTER_AUTH_URL
+  // 5. NEXT_PUBLIC_APP_URL-only env derives apex rpID rather than localhost
+  const publicUrlOnly = resolvePasskeyAndAuthConfig({
+    NODE_ENV: "production",
+    NEXT_PUBLIC_APP_URL: "https://www.careerpilot.io/dashboard",
+  });
+  assert(
+    publicUrlOnly.rpID === "careerpilot.io",
+    `Expected rpID careerpilot.io from NEXT_PUBLIC_APP_URL, got ${publicUrlOnly.rpID}`
+  );
+  assert(
+    publicUrlOnly.baseURL === "https://www.careerpilot.io",
+    `Expected normalized baseURL from NEXT_PUBLIC_APP_URL, got ${publicUrlOnly.baseURL}`
+  );
+
+  // 6. Vercel fallback without BETTER_AUTH_URL
   const vercelProd = resolvePasskeyAndAuthConfig({
     NODE_ENV: "production",
     VERCEL_PROJECT_PRODUCTION_URL: "my-app.vercel.app",

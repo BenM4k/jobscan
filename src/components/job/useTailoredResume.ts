@@ -159,13 +159,14 @@ export function useTailoredResume({
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (overrideContent?: string) => {
+    const contentToSave = overrideContent ?? editedResume;
     try {
       setIsSaving(true);
       const res = await fetch(`/api/jobs/${job.id}/tailor-resume`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tailoredResume: editedResume }),
+        body: JSON.stringify({ tailoredResume: contentToSave }),
       });
 
       if (!res.ok) {
@@ -175,6 +176,7 @@ export function useTailoredResume({
 
       const { data } = await res.json();
       posthog.capture("tailored_resume_saved");
+      setEditedResume(contentToSave);
       onJobUpdated(data);
       setIsEditing(false);
       toast.success(t("saveResumeSuccess"));

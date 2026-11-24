@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -25,6 +25,14 @@ const INITIAL_VALUES: AddJobFormValues = {
   description: "",
 };
 
+function normalizeImportedUrl(rawUrl: string): string {
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trimmed)) return trimmed;
+  return `https://${trimmed.replace(/^\/+/, "")}`;
+}
+
 /** Orchestrates Quick Import pre-fill and manual job submission on `/dashboard/add-job`. */
 export function AddJobForm() {
   const router = useRouter();
@@ -32,24 +40,49 @@ export function AddJobForm() {
 
   const [values, setValues] = useState<AddJobFormValues>(INITIAL_VALUES);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const editedSinceImportStartRef = useRef<Set<keyof AddJobFormValues>>(new Set());
 
   const handleFieldChange = <K extends keyof AddJobFormValues>(
     field: K,
     value: AddJobFormValues[K]
   ) => {
+    editedSinceImportStartRef.current.add(field);
     setValues((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handleImportStart = () => {
+    editedSinceImportStartRef.current = new Set();
+  };
+
   const handleImported = ({ fields, method, creditsUsed }: ExtractedJobResult) => {
+    const edited = editedSinceImportStartRef.current;
+    const normalizedUrl = fields.url ? normalizeImportedUrl(fields.url) : "";
+
     setValues((prev) => ({
-      title: fields.title || prev.title,
-      company: fields.company || prev.company,
-      location: fields.location || prev.location,
-      workplaceType: fields.workplaceType || prev.workplaceType,
-      url: fields.url || prev.url,
-      salary: fields.rawSalaryText || prev.salary,
-      language: fields.language || prev.language,
-      description: fields.description || prev.description,
+      title: !edited.has("title") && fields.title ? fields.title : prev.title,
+      company:
+        !edited.has("company") && fields.company ? fields.company : prev.company,
+      location:
+        !edited.has("location") && fields.location
+          ? fields.location
+          : prev.location,
+      workplaceType:
+        !edited.has("workplaceType") && fields.workplaceType
+          ? fields.workplaceType
+          : prev.workplaceType,
+      url: !edited.has("url") && normalizedUrl ? normalizedUrl : prev.url,
+      salary:
+        !edited.has("salary") && fields.rawSalaryText
+          ? fields.rawSalaryText
+          : prev.salary,
+      language:
+        !edited.has("language") && fields.language
+          ? fields.language
+          : prev.language,
+      description:
+        !edited.has("description") && fields.description
+          ? fields.description
+          : prev.description,
     }));
     posthog.capture("job_imported", { method, creditsUsed });
   };
@@ -89,7 +122,10 @@ export function AddJobForm() {
   return (
     <div className="space-y-6 w-full font-sans">
       <AddJobHeader />
-      <QuickImportPanel onImported={handleImported} />
+      <QuickImportPanel
+        onImportStart={handleImportStart}
+        onImported={handleImported}
+      />
       <AddJobFormFields
         values={values}
         isSubmitting={isSubmitting}

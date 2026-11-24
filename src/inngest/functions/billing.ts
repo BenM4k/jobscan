@@ -1,8 +1,9 @@
 import { inngest } from "../client";
-import { mockPaymentInitiatedEvent } from "../events";
+import { creditRefundRetryEvent, mockPaymentInitiatedEvent } from "../events";
 import {
   confirmCreditPurchase,
   confirmSubscription,
+  grantCredits,
   processExpiredSubscriptions,
 } from "@/services/billing/billing.service";
 
@@ -52,6 +53,27 @@ export const checkSubscriptionExpiryCron = inngest.createFunction(
       const res = await processExpiredSubscriptions();
       if (!res.ok) {
         throw new Error(`Failed to process expired subscriptions: ${res.error.message}`);
+      }
+      return res.value;
+    });
+  }
+);
+
+/**
+ * Durable retry job for transient billing credit refunds that failed inline compensation.
+ */
+export const retryCreditRefundJob = inngest.createFunction(
+  {
+    id: "retry-credit-refund",
+    triggers: [creditRefundRetryEvent],
+  },
+  async ({ event, step }) => {
+    const { userId, amount } = event.data;
+
+    return await step.run("execute-credit-refund", async () => {
+      const res = await grantCredits(userId, amount, "refund", null);
+      if (!res.ok) {
+        throw new Error(`Credit refund retry failed: ${res.error.message}`);
       }
       return res.value;
     });

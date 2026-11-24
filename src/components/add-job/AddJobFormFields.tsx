@@ -167,12 +167,20 @@ export function AddJobFormFields({
 
         {/* Row 4: Language Selection */}
         <div>
-          <label className="block text-xs font-medium text-slate-500 dark:text-zinc-400 mb-2 font-sans">
+          <span
+            id="job-language-label"
+            className="block text-xs font-medium text-slate-500 dark:text-zinc-400 mb-2 font-sans"
+          >
             Job Language / Langue de l&apos;offre
-          </label>
-          <div className="inline-flex rounded-lg border border-slate-300 dark:border-zinc-800 p-0.5 bg-slate-100 dark:bg-zinc-900 text-xs">
+          </span>
+          <div
+            role="group"
+            aria-labelledby="job-language-label"
+            className="inline-flex rounded-lg border border-slate-300 dark:border-zinc-800 p-0.5 bg-slate-100 dark:bg-zinc-900 text-xs"
+          >
             <button
               type="button"
+              aria-pressed={values.language === "en"}
               onClick={() => onChange("language", "en")}
               className={cn(
                 "px-3.5 py-1.5 rounded-md font-medium transition cursor-pointer flex items-center gap-1.5",
@@ -186,6 +194,7 @@ export function AddJobFormFields({
             </button>
             <button
               type="button"
+              aria-pressed={values.language === "fr"}
               onClick={() => onChange("language", "fr")}
               className={cn(
                 "px-3.5 py-1.5 rounded-md font-medium transition cursor-pointer flex items-center gap-1.5",

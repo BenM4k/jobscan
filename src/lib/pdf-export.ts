@@ -8,14 +8,23 @@ export async function downloadTextAsPdf(
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const marginX = 18;
+  const topMargin = 20;
   const maxWidth = 210 - marginX * 2;
   const pageBottomY = 278;
-  let cursorY = 20;
+  const pageUsableHeight = pageBottomY - topMargin;
+  let cursorY = topMargin;
 
-  const ensureSpace = (neededHeight: number) => {
-    if (cursorY + neededHeight > pageBottomY) {
+  const ensureBlockSpace = (blockHeight: number) => {
+    if (blockHeight <= pageUsableHeight && cursorY + blockHeight > pageBottomY) {
       doc.addPage();
-      cursorY = 20;
+      cursorY = topMargin;
+    }
+  };
+
+  const ensureLineSpace = (lineStep: number) => {
+    if (cursorY + lineStep > pageBottomY) {
+      doc.addPage();
+      cursorY = topMargin;
     }
   };
 
@@ -36,8 +45,9 @@ export async function downloadTextAsPdf(
       doc.setFont("helvetica", "bold");
       doc.setFontSize(16);
       const wrapped = doc.splitTextToSize(title, maxWidth) as string[];
-      ensureSpace(wrapped.length * 7 + 2);
+      ensureBlockSpace(wrapped.length * 7 + 2);
       for (const line of wrapped) {
+        ensureLineSpace(7);
         doc.text(line, marginX, cursorY);
         cursorY += 7;
       }
@@ -52,11 +62,13 @@ export async function downloadTextAsPdf(
       doc.setFont("helvetica", "bold");
       doc.setFontSize(11.5);
       const wrapped = doc.splitTextToSize(heading, maxWidth) as string[];
-      ensureSpace(wrapped.length * 5.5 + 4);
+      ensureBlockSpace(wrapped.length * 5.5 + 4);
       for (const line of wrapped) {
+        ensureLineSpace(5.5);
         doc.text(line, marginX, cursorY);
         cursorY += 5.5;
       }
+      ensureLineSpace(2.2);
       doc.setDrawColor(210, 214, 220);
       doc.setLineWidth(0.3);
       doc.line(marginX, cursorY - 1.2, marginX + maxWidth, cursorY - 1.2);
@@ -71,8 +83,9 @@ export async function downloadTextAsPdf(
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10.5);
       const wrapped = doc.splitTextToSize(subheading, maxWidth) as string[];
-      ensureSpace(wrapped.length * 5 + 1);
+      ensureBlockSpace(wrapped.length * 5 + 1);
       for (const line of wrapped) {
+        ensureLineSpace(5);
         doc.text(line, marginX, cursorY);
         cursorY += 5;
       }
@@ -89,8 +102,9 @@ export async function downloadTextAsPdf(
         bulletText,
         maxWidth - bulletIndent
       ) as string[];
-      ensureSpace(wrapped.length * lineHeight);
+      ensureBlockSpace(wrapped.length * lineHeight);
       wrapped.forEach((line, idx) => {
+        ensureLineSpace(lineHeight);
         if (idx === 0) {
           doc.text("•", marginX + 1, cursorY);
         }
@@ -105,8 +119,9 @@ export async function downloadTextAsPdf(
     doc.setFontSize(fontSize);
     const cleanText = trimmed.replace(/\*\*(.*?)\*\*/g, "$1");
     const wrapped = doc.splitTextToSize(cleanText, maxWidth) as string[];
-    ensureSpace(wrapped.length * lineHeight);
+    ensureBlockSpace(wrapped.length * lineHeight);
     for (const line of wrapped) {
+      ensureLineSpace(lineHeight);
       doc.text(line, marginX, cursorY);
       cursorY += lineHeight;
     }

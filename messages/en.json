@@ -204,7 +204,7 @@
       "extractButton": "Extract & Fill",
       "extracting": "Extracting...",
       "uploadButton": "Upload PDF / DOCX",
-      "uploadHint": "PDF, DOCX, DOC, or TXT (max 5 MB)",
+      "uploadHint": "PDF, DOCX, or TXT (max 5 MB)",
       "badgeJsonFree": "JSON detected · Free",
       "badgeUrlHint": "URL detected · Free (1 credit if AI needed)",
       "badgeTextCost": "Job text · 1 credit",
@@ -213,7 +213,7 @@
       "successAi": "Form pre-filled with AI ({credits} credit used). Review the details below before saving.",
       "urlBlockedFallback": "This website blocked automated fetching or requires login. Copy-paste the job text above or upload a PDF instead (no credits were charged).",
       "fileTooLarge": "File is too large. Maximum size is 5 MB.",
-      "unsupportedFile": "Unsupported file type. Please upload a PDF, DOCX, DOC, or TXT file.",
+      "unsupportedFile": "Unsupported file type. Please upload a PDF, DOCX, or TXT file.",
       "extractionFailed": "Could not extract job details. Any spent credit was refunded — please paste the job text or fill the form manually.",
       "unexpectedError": "Something went wrong during extraction. Please check your connection and try again.",
       "dismiss": "Dismiss"

@@ -51,7 +51,13 @@ export function normalizeOrigin(raw?: string | null): string | null {
   }
 }
 
-/** Normalizes a URL or domain into a WebAuthn RP ID (bare lowercase hostname, apex when `www.` prefix is present). */
+/**
+ * Normalizes a URL or domain into a WebAuthn RP ID (bare lowercase hostname, apex when `www.` prefix is present).
+ *
+ * Rollout policy: consolidating onto the apex RP ID shares newly registered passkeys across both
+ * apex and `www.` origins; any pre-existing credentials registered under a `www.` RP ID cannot be
+ * validated by origin allowlists alone and require affected users to re-register a passkey.
+ */
 export function normalizeRpId(raw?: string | null): string | null {
   const origin = normalizeOrigin(raw);
   if (!origin) return null;
@@ -102,19 +108,18 @@ function addApexAndWwwVariants(originSet: Set<string>, origin: string): void {
 export function resolvePasskeyAndAuthConfig(
   env: PasskeyAuthEnv
 ): ResolvedPasskeyAuthConfig {
-  const rpID =
-    normalizeRpId(env.NEXT_PUBLIC_APP_DOMAIN) ||
-    normalizeRpId(env.BETTER_AUTH_URL) ||
-    normalizeRpId(env.VERCEL_PROJECT_PRODUCTION_URL) ||
-    normalizeRpId(env.VERCEL_URL) ||
-    "localhost";
-
   const baseURL =
     normalizeOrigin(env.BETTER_AUTH_URL) ||
     normalizeOrigin(env.VERCEL_PROJECT_PRODUCTION_URL) ||
     normalizeOrigin(env.NEXT_PUBLIC_APP_DOMAIN) ||
     normalizeOrigin(env.NEXT_PUBLIC_APP_URL) ||
+    normalizeOrigin(env.VERCEL_URL) ||
     "http://localhost:3000";
+
+  const rpID =
+    normalizeRpId(env.NEXT_PUBLIC_APP_DOMAIN) ||
+    normalizeRpId(baseURL) ||
+    "localhost";
 
   const originSet = new Set<string>();
   const candidates = [

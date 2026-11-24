@@ -3,9 +3,10 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth-guard";
 import { getAdminAiTelemetry } from "@/services/admin/admin.service";
 import {
-  getGlobalAiProvider,
+  getGlobalAiConfig,
   getConfiguredAiProviders,
 } from "@/services/ai/provider-config";
+import { listModelsForProvider } from "@/services/ai/model-catalog";
 import { AiUsageTable } from "@/components/admin/AiUsageTable";
 import { AdminAiProviderCard } from "@/components/admin/AdminAiProviderCard";
 import { Cpu, Zap, DollarSign } from "lucide-react";
@@ -41,15 +42,18 @@ async function TelemetryContent({
   const page = parseInt(params.page || "1", 10) || 1;
   const feature = params.feature || undefined;
 
-  const [res, currentProvider] = await Promise.all([
+  const [res, aiConfig] = await Promise.all([
     getAdminAiTelemetry({
       page,
       limit: PAGE_SIZE,
       feature,
     }),
-    getGlobalAiProvider(),
+    getGlobalAiConfig(),
   ]);
-  const configuredProviders = getConfiguredAiProviders();
+  const [configuredProviders, initialCatalog] = await Promise.all([
+    Promise.resolve(getConfiguredAiProviders()),
+    listModelsForProvider(aiConfig.provider),
+  ]);
 
   const data = res.ok
     ? res.value
@@ -58,7 +62,9 @@ async function TelemetryContent({
   return (
     <div className="space-y-6">
       <AdminAiProviderCard
-        currentProvider={currentProvider}
+        currentProvider={aiConfig.provider}
+        currentModelsByProvider={aiConfig.modelsByProvider}
+        initialCatalog={initialCatalog}
         configuredProviders={configuredProviders}
       />
 

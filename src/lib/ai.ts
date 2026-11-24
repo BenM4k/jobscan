@@ -2,13 +2,13 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { z } from "zod";
 
 /**
- * Pinned AI Model Constant for Job Pilot
- * All Gemini calls (extraction, scoring, resume tailoring, cover letter generation)
- * must use this centralized constant. Configurable via GEMINI_MODEL env var.
+ * Default Gemini Model Constant for Job Pilot.
+ * Used as fallback when no admin-selected model is configured in `app_setting`.
+ * Configurable via GEMINI_MODEL env var or the Admin -> AI Usage console.
  */
-export const AI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+export const AI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
-export function getGoogleModel() {
+export function getGoogleModel(modelId?: string) {
   const apiKey =
     process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
 
@@ -19,7 +19,7 @@ export function getGoogleModel() {
   }
 
   const google = createGoogleGenerativeAI({ apiKey });
-  return google(AI_MODEL);
+  return google(modelId?.trim() || AI_MODEL);
 }
 
 // ---------------------------------------------------------------------------

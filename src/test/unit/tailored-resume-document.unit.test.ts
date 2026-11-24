@@ -109,6 +109,31 @@ Français | Anglais`;
   assert.strictEqual(parsedFr.education.length, 1);
   assert.strictEqual(parsedFr.languages.length, 2);
 
+  // Round-trip serialization preserves empty title/degree positions cleanly
+  const sparseDoc = parseTailoredResumeDocument(`# Alex Mbuyi
+
+## Professional Experience
+### — Kivu Cloud
+2023 – Present
+• Built Kubernetes deployment pipelines.
+
+## Education
+### — University of Lubumbashi
+2018 – 2022`);
+  assert.strictEqual(sparseDoc.experience.length, 1);
+  assert.strictEqual(sparseDoc.experience[0].title, "");
+  assert.strictEqual(sparseDoc.experience[0].company, "Kivu Cloud");
+  assert.strictEqual(sparseDoc.education.length, 1);
+  assert.strictEqual(sparseDoc.education[0].degree, "");
+  assert.strictEqual(sparseDoc.education[0].institution, "University of Lubumbashi");
+
+  const sparseReserialized = serializeTailoredResumeDocument(sparseDoc, "en");
+  const sparseReparsed = parseTailoredResumeDocument(sparseReserialized);
+  assert.strictEqual(sparseReparsed.experience[0].title, "");
+  assert.strictEqual(sparseReparsed.experience[0].company, "Kivu Cloud");
+  assert.strictEqual(sparseReparsed.education[0].degree, "");
+  assert.strictEqual(sparseReparsed.education[0].institution, "University of Lubumbashi");
+
   // Keyword coverage matching
   const coverage = computeKeywordCoverage(
     englishMarkdown,
@@ -119,6 +144,15 @@ Français | Anglais`;
   assert.strictEqual(coverage.covered.length, 3);
   assert.deepStrictEqual(coverage.missing, ["GraphQL"]);
   assert.strictEqual(coverage.percent, 75);
+
+  // Distinct-term keyword matching and punctuation-bearing skills
+  const boundaryCoverage = computeKeywordCoverage(
+    "This is good JavaScript and CSS code using C++, C#, .NET, and Node.js.",
+    ["Go", "Java", "C", "C++", "C#", ".NET", "Node.js", "CSS"],
+    []
+  );
+  assert.deepStrictEqual(boundaryCoverage.covered, ["C++", "C#", ".NET", "Node.js", "CSS"]);
+  assert.deepStrictEqual(boundaryCoverage.missing, ["Go", "Java", "C"]);
 
   assert.strictEqual(countWords("  hello   world  test "), 3);
 

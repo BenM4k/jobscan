@@ -37,7 +37,7 @@ export function CoverLetterEditor({
   const [hasSwitchedTab, setHasSwitchedTab] = useState(false);
 
   const selectTab = (next: "write" | "preview") => {
-    if (next !== tab) {
+    if (!isSaving && next !== tab) {
       setHasSwitchedTab(true);
       setTab(next);
     }
@@ -57,7 +57,7 @@ export function CoverLetterEditor({
   };
 
   const tabClass = (mode: "write" | "preview") =>
-    `text-xs font-semibold px-3 py-1 rounded-lg transition-colors duration-300 ease-out cursor-pointer ${
+    `text-xs font-semibold px-3 py-1 rounded-lg transition-colors duration-300 ease-out cursor-pointer disabled:opacity-50 ${
       tab === mode
         ? "bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-2xs"
         : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
@@ -70,10 +70,20 @@ export function CoverLetterEditor({
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="inline-flex items-center gap-1 bg-slate-100 dark:bg-zinc-800/80 p-1 rounded-xl border border-slate-200 dark:border-zinc-700/60">
-          <button type="button" onClick={() => selectTab("write")} className={tabClass("write")}>
+          <button
+            type="button"
+            disabled={isSaving}
+            onClick={() => selectTab("write")}
+            className={tabClass("write")}
+          >
             {t("editorTabWrite")}
           </button>
-          <button type="button" onClick={() => selectTab("preview")} className={tabClass("preview")}>
+          <button
+            type="button"
+            disabled={isSaving}
+            onClick={() => selectTab("preview")}
+            className={tabClass("preview")}
+          >
             {t("editorTabPreview")}
           </button>
         </div>
@@ -103,10 +113,11 @@ export function CoverLetterEditor({
         {tab === "write" ? (
           <textarea
             rows={12}
+            aria-label={t("coverLetterHeading")}
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            disabled={isStreaming}
-            className="w-full bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-slate-900 dark:text-zinc-100 p-4 rounded-xl text-base sm:text-sm leading-relaxed font-sans focus:outline-none focus:border-blue-500 shadow-2xs transition-colors duration-300"
+            disabled={isStreaming || isSaving}
+            className="w-full bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 text-slate-900 dark:text-zinc-100 p-4 rounded-xl text-base sm:text-sm leading-relaxed font-sans focus:outline-none focus:border-blue-500 shadow-2xs transition-colors duration-300 disabled:opacity-60"
           />
         ) : (
           <div className="rounded-xl border border-border/50 bg-white dark:bg-zinc-950/60 p-4">

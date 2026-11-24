@@ -50,25 +50,25 @@ const SECTION_HEADING_MAP: Record<string, SectionKey> = {
   "executive summary": "summary",
   profil: "summary",
   "profil professionnel": "summary",
-  "résumé": "summary",
+  résumé: "summary",
   resume: "summary",
   skills: "skills",
   "core skills": "skills",
   "technical skills": "skills",
-  "compétences": "skills",
+  compétences: "skills",
   "compétences clés": "skills",
   "compétences techniques": "skills",
   experience: "experience",
   "work experience": "experience",
   "professional experience": "experience",
   "relevant experience": "experience",
-  "expérience": "experience",
+  expérience: "experience",
   "expérience professionnelle": "experience",
   projects: "projects",
   projets: "projects",
   education: "education",
   formation: "education",
-  "études": "education",
+  études: "education",
   certifications: "certifications",
   languages: "languages",
   langues: "languages",
@@ -100,14 +100,31 @@ function stripBulletPrefix(line: string): string {
 }
 
 function splitTitlePair(raw: string): [string, string] {
+  const trimmed = raw.trim();
+  const leadingMatch = trimmed.match(/^(?:—|–|-|\|)\s*(.*)$/);
+  if (leadingMatch) {
+    return ["", leadingMatch[1].trim()];
+  }
   const separators = [" — ", " – ", " - ", " | "];
   for (const sep of separators) {
-    const idx = raw.indexOf(sep);
+    const idx = trimmed.indexOf(sep);
     if (idx !== -1) {
-      return [raw.slice(0, idx).trim(), raw.slice(idx + sep.length).trim()];
+      return [
+        trimmed.slice(0, idx).trim(),
+        trimmed.slice(idx + sep.length).trim(),
+      ];
     }
   }
-  return [raw.trim(), ""];
+  return [trimmed, ""];
+}
+
+function formatTitlePair(first: string, second: string): string {
+  const a = first.trim();
+  const b = second.trim();
+  if (a && b) return `${a} — ${b}`;
+  if (a) return a;
+  if (b) return `— ${b}`;
+  return "";
 }
 
 function parseExperienceBlock(body: string): TailoredResumeRole[] {
@@ -120,7 +137,10 @@ function parseExperienceBlock(body: string): TailoredResumeRole[] {
 
   const roles: TailoredResumeRole[] = [];
   for (const chunk of chunks) {
-    const lines = chunk.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const lines = chunk
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
     if (lines.length === 0) continue;
 
     let title = "";
@@ -161,7 +181,10 @@ function parseProjectsBlock(body: string): TailoredResumeProject[] {
 
   const projects: TailoredResumeProject[] = [];
   for (const chunk of chunks) {
-    const lines = chunk.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const lines = chunk
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
     if (lines.length === 0) continue;
 
     let name = "";
@@ -191,7 +214,10 @@ function parseEducationBlock(body: string): TailoredResumeEducation[] {
 
   const items: TailoredResumeEducation[] = [];
   for (const chunk of chunks) {
-    const lines = chunk.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const lines = chunk
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
     if (lines.length === 0) continue;
 
     let degree = "";
@@ -201,10 +227,18 @@ function parseEducationBlock(body: string): TailoredResumeEducation[] {
     if (lines[0].startsWith("###")) {
       const heading = lines[0].replace(/^###\s*/, "").trim();
       [degree, institution] = splitTitlePair(heading);
-      period = lines.slice(1).map(stripBulletPrefix).filter(Boolean).join(" · ");
+      period = lines
+        .slice(1)
+        .map(stripBulletPrefix)
+        .filter(Boolean)
+        .join(" · ");
     } else {
       [degree, institution] = splitTitlePair(stripBulletPrefix(lines[0]));
-      period = lines.slice(1).map(stripBulletPrefix).filter(Boolean).join(" · ");
+      period = lines
+        .slice(1)
+        .map(stripBulletPrefix)
+        .filter(Boolean)
+        .join(" · ");
     }
 
     if (degree || institution || period) {
@@ -233,7 +267,7 @@ function parseLanguagesBlock(body: string): string[] {
  * into structured sections without truncating bullets or losing unknown sections.
  */
 export function parseTailoredResumeDocument(
-  markdown?: string | null
+  markdown?: string | null,
 ): TailoredResumeDocument {
   const emptyDoc: TailoredResumeDocument = {
     fullName: "",
@@ -295,8 +329,14 @@ export function parseTailoredResumeDocument(
   for (let idx = 0; idx < h2Indices.length; idx++) {
     const start = h2Indices[idx];
     const end = idx + 1 < h2Indices.length ? h2Indices[idx + 1] : lines.length;
-    const rawHeading = lines[start].trim().replace(/^##\s+/, "").trim();
-    const body = lines.slice(start + 1, end).join("\n").trim();
+    const rawHeading = lines[start]
+      .trim()
+      .replace(/^##\s+/, "")
+      .trim();
+    const body = lines
+      .slice(start + 1, end)
+      .join("\n")
+      .trim();
     if (!body) continue;
 
     const mapped = SECTION_HEADING_MAP[rawHeading.toLowerCase()];
@@ -336,7 +376,7 @@ export function parseTailoredResumeDocument(
  */
 export function serializeTailoredResumeDocument(
   doc: TailoredResumeDocument,
-  language: "en" | "fr" = "en"
+  language: "en" | "fr" = "en",
 ): string {
   const headings = SERIALIZED_HEADINGS[language];
   const sections: string[] = [];
@@ -360,21 +400,18 @@ export function serializeTailoredResumeDocument(
 
   if (doc.experience.length > 0) {
     const expBlocks = doc.experience
-      .filter((r) => r.title.trim() || r.company.trim() || r.bullets.some((b) => b.trim()))
+      .filter(
+        (r) =>
+          r.title.trim() || r.company.trim() || r.bullets.some((b) => b.trim()),
+      )
       .map((role) => {
-        const heading = [role.title.trim(), role.company.trim()]
-          .filter(Boolean)
-          .join(" — ");
+        const heading = formatTitlePair(role.title, role.company);
         const bullets = role.bullets
           .map((b) => b.trim())
           .filter(Boolean)
           .map((b) => `• ${b}`)
           .join("\n");
-        return [
-          heading ? `### ${heading}` : "",
-          role.period.trim(),
-          bullets,
-        ]
+        return [heading ? `### ${heading}` : "", role.period.trim(), bullets]
           .filter(Boolean)
           .join("\n");
       })
@@ -409,9 +446,7 @@ export function serializeTailoredResumeDocument(
     const eduBlocks = doc.education
       .filter((e) => e.degree.trim() || e.institution.trim() || e.period.trim())
       .map((edu) => {
-        const heading = [edu.degree.trim(), edu.institution.trim()]
-          .filter(Boolean)
-          .join(" — ");
+        const heading = formatTitlePair(edu.degree, edu.institution);
         return [heading ? `### ${heading}` : "", edu.period.trim()]
           .filter(Boolean)
           .join("\n");
@@ -426,7 +461,7 @@ export function serializeTailoredResumeDocument(
   const certs = doc.certifications.map((c) => c.trim()).filter(Boolean);
   if (certs.length > 0) {
     sections.push(
-      `## ${headings.certifications}\n${certs.map((c) => `• ${c}`).join("\n")}`
+      `## ${headings.certifications}\n${certs.map((c) => `• ${c}`).join("\n")}`,
     );
   }
 

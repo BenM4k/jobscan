@@ -35,7 +35,8 @@ export function useCoverLetter({
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  const [isInsufficientCreditsOpen, setIsInsufficientCreditsOpen] = useState(false);
+  const [isInsufficientCreditsOpen, setIsInsufficientCreditsOpen] =
+    useState(false);
   const [insufficientCreditsData, setInsufficientCreditsData] = useState<{
     requiredCost: number;
     currentBalance: number;
@@ -43,7 +44,7 @@ export function useCoverLetter({
   const abortControllerRef = useRef<AbortController | null>(null);
   const pendingIdempotencyKeyRef = useRef<string | null>(null);
   const pendingResumeIdRef = useRef<string | undefined>(undefined);
-  const previousDraftRef = useRef<string>("");
+  const previousDraftRef = useRef<string | null>(null);
 
   const retryRunner = useAsyncJobWithRetry<string>({
     jobName: "Cover Letter Generation",
@@ -59,8 +60,9 @@ export function useCoverLetter({
     }
     pendingIdempotencyKeyRef.current = null;
     pendingResumeIdRef.current = undefined;
-    if (previousDraftRef.current) {
+    if (previousDraftRef.current !== null) {
       setCoverLetter(previousDraftRef.current);
+      previousDraftRef.current = null;
     }
     retryRunner.cancelRetry();
   }, [retryRunner]);
@@ -109,7 +111,7 @@ export function useCoverLetter({
       Boolean(coverLetter);
 
     const targetResumeId = safeOptions?.resumeId || selectedResumeId;
-    previousDraftRef.current = coverLetter || job.coverLetterDraft || "";
+    previousDraftRef.current = coverLetter;
 
     if (isRegeneration) {
       pendingIdempotencyKeyRef.current = crypto.randomUUID();
@@ -189,19 +191,20 @@ export function useCoverLetter({
     if (result) {
       pendingIdempotencyKeyRef.current = null;
       pendingResumeIdRef.current = undefined;
-      previousDraftRef.current = "";
+      previousDraftRef.current = null;
       setIsEditing(false);
       posthog.capture("cover_letter_generated");
       onJobUpdated({ ...job, coverLetterDraft: result });
       notifyCreditsUpdated();
       router.refresh();
-    } else if (previousDraftRef.current) {
+    } else if (previousDraftRef.current !== null) {
       setCoverLetter(previousDraftRef.current);
+      previousDraftRef.current = null;
     }
   };
 
   const handleRegenerate = async (
-    options?: Omit<GenerateCoverLetterOptions, "regenerate">
+    options?: Omit<GenerateCoverLetterOptions, "regenerate">,
   ) => {
     return handleGenerateStream({ ...options, regenerate: true });
   };
@@ -239,7 +242,7 @@ export function useCoverLetter({
       if (!content) return;
       await downloadTextAsPdf(
         `${job.company || "Company"}-Cover-Letter.pdf`,
-        content
+        content,
       );
       toast.success(t("downloadPdfSuccess"));
     } catch (err) {

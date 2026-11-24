@@ -223,6 +223,37 @@ export function mapJobObjectToFields(obj: UnknownRecord): ExtractedJobFields {
   });
 }
 
+/** Recursively locates a `schema.org/JobPosting` object within JSON-LD nodes, arrays, or `@graph` graphs. */
+export function findJobPostingInJsonLd(node: unknown): UnknownRecord | null {
+  if (!node) return null;
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const found = findJobPostingInJsonLd(item);
+      if (found) return found;
+    }
+    return null;
+  }
+  const rec = asRecord(node);
+  if (!rec) return null;
+
+  const rawType = rec["@type"];
+  const types = Array.isArray(rawType) ? rawType : [rawType];
+  if (
+    types.some(
+      (t) => typeof t === "string" && t.toLowerCase().includes("jobposting")
+    )
+  ) {
+    return rec;
+  }
+
+  if (rec["@graph"]) {
+    const graphFound = findJobPostingInJsonLd(rec["@graph"]);
+    if (graphFound) return graphFound;
+  }
+
+  return null;
+}
+
 /**
  * Parses pasted JSON (Jobpilot fields or schema.org/JobPosting) into extracted job fields.
  */
@@ -241,7 +272,9 @@ export function parseJobJson(
     );
   }
 
-  const target = Array.isArray(parsed) ? asRecord(parsed[0]) : asRecord(parsed);
+  const target =
+    findJobPostingInJsonLd(parsed) ??
+    (Array.isArray(parsed) ? asRecord(parsed[0]) : asRecord(parsed));
   if (!target) {
     return err(
       new AppError(

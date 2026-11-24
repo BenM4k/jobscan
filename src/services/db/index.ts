@@ -23,12 +23,20 @@ export function buildPoolConfig(
   env: Record<string, string | undefined> = process.env
 ): PoolConfig {
   const disableCertVerify = env.DB_SSL_REJECT_UNAUTHORIZED === "false";
+  const poolDefaults: PoolConfig = {
+    max: env.NODE_ENV === "production" ? 10 : 5,
+    idleTimeoutMillis: 20_000,
+    connectionTimeoutMillis: 10_000,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
+  };
 
   let parsed: URL;
   try {
     parsed = new URL(rawConnectionString);
   } catch {
     return {
+      ...poolDefaults,
       connectionString: rawConnectionString,
       ssl: disableCertVerify ? { rejectUnauthorized: false } : undefined,
     };
@@ -45,6 +53,7 @@ export function buildPoolConfig(
     parsed.searchParams.delete("sslmode");
     parsed.searchParams.delete("ssl");
     return {
+      ...poolDefaults,
       connectionString: parsed.toString(),
       ssl: { rejectUnauthorized: false },
     };
@@ -52,6 +61,7 @@ export function buildPoolConfig(
 
   if (urlDisablesSsl) {
     return {
+      ...poolDefaults,
       connectionString: rawConnectionString,
       ssl: undefined,
     };
@@ -61,6 +71,7 @@ export function buildPoolConfig(
     parsed.searchParams.delete("sslmode");
     parsed.searchParams.delete("ssl");
     return {
+      ...poolDefaults,
       connectionString: parsed.toString(),
       ssl: { rejectUnauthorized: true },
     };
@@ -68,6 +79,7 @@ export function buildPoolConfig(
 
   if (hasPgSslMode) {
     return {
+      ...poolDefaults,
       connectionString: rawConnectionString,
       ssl: undefined,
     };
@@ -75,12 +87,14 @@ export function buildPoolConfig(
 
   if (isRemoteManagedDatabaseHost(parsed.hostname)) {
     return {
+      ...poolDefaults,
       connectionString: rawConnectionString,
       ssl: { rejectUnauthorized: true },
     };
   }
 
   return {
+    ...poolDefaults,
     connectionString: rawConnectionString,
     ssl: undefined,
   };
@@ -96,9 +110,39 @@ if (
   throw new Error("DATABASE_URL environment variable is required");
 }
 
-const basePool = connectionString
-  ? new Pool(buildPoolConfig(connectionString))
-  : new Pool({ connectionString: undefined });
+const globalForDb = globalThis as typeof globalThis & {
+  __jobpilotPgPool?: Pool;
+  __jobpilotPgPoolUrl?: string;
+};
+
+function createManagedPool(url: string): Pool {
+  const managedPool = new Pool(buildPoolConfig(url));
+  managedPool.on("error", (err) => {
+    console.warn("[DB Pool] Idle client error:", err.message);
+  });
+  return managedPool;
+}
+
+function getOrCreatePool(url: string | undefined): Pool {
+  if (!url) {
+    return new Pool({ connectionString: undefined });
+  }
+  if (process.env.NODE_ENV === "production") {
+    return createManagedPool(url);
+  }
+  if (globalForDb.__jobpilotPgPool && globalForDb.__jobpilotPgPoolUrl === url) {
+    return globalForDb.__jobpilotPgPool;
+  }
+  if (globalForDb.__jobpilotPgPool) {
+    void globalForDb.__jobpilotPgPool.end().catch(() => undefined);
+  }
+  const managedPool = createManagedPool(url);
+  globalForDb.__jobpilotPgPool = managedPool;
+  globalForDb.__jobpilotPgPoolUrl = url;
+  return managedPool;
+}
+
+const basePool = getOrCreatePool(connectionString);
 
 const pool: Pool = connectionString
   ? basePool

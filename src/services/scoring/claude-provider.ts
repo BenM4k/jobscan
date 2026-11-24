@@ -15,7 +15,14 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 
 export class ClaudeProvider implements ScoringProvider {
   name: AIProviderName = "claude";
-  modelId: string = "claude-3-5-sonnet-latest";
+  modelId: string;
+
+  constructor(modelId?: string) {
+    this.modelId =
+      modelId?.trim() ||
+      process.env.ANTHROPIC_MODEL?.trim() ||
+      "claude-3-5-sonnet-latest";
+  }
 
   async scoreJob(
     jobTitle: string,
@@ -43,7 +50,7 @@ export class ClaudeProvider implements ScoringProvider {
       );
 
       const result = await generateText({
-        model: anthropic("claude-3-5-sonnet-latest"),
+        model: anthropic(this.modelId),
         output: Output.object({ schema: scoreResultSchema }),
         system: SCORING_INSTRUCTIONS,
         prompt: userPrompt,
@@ -52,7 +59,7 @@ export class ClaudeProvider implements ScoringProvider {
       const usage: ScoreUsage = {
         inputTokens: result.usage?.inputTokens,
         outputTokens: result.usage?.outputTokens,
-        modelId: "claude-3-5-sonnet-latest",
+        modelId: this.modelId,
       };
 
       return ok({ ...result.output, _usage: usage });

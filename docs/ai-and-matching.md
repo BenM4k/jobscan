@@ -139,3 +139,13 @@ Job descriptions pulled from external scrapers or pasted by users are **untruste
 - Treat all instructions inside scraped text as inert data, never as system directives.
 - Always apply server-side validation and constraints (e.g. Zod schemas, size limits) to generated AI output before persistence or downstream use.
 - Never log user resume contents, personal identifiable information (PII), or raw prompts to external logging systems or unencrypted audit logs.
+
+---
+
+## 10. Global Admin AI Provider & Model Configuration
+
+Administrators manage the active AI provider and model from `/dashboard/admin/ai-usage` (`AdminAiProviderCard` + `AdminAiModelSelector`):
+
+- **Persistence & Caching:** `provider-config.ts` stores `ai_provider` (`gemini`, `claude`, `openai`, `gateway`) and per-provider model IDs (`ai_model:<provider>`) in PostgreSQL `app_setting`, cached for 60s in Redis, with environment variables (`GEMINI_MODEL`, `ANTHROPIC_MODEL`, `OPENAI_MODEL`, `AI_GATEWAY_MODEL`) and safe defaults (`gemini-2.5-flash`, `claude-3-5-sonnet-latest`, `gpt-4o`, `openai/gpt-4o`) as fallbacks.
+- **Live Model Discovery:** `model-catalog.ts` (`listModelsForProvider`) queries Google's `GET https://generativelanguage.googleapis.com/v1beta/models`, Anthropic's `GET /v1/models`, and OpenAI's `GET /v1/models` with 15-minute Redis caching (`app:ai:models:<provider>`), filtering out non-chat variants (e.g. TTS, image, embedding, live-only models) and falling back cleanly when offline or unconfigured.
+- **Unified Runtime Resolution:** `getActiveLanguageModel()` and `getScoringProvider(provider, modelId)` propagate the admin-selected provider and model across scoring, skill extraction, tailored resume generation, cover letter streaming, interview prep, resume profile parsing, and job import extraction.

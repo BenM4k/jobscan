@@ -5,7 +5,8 @@ import { requireSession } from "@/lib/auth-guard";
 import { AppError } from "@/lib/errors";
 import { err, ok } from "@/lib/result";
 import { spendCredits, grantCredits } from "@/services/billing/billing.service";
-import { cacheGet, cacheSet } from "@/services/cache/redis-client";
+import { cacheGet, cacheSetChecked } from "@/services/cache/redis-client";
+import { inngest } from "@/inngest/client";
 import { runWithIdempotency } from "@/services/idempotency.service";
 import { extractJobFieldsWithAi } from "@/services/job-import/ai-job-extractor";
 import { extractTextFromJobFile } from "@/services/job-import/file-extractor";
@@ -46,13 +47,63 @@ export type JobImportActionResponse =
   | {
       success: false;
       error: string;
-      code?: "rate_limited" | "insufficient_credits" | "url_fetch_failed";
+      code?:
+        | "rate_limited"
+        | "insufficient_credits"
+        | "url_fetch_failed"
+        | "result_expired";
       retryAfterSeconds?: number;
       details?: JobImportCreditDetails;
     };
 
 function getExtractionCacheKey(userId: string, idempotencyKey: string): string {
   return `job_extraction:${userId}:${idempotencyKey}`;
+}
+
+async function compensateCreditDebit(params: {
+  userId: string;
+  amount: number;
+  idempotencyKey: string;
+  reason: string;
+}): Promise<void> {
+  if (params.amount <= 0) return;
+
+  const firstAttempt = await grantCredits(
+    params.userId,
+    params.amount,
+    "refund",
+    null
+  );
+  if (firstAttempt.ok) return;
+
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  const retryAttempt = await grantCredits(
+    params.userId,
+    params.amount,
+    "refund",
+    null
+  );
+  if (retryAttempt.ok) return;
+
+  try {
+    await inngest.send({
+      name: "billing.refund.retry",
+      id: `refund:${params.userId}:${params.idempotencyKey}`,
+      data: {
+        userId: params.userId,
+        amount: params.amount,
+        reason: params.reason,
+        idempotencyKey: params.idempotencyKey,
+      },
+    });
+  } catch (err) {
+    console.error(
+      `[Billing] Failed to refund or enqueue refund retry for user=${params.userId} key=${params.idempotencyKey} amount=${params.amount}:`,
+      firstAttempt.error.message,
+      retryAttempt.error.message,
+      err instanceof Error ? err.message : err
+    );
+  }
 }
 
 async function runCreditGatedAiExtraction(params: {
@@ -96,14 +147,12 @@ async function runCreditGatedAiExtraction(params: {
       });
 
       if (!aiRes.ok) {
-        if (spendRes.value.cost > 0) {
-          await grantCredits(
-            params.userId,
-            spendRes.value.cost,
-            "refund",
-            null,
-          );
-        }
+        await compensateCreditDebit({
+          userId: params.userId,
+          amount: spendRes.value.cost,
+          idempotencyKey: params.idempotencyKey,
+          reason: aiRes.error.message,
+        });
         revalidateTags([BILLING_TAG, NAVBAR_TAG]);
         return err(aiRes.error);
       }
@@ -114,7 +163,27 @@ async function runCreditGatedAiExtraction(params: {
         creditsUsed: spendRes.value.cost,
       };
 
-      await cacheSet(cacheKey, payload, EXTRACTION_CACHE_TTL_SEC);
+      const cachedOk = await cacheSetChecked(
+        cacheKey,
+        payload,
+        EXTRACTION_CACHE_TTL_SEC
+      );
+      if (!cachedOk) {
+        await compensateCreditDebit({
+          userId: params.userId,
+          amount: spendRes.value.cost,
+          idempotencyKey: params.idempotencyKey,
+          reason: "Extraction result storage unavailable",
+        });
+        revalidateTags([BILLING_TAG, NAVBAR_TAG]);
+        return err(
+          new AppError(
+            "EXTERNAL_API_ERROR",
+            "Temporary storage error prevented saving the extraction result. Any spent credit has been refunded — please try again."
+          )
+        );
+      }
+
       revalidateTags([BILLING_TAG, NAVBAR_TAG]);
 
       return ok({ data: payload, resultRef: null });
@@ -140,6 +209,13 @@ async function runCreditGatedAiExtraction(params: {
         code: "insufficient_credits",
         error: idemResult.error.message,
         details: (idemResult.error.details ?? {}) as JobImportCreditDetails,
+      };
+    }
+    if (idemResult.error.code === "NOT_FOUND") {
+      return {
+        success: false,
+        code: "result_expired",
+        error: "Previous extraction result expired. Please click extract again.",
       };
     }
     return { success: false, error: idemResult.error.message };
@@ -196,6 +272,19 @@ export async function extractJobFromInputAction(input: {
   }
 
   if (kind === "url") {
+    const urlRateLimit = await checkAiRateLimit(userId, "job_url_fetch", {
+      capacity: 15,
+      refillRatePerSec: 0.25,
+    });
+    if (!urlRateLimit.allowed) {
+      return {
+        success: false,
+        code: "rate_limited",
+        retryAfterSeconds: urlRateLimit.retryAfterSeconds,
+        error: `Rate limit exceeded. Please wait ${urlRateLimit.retryAfterSeconds}s.`,
+      };
+    }
+
     const urlRes = await fetchAndExtractJobUrl(rawInput);
     if (!urlRes.ok) {
       return {
@@ -237,7 +326,7 @@ export async function extractJobFromInputAction(input: {
 }
 
 /**
- * Extracts job fields from an uploaded PDF, DOCX/DOC, or TXT file using credit-gated AI parsing.
+ * Extracts job fields from an uploaded PDF, DOCX, or TXT file using credit-gated AI parsing.
  * Document text extraction happens prior to billing so corrupt/empty files never cost credits.
  */
 export async function extractJobFromFileAction(
@@ -248,6 +337,13 @@ export async function extractJobFromFileAction(
     return {
       success: false,
       error: session.ok ? "Unauthorized" : session.error.message,
+    };
+  }
+
+  if (!(formData instanceof FormData)) {
+    return {
+      success: false,
+      error: "Invalid file upload payload.",
     };
   }
 

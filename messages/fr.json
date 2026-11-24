@@ -204,7 +204,7 @@
       "extractButton": "Extraire et remplir",
       "extracting": "Extraction...",
       "uploadButton": "Importer PDF / DOCX",
-      "uploadHint": "PDF, DOCX, DOC ou TXT (max 5 Mo)",
+      "uploadHint": "PDF, DOCX ou TXT (max 5 Mo)",
       "badgeJsonFree": "JSON détecté · Gratuit",
       "badgeUrlHint": "Lien détecté · Gratuit (1 crédit si IA requise)",
       "badgeTextCost": "Texte d'offre · 1 crédit",
@@ -213,7 +213,7 @@
       "successAi": "Formulaire pré-rempli par l'IA ({credits} crédit utilisé). Vérifiez les champs avant d'enregistrer.",
       "urlBlockedFallback": "Ce site bloque la récupération automatique ou exige une connexion. Copiez-collez le texte de l'annonce ou importez un PDF (aucun crédit débité).",
       "fileTooLarge": "Le fichier dépasse la taille maximale autorisée de 5 Mo.",
-      "unsupportedFile": "Format non pris en charge. Importez un fichier PDF, DOCX, DOC ou TXT.",
+      "unsupportedFile": "Format non pris en charge. Importez un fichier PDF, DOCX ou TXT.",
       "extractionFailed": "Impossible d'extraire les détails de l'offre. Tout crédit débité a été remboursé — collez le texte ou remplissez le formulaire manuellement.",
       "unexpectedError": "Une erreur inattendue est survenue lors de l'extraction. Vérifiez votre connexion et réessayez.",
       "dismiss": "Fermer"

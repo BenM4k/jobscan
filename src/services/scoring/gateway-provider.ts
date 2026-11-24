@@ -15,7 +15,12 @@ import { gateway } from "@ai-sdk/gateway";
 
 export class GatewayProvider implements ScoringProvider {
   name: AIProviderName = "gateway";
-  modelId: string = process.env.AI_GATEWAY_MODEL || "openai/gpt-4o";
+  modelId: string;
+
+  constructor(modelId?: string) {
+    this.modelId =
+      modelId?.trim() || process.env.AI_GATEWAY_MODEL?.trim() || "openai/gpt-4o";
+  }
 
   async scoreJob(
     jobTitle: string,
@@ -24,8 +29,7 @@ export class GatewayProvider implements ScoringProvider {
     skills: string[]
   ): Promise<Result<ScoreWithUsage, AppError>> {
     try {
-      const modelName = process.env.AI_GATEWAY_MODEL || "openai/gpt-4o";
-      const model = gateway(modelName);
+      const model = gateway(this.modelId);
 
       const userPrompt = buildScoringUserPrompt(
         jobTitle,
@@ -44,7 +48,7 @@ export class GatewayProvider implements ScoringProvider {
       const usage: ScoreUsage = {
         inputTokens: result.usage?.inputTokens,
         outputTokens: result.usage?.outputTokens,
-        modelId: modelName,
+        modelId: this.modelId,
       };
 
       return ok({ ...result.output, _usage: usage });

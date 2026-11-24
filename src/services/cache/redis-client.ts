@@ -101,6 +101,34 @@ export async function cacheSet<T>(
 }
 
 /**
+ * Stores a value in Redis cache and reports whether it was durably persisted.
+ * Returns `false` if Redis is unconfigured or the write fails.
+ */
+export async function cacheSetChecked<T>(
+  key: string,
+  value: T,
+  ttlSeconds?: number
+): Promise<boolean> {
+  const client = getRedisClient();
+  if (!client) return false;
+
+  try {
+    if (ttlSeconds && ttlSeconds > 0) {
+      await client.set(key, value, { ex: ttlSeconds });
+    } else {
+      await client.set(key, value);
+    }
+    return true;
+  } catch (err) {
+    console.warn(
+      `[Redis] Failed checked write for key "${key}":`,
+      err instanceof Error ? err.message : err
+    );
+    return false;
+  }
+}
+
+/**
  * Delete one or more keys from Redis cache.
  */
 export async function cacheDel(...keys: string[]): Promise<number> {

@@ -27,6 +27,17 @@ function normalizeSkillList(
   return combined;
 }
 
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function matchesDistinctKeyword(lowerDraft: string, lowerKw: string): boolean {
+  const regex = new RegExp(
+    `(?<![a-z0-9_.+#])${escapeRegex(lowerKw)}(?![a-z0-9_+#]|\\.[a-z0-9])`
+  );
+  return regex.test(lowerDraft);
+}
+
 /**
  * Evaluates which matched/missing ATS keywords from job scoring appear in the user's draft text.
  */
@@ -46,7 +57,7 @@ export function computeKeywordCoverage(
 
   for (const keyword of keywords) {
     const lowerKw = keyword.toLowerCase();
-    if (lowerDraft.includes(lowerKw)) {
+    if (matchesDistinctKeyword(lowerDraft, lowerKw)) {
       covered.push(keyword);
     } else {
       missing.push(keyword);

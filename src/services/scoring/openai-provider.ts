@@ -15,7 +15,11 @@ import { createOpenAI } from "@ai-sdk/openai";
 
 export class OpenAIProvider implements ScoringProvider {
   name: AIProviderName = "openai";
-  modelId: string = "gpt-4o";
+  modelId: string;
+
+  constructor(modelId?: string) {
+    this.modelId = modelId?.trim() || process.env.OPENAI_MODEL?.trim() || "gpt-4o";
+  }
 
   async scoreJob(
     jobTitle: string,
@@ -43,7 +47,7 @@ export class OpenAIProvider implements ScoringProvider {
       );
 
       const result = await generateText({
-        model: openai("gpt-4o"),
+        model: openai(this.modelId),
         output: Output.object({ schema: scoreResultSchema }),
         system: SCORING_INSTRUCTIONS,
         prompt: userPrompt,
@@ -52,7 +56,7 @@ export class OpenAIProvider implements ScoringProvider {
       const usage: ScoreUsage = {
         inputTokens: result.usage?.inputTokens,
         outputTokens: result.usage?.outputTokens,
-        modelId: "gpt-4o",
+        modelId: this.modelId,
       };
 
       return ok({ ...result.output, _usage: usage });

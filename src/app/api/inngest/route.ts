@@ -9,6 +9,7 @@ import {
   scoreJobOnCreation,
   mockPaymentConfirmationJob,
   checkSubscriptionExpiryCron,
+  retryCreditRefundJob,
   embedResumeOnUpdate,
 } from "@/inngest/functions";
 
@@ -23,6 +24,7 @@ export const { GET, POST, PUT } = serve({
     scoreJobOnCreation,
     mockPaymentConfirmationJob,
     checkSubscriptionExpiryCron,
+    retryCreditRefundJob,
     embedResumeOnUpdate,
   ],
 });

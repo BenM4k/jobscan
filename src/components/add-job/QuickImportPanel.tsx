@@ -19,14 +19,18 @@ import { SmartPasteBadge } from "./SmartPasteBadge";
 import { FileText, Loader2, Sparkles, Upload } from "lucide-react";
 
 const MAX_CLIENT_FILE_BYTES = 5 * 1024 * 1024;
-const ALLOWED_EXTENSIONS = [".pdf", ".docx", ".doc", ".txt"];
+const ALLOWED_EXTENSIONS = [".pdf", ".docx", ".txt"];
 
 interface QuickImportPanelProps {
+  onImportStart?: () => void;
   onImported: (result: ExtractedJobResult) => void;
 }
 
 /** Smart Paste (URL / JSON / Raw Text) + PDF/DOCX file importer with toast notifications. */
-export function QuickImportPanel({ onImported }: QuickImportPanelProps) {
+export function QuickImportPanel({
+  onImportStart,
+  onImported,
+}: QuickImportPanelProps) {
   const t = useTranslations("addJob.import");
   const router = useRouter();
 
@@ -40,11 +44,24 @@ export function QuickImportPanel({ onImported }: QuickImportPanelProps) {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const idempotencyKeyRef = useRef<string | null>(null);
+  const fileIdempotencyRef = useRef<{ signature: string; key: string } | null>(
+    null
+  );
   const detectedKind = detectSmartPasteType(rawInput);
 
-  const handleExtractionResponse = (res: JobImportActionResponse) => {
+  const handleExtractionResponse = (
+    res: JobImportActionResponse,
+    source: "smart" | "file"
+  ) => {
     if (!res.success) {
-      if (res.code === "insufficient_credits") {
+      if (res.code === "result_expired") {
+        if (source === "smart") {
+          idempotencyKeyRef.current = null;
+        } else {
+          fileIdempotencyRef.current = null;
+        }
+        toast.error(res.error || t("extractionFailed"), { duration: 5000 });
+      } else if (res.code === "insufficient_credits") {
         setCreditsDialog({
           open: true,
           requiredCost: res.details?.requiredCost ?? 1,
@@ -59,7 +76,11 @@ export function QuickImportPanel({ onImported }: QuickImportPanelProps) {
       return;
     }
 
-    idempotencyKeyRef.current = null;
+    if (source === "smart") {
+      idempotencyKeyRef.current = null;
+    } else {
+      fileIdempotencyRef.current = null;
+    }
     onImported(res.data);
     toast.success(
       res.data.creditsUsed > 0
@@ -74,14 +95,15 @@ export function QuickImportPanel({ onImported }: QuickImportPanelProps) {
   const handleSmartExtract = async () => {
     if (!rawInput.trim() || isExtracting) return;
     setIsExtracting(true);
+    onImportStart?.();
 
-    const key = (idempotencyKeyRef.current ??= crypto.randomUUID());
     try {
+      const key = (idempotencyKeyRef.current ??= crypto.randomUUID());
       const res = await extractJobFromInputAction({
         rawInput,
         idempotencyKey: key,
       });
-      handleExtractionResponse(res);
+      handleExtractionResponse(res, "smart");
     } catch {
       toast.error(t("unexpectedError"));
     } finally {
@@ -105,13 +127,21 @@ export function QuickImportPanel({ onImported }: QuickImportPanelProps) {
     }
 
     setIsExtracting(true);
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("idempotencyKey", crypto.randomUUID());
+    onImportStart?.();
 
+    const signature = `${file.name}:${file.size}:${file.lastModified}`;
     try {
+      const key =
+        fileIdempotencyRef.current?.signature === signature
+          ? fileIdempotencyRef.current.key
+          : crypto.randomUUID();
+      fileIdempotencyRef.current = { signature, key };
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("idempotencyKey", key);
       const res = await extractJobFromFileAction(formData);
-      handleExtractionResponse(res);
+      handleExtractionResponse(res, "file");
     } catch {
       toast.error(t("unexpectedError"));
     } finally {

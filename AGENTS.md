@@ -56,20 +56,20 @@ For any non-trivial request:
 
 ## 4. Tech Stack
 
-| Layer | Technology | Key Details |
-| :--- | :--- | :--- |
-| **Framework** | Next.js (App Router) | React Server Components by default; `"use client"` pushed to leaves. |
-| **Language** | TypeScript | `strict: true`. No untyped `any` without documented reason. |
-| **Styling** | Tailwind CSS | Utility-first styling. |
-| **UI Primitives** | shadcn/ui | Mandatory official primitives in `components/ui/`; no custom handwritten modals/dropdowns. |
-| **Auth** | better-auth | Server instance (`auth.ts`), client instance (`auth-client.ts`), session guards. |
-| **Database** | PostgreSQL + Drizzle ORM | Schema-first, migrations via `drizzle-kit`, DAL isolation in `src/dal/`. |
-| **Extensions** | `pgvector`, `pg_trgm`, `bit_count` | 1536-dim vector embeddings, fuzzy trigram search, bitwise SimHash Hamming distance. |
-| **Cache & Rate Limit** | Upstash Redis | Serverless REST, strictly encapsulated in `src/services/cache/redis-client.ts`. |
-| **Background Jobs** | Inngest (v4) | Typed event queue served at `/api/inngest`; zero synchronous blocking in request paths. |
-| **AI Layer** | Vercel AI SDK | Multi-provider (Google Gemini, Anthropic Claude, OpenAI, Vercel AI Gateway). |
-| **Localization** | `next-intl` | Full bilingual French and English UI (`messages/en.json`, `messages/fr.json`). |
-| **Validation** | Zod | Shared validation schemas in `src/lib/validations/`. |
+| Layer                  | Technology                         | Key Details                                                                                |
+| :--------------------- | :--------------------------------- | :----------------------------------------------------------------------------------------- |
+| **Framework**          | Next.js (App Router)               | React Server Components by default; `"use client"` pushed to leaves.                       |
+| **Language**           | TypeScript                         | `strict: true`. No untyped `any` without documented reason.                                |
+| **Styling**            | Tailwind CSS                       | Utility-first styling.                                                                     |
+| **UI Primitives**      | shadcn/ui                          | Mandatory official primitives in `components/ui/`; no custom handwritten modals/dropdowns. |
+| **Auth**               | better-auth                        | Server instance (`auth.ts`), client instance (`auth-client.ts`), session guards.           |
+| **Database**           | PostgreSQL + Drizzle ORM           | Schema-first, migrations via `drizzle-kit`, DAL isolation in `src/dal/`.                   |
+| **Extensions**         | `pgvector`, `pg_trgm`, `bit_count` | 1536-dim vector embeddings, fuzzy trigram search, bitwise SimHash Hamming distance.        |
+| **Cache & Rate Limit** | Upstash Redis                      | Serverless REST, strictly encapsulated in `src/services/cache/redis-client.ts`.            |
+| **Background Jobs**    | Inngest (v4)                       | Typed event queue served at `/api/inngest`; zero synchronous blocking in request paths.    |
+| **AI Layer**           | Vercel AI SDK                      | Multi-provider (Google Gemini, Anthropic Claude, OpenAI, Vercel AI Gateway).               |
+| **Localization**       | `next-intl`                        | Full bilingual French and English UI (`messages/en.json`, `messages/fr.json`).             |
+| **Validation**         | Zod                                | Shared validation schemas in `src/lib/validations/`.                                       |
 
 ---
 
@@ -115,7 +115,7 @@ src/
     profile/                # ProfileSidebar, ProfileViewMode, ProfileAiUsageSlot, MasterResumeUpload & editor sections
     billing/                # CreditBalanceIndicator, CreditPurchaseCard, CreditPackGrid, SubscriptionCard, SubscriptionActionArea, InsufficientCreditsDialog
     settings/               # Settings, AddPasskeyDialog, PasskeyManagementCard & feature flag cards
-    admin/                  # AdminNav, AdminStatCard, AdminUsersTable, AdminUserRow, AiUsageTable, AdminAiProviderCard, GrantCreditsDialog, GiftSubscriptionDialog, BanUserDialog, AdminFeatureFlagsManager, GlobalFlagsCard, UserFlagOverrideForm, ActiveOverridesTable
+    admin/                  # AdminNav, AdminStatCard, AdminUsersTable, AdminUserRow, AiUsageTable, AdminAiProviderCard, AdminAiModelSelector, GrantCreditsDialog, GiftSubscriptionDialog, BanUserDialog, AdminFeatureFlagsManager, GlobalFlagsCard, UserFlagOverrideForm, ActiveOverridesTable
 
   actions/                  # Server actions (validation + auth boundary → service layer)
     admin.actions.ts        # Admin feature flags actions
@@ -129,7 +129,7 @@ src/
     adapters/               # Unified job adapters (Ashby, Greenhouse, Lever, RemoteOK, CongoJob, Emploi.cd, FECRDC, UNJobs, ReliefWeb)
     crawler/sources/        # Regional & scraper fetch helpers (CongoJob, Emploi.cd, FECRDC, UNJobs, ReliefWeb)
     job-import/             # URL/JSON/PDF/DOCX/AI job extraction & SSRF-guarded page fetcher
-    ai/                     # Vercel AI SDK clients, embeddings, score-cache, rate-limiting, tracker, global admin AI provider config (provider-config.ts)
+    ai/                     # Vercel AI SDK clients, embeddings, score-cache, rate-limiting, tracker, global admin AI provider & model config (provider-config.ts, model-catalog.ts)
     scoring/                # Scoring factory, hybrid match calculator, scoreJobForResume orchestrator
     ranking/                # Display ranking recency exponential decay
     flags/                  # Feature flags service with 60s Redis caching
@@ -207,17 +207,17 @@ The following core rules govern all feature implementation in Jobpilot:
 
 For detailed guides, schemas, algorithms, and workflows, consult the corresponding topic document in [`docs/`](./docs/):
 
-| Topic | Document | Contents |
-| :--- | :--- | :--- |
-| **Architecture & Layering** | [`docs/architecture-and-layering.md`](./docs/architecture-and-layering.md) | Request flow, `Result` types, action idempotency state machine, feature flags, circuit breaker, Inngest. |
-| **Billing & Monetization** | [`docs/billing-and-monetization.md`](./docs/billing-and-monetization.md) | Two-layer monetization: credit packs (spendable per AI action, scoring free), Pro subscription ($15/mo gating personas, digests, hybrid scoring), payment provider abstraction, mock mobile money, idempotency, non-retryable 402 handling. |
-| **Job Ingestion & Sources** | [`docs/job-ingestion-and-sources.md`](./docs/job-ingestion-and-sources.md) | ATS adapters, crawler sources, two-step ingestion pipeline, SimHash deduplication ($k \le 3$), adding new sources. |
-| **AI & Matching Engine** | [`docs/ai-and-matching.md`](./docs/ai-and-matching.md) | Dual-language hybrid matching (pgvector + tsvector), skill extraction, recency decay ($\lambda = 0.0495$), rate limiter, AI cost tracking, persona promotion. |
-| **Database & Models** | [`docs/database-and-models.md`](./docs/database-and-models.md) | Drizzle ORM schemas, canonical tables, legacy table isolation, pgvector literal workaround, migrations. |
-| **Auth & Security** | [`docs/auth-and-security.md`](./docs/auth-and-security.md) | better-auth server/client separation, session guards, admin access check, DOMParser HTML sanitization, secrets. |
-| **UI & Frontend** | [`docs/ui-and-frontend.md`](./docs/ui-and-frontend.md) | shadcn/ui rules, server vs. client boundaries, `next-intl` localization, async job retry hooks, resume inline editing. |
-| **Redis & Caching** | [`docs/redis-provisioning.md`](./docs/redis-provisioning.md) | Upstash and Redis Cloud provisioning, `allkeys-lru` eviction policy, environment variables, local Docker setup. |
-| **Testing & Troubleshooting** | [`docs/testing-and-troubleshooting.md`](./docs/testing-and-troubleshooting.md) | Test runner commands (`NODE_OPTIONS='--conditions=react-server'`), quality gates, and 15+ architectural traps & gotchas. |
+| Topic                         | Document                                                                       | Contents                                                                                                                                                                                                                                    |
+| :---------------------------- | :----------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Architecture & Layering**   | [`docs/architecture-and-layering.md`](./docs/architecture-and-layering.md)     | Request flow, `Result` types, action idempotency state machine, feature flags, circuit breaker, Inngest.                                                                                                                                    |
+| **Billing & Monetization**    | [`docs/billing-and-monetization.md`](./docs/billing-and-monetization.md)       | Two-layer monetization: credit packs (spendable per AI action, scoring free), Pro subscription ($15/mo gating personas, digests, hybrid scoring), payment provider abstraction, mock mobile money, idempotency, non-retryable 402 handling. |
+| **Job Ingestion & Sources**   | [`docs/job-ingestion-and-sources.md`](./docs/job-ingestion-and-sources.md)     | ATS adapters, crawler sources, two-step ingestion pipeline, SimHash deduplication ($k \le 3$), adding new sources.                                                                                                                          |
+| **AI & Matching Engine**      | [`docs/ai-and-matching.md`](./docs/ai-and-matching.md)                         | Dual-language hybrid matching (pgvector + tsvector), skill extraction, recency decay ($\lambda = 0.0495$), rate limiter, AI cost tracking, persona promotion.                                                                               |
+| **Database & Models**         | [`docs/database-and-models.md`](./docs/database-and-models.md)                 | Drizzle ORM schemas, canonical tables, legacy table isolation, pgvector literal workaround, migrations.                                                                                                                                     |
+| **Auth & Security**           | [`docs/auth-and-security.md`](./docs/auth-and-security.md)                     | better-auth server/client separation, session guards, admin access check, DOMParser HTML sanitization, secrets.                                                                                                                             |
+| **UI & Frontend**             | [`docs/ui-and-frontend.md`](./docs/ui-and-frontend.md)                         | shadcn/ui rules, server vs. client boundaries, `next-intl` localization, async job retry hooks, resume inline editing.                                                                                                                      |
+| **Redis & Caching**           | [`docs/redis-provisioning.md`](./docs/redis-provisioning.md)                   | Upstash and Redis Cloud provisioning, `allkeys-lru` eviction policy, environment variables, local Docker setup.                                                                                                                             |
+| **Testing & Troubleshooting** | [`docs/testing-and-troubleshooting.md`](./docs/testing-and-troubleshooting.md) | Test runner commands (`NODE_OPTIONS='--conditions=react-server'`), quality gates, and 15+ architectural traps & gotchas.                                                                                                                    |
 
 ---
 
@@ -247,8 +247,9 @@ Run quality checks before considering any task complete:
 ---
 
 ## 10. Maintenance
- 
+
 Update this file and the corresponding guides in [`docs/`](./docs/) whenever:
+
 - **The structure of the app is modified** (e.g. adding or restructuring routes, database models/schemas, DAL modules, services, external adapters, or directory layouts).
 - A major framework or dependency introduces new patterns or breaking changes.
 - A new core architectural pattern, background job, or data store is introduced.

@@ -181,8 +181,9 @@ export function JobDetailView({
             newPersona,
             ...prev.filter((r) => r.id !== newPersona.id),
           ]);
-          setSelectedResumeId(newPersona.id);
+          handleSelectResume(newPersona.id);
         }}
+        onResumeReverted={handleSelectResume}
       />
 
       <JobCoverLetterSection

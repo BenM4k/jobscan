@@ -1,11 +1,14 @@
 import "server-only";
 
+import type { LookupAddress } from "node:dns";
 import dns from "node:dns/promises";
+import http from "node:http";
+import https from "node:https";
 import net from "node:net";
 import * as cheerio from "cheerio";
 import { ok, err, type Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
-import { mapJobObjectToFields } from "./json-parser";
+import { findJobPostingInJsonLd, mapJobObjectToFields } from "./json-parser";
 import type { ExtractedJobFields } from "./schema";
 
 const FETCH_TIMEOUT_MS = 10_000;
@@ -37,6 +40,36 @@ function isPrivateIpv4(ip: string): boolean {
   return false;
 }
 
+function parseIpv4MappedIpv6(normalizedIpv6: string): string | null {
+  const parts = normalizedIpv6.split("::ffff:");
+  if (parts.length !== 2) {
+    // Also handle expanded form 0:0:0:0:0:ffff:...
+    const match = normalizedIpv6.match(
+      /^(?:0{1,4}:){5}ffff:([0-9a-f.:]+)$/i
+    );
+    if (!match) return null;
+    const tail = match[1];
+    if (net.isIP(tail) === 4) return tail;
+    const hexMatch = tail.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i);
+    if (!hexMatch) return null;
+    const hi = parseInt(hexMatch[1], 16);
+    const lo = parseInt(hexMatch[2], 16);
+    return `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+  }
+
+  const [prefix, tail] = parts;
+  if (prefix !== "" && !/^(?:0{1,4}:)*0{1,4}$/.test(prefix)) {
+    return null;
+  }
+  if (net.isIP(tail) === 4) return tail;
+
+  const hexMatch = tail.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i);
+  if (!hexMatch) return null;
+  const hi = parseInt(hexMatch[1], 16);
+  const lo = parseInt(hexMatch[2], 16);
+  return `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+}
+
 export function isPrivateOrReservedIp(ip: string): boolean {
   const normalized = ip.trim().toLowerCase().replace(/^\[|\]$/g, "");
   const ipType = net.isIP(normalized);
@@ -45,9 +78,9 @@ export function isPrivateOrReservedIp(ip: string): boolean {
   }
   if (ipType === 6) {
     if (normalized === "::" || normalized === "::1") return true;
-    if (normalized.startsWith("::ffff:")) {
-      const mapped = normalized.slice("::ffff:".length);
-      if (net.isIP(mapped) === 4) return isPrivateIpv4(mapped);
+    const mappedIpv4 = parseIpv4MappedIpv6(normalized);
+    if (mappedIpv4) {
+      return isPrivateIpv4(mappedIpv4);
     }
     if (/^(fc|fd)[0-9a-f]{2}:/i.test(normalized)) return true; // ULA fc00::/7
     if (/^fe[89ab][0-9a-f]:/i.test(normalized)) return true; // link-local fe80::/10
@@ -105,16 +138,45 @@ export function validateExternalJobUrl(rawUrl: string): Result<URL, AppError> {
   return ok(parsed);
 }
 
-async function assertHostResolvesPublicly(hostname: string): Promise<Result<void, AppError>> {
+function createTimeoutError(): Error {
+  const errObj = new Error("Timed out fetching job URL.");
+  errObj.name = "TimeoutError";
+  return errObj;
+}
+
+function getRemainingMs(deadline: number): number {
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) {
+    throw createTimeoutError();
+  }
+  return remaining;
+}
+
+interface PinnedAddress {
+  address: string;
+  family: 4 | 6;
+}
+
+async function assertHostResolvesPublicly(
+  hostname: string,
+  remainingMs: number
+): Promise<Result<PinnedAddress, AppError>> {
   const cleanHost = hostname.replace(/^\[|\]$/g, "");
-  if (net.isIP(cleanHost) !== 0) {
+  const ipVer = net.isIP(cleanHost);
+  if (ipVer !== 0) {
     return isPrivateOrReservedIp(cleanHost)
       ? err(new AppError("VALIDATION_ERROR", "Private network IP URLs cannot be fetched."))
-      : ok(undefined);
+      : ok({ address: cleanHost, family: ipVer === 6 ? 6 : 4 });
   }
 
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
-    const records = await dns.lookup(cleanHost, { all: true });
+    const records = await Promise.race([
+      dns.lookup(cleanHost, { all: true }),
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(createTimeoutError()), remainingMs);
+      }),
+    ]);
     if (records.length === 0) {
       return err(new AppError("EXTERNAL_API_ERROR", "Could not resolve job URL host."));
     }
@@ -128,40 +190,33 @@ async function assertHostResolvesPublicly(hostname: string): Promise<Result<void
         );
       }
     }
-    return ok(undefined);
-  } catch {
+    const primary = records[0];
+    return ok({
+      address: primary.address,
+      family: primary.family === 6 ? 6 : 4,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "TimeoutError") {
+      throw error;
+    }
     return err(
       new AppError("EXTERNAL_API_ERROR", "Could not resolve job URL domain.")
     );
+  } finally {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+    }
   }
 }
 
-function findJobPostingInJsonLd(node: unknown): Record<string, unknown> | null {
-  if (!node) return null;
-  if (Array.isArray(node)) {
-    for (const item of node) {
-      const found = findJobPostingInJsonLd(item);
-      if (found) return found;
-    }
-    return null;
+/** Returns true when the URL path matches common login or bot-verification gates. */
+export function isBlockedAuthWallPath(finalUrl: string): boolean {
+  try {
+    const parsed = new URL(finalUrl);
+    return /\/(authwall|uas\/login|checkpoint|login)(\/|$)/i.test(parsed.pathname);
+  } catch {
+    return false;
   }
-  if (typeof node === "object") {
-    const rec = node as Record<string, unknown>;
-    const rawType = rec["@type"];
-    const types = Array.isArray(rawType) ? rawType : [rawType];
-    if (
-      types.some(
-        (t) => typeof t === "string" && t.toLowerCase().includes("jobposting")
-      )
-    ) {
-      return rec;
-    }
-    if (rec["@graph"]) {
-      const graphFound = findJobPostingInJsonLd(rec["@graph"]);
-      if (graphFound) return graphFound;
-    }
-  }
-  return null;
 }
 
 const BLOCKED_TITLE_PATTERNS = [
@@ -186,13 +241,8 @@ export function detectBlockedOrAuthWallPage(
   html: string,
   plainText: string
 ): boolean {
-  try {
-    const parsed = new URL(finalUrl);
-    if (/\/(authwall|uas\/login|checkpoint|login)(\/|$)/i.test(parsed.pathname)) {
-      return true;
-    }
-  } catch {
-    // Ignore URL parse error here
+  if (isBlockedAuthWallPath(finalUrl)) {
+    return true;
   }
 
   const $ = cheerio.load(html);
@@ -255,7 +305,8 @@ export function extractJobFromHtml(
 
   $("script, style, noscript, svg, nav, footer, header, iframe, form").remove();
 
-  const mainContainer = $("main, article, [role='main']").first();
+  const primaryMain = $("main, [role='main']").first();
+  const mainContainer = primaryMain.length ? primaryMain : $("article").first();
   const rawBody = (mainContainer.length ? mainContainer : $("body")).text();
   const cleanedBody = rawBody
     .replace(/\r\n/g, "\n")
@@ -279,49 +330,199 @@ export function extractJobFromHtml(
   };
 }
 
-async function readResponseWithLimit(
-  response: Response,
-  maxBytes: number
-): Promise<Result<string, AppError>> {
-  const contentLengthHeader = response.headers.get("content-length");
-  if (contentLengthHeader) {
-    const len = Number(contentLengthHeader);
-    if (!Number.isNaN(len) && len > maxBytes) {
-      return err(
-        new AppError("EXTERNAL_API_ERROR", "Target job page is too large to import.")
-      );
+type PinnedResponsePayload =
+  | { kind: "redirect"; location: string }
+  | { kind: "body"; contentType: string; text: string };
+
+function createPinnedLookup(pinned: PinnedAddress): net.LookupFunction {
+  return (_hostname, options, callback) => {
+    if (typeof options === "object" && options?.all) {
+      const multiCb = callback as (
+        err: NodeJS.ErrnoException | null,
+        addresses: LookupAddress[]
+      ) => void;
+      multiCb(null, [{ address: pinned.address, family: pinned.family }]);
+      return;
     }
-  }
+    callback(null, pinned.address, pinned.family);
+  };
+}
 
-  if (!response.body) {
-    const text = await response.text();
-    return ok(text.slice(0, maxBytes));
-  }
+function requestPinnedUrl(
+  targetUrl: URL,
+  pinned: PinnedAddress,
+  maxBytes: number,
+  deadline: number
+): Promise<Result<PinnedResponsePayload, AppError>> {
+  const remainingMs = getRemainingMs(deadline);
 
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const isHttps = targetUrl.protocol === "https:";
+    const pinnedLookup = createPinnedLookup(pinned);
+    const timeout: { id: ReturnType<typeof setTimeout> | undefined } = {
+      id: undefined,
+    };
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (value) {
-      total += value.byteLength;
-      if (total > maxBytes) {
-        await reader.cancel();
-        break;
+    const settleOk = (res: Result<PinnedResponsePayload, AppError>) => {
+      if (settled) return;
+      settled = true;
+      if (timeout.id !== undefined) clearTimeout(timeout.id);
+      resolve(res);
+    };
+
+    const settleErr = (error: unknown) => {
+      if (settled) return;
+      settled = true;
+      if (timeout.id !== undefined) clearTimeout(timeout.id);
+      reject(error);
+    };
+
+    const baseOptions: http.RequestOptions = {
+      protocol: targetUrl.protocol,
+      hostname: targetUrl.hostname,
+      port: targetUrl.port ? Number(targetUrl.port) : undefined,
+      path: `${targetUrl.pathname}${targetUrl.search}`,
+      method: "GET",
+      lookup: pinnedLookup,
+      headers: {
+        Host: targetUrl.host,
+        "User-Agent":
+          "Mozilla/5.0 (compatible; JobpilotImporter/1.0; +https://jobpilot.app)",
+        Accept:
+          "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
+      },
+    };
+
+    const handleResponse = (res: http.IncomingMessage) => {
+      const status = res.statusCode ?? 0;
+
+      if (status >= 300 && status < 400) {
+        const rawLocation = res.headers.location;
+        const location = Array.isArray(rawLocation)
+          ? rawLocation[0] || ""
+          : rawLocation || "";
+        res.destroy();
+        settleOk(ok({ kind: "redirect", location }));
+        return;
       }
-      chunks.push(value);
-    }
-  }
 
-  const merged = Buffer.concat(chunks.map((c) => Buffer.from(c)));
-  return ok(merged.toString("utf-8"));
+      if (status < 200 || status >= 300) {
+        res.destroy();
+        settleOk(
+          err(
+            new AppError(
+              "EXTERNAL_API_ERROR",
+              `This site blocked or failed the request (HTTP ${status}). Copy-paste the job text or upload a PDF instead.`
+            )
+          )
+        );
+        return;
+      }
+
+      const contentType = (res.headers["content-type"] || "").toLowerCase();
+      if (
+        contentType &&
+        !contentType.includes("text/html") &&
+        !contentType.includes("application/xhtml+xml") &&
+        !contentType.includes("application/json") &&
+        !contentType.includes("text/plain")
+      ) {
+        res.destroy();
+        settleOk(
+          err(
+            new AppError(
+              "EXTERNAL_API_ERROR",
+              "The URL did not return a readable job webpage."
+            )
+          )
+        );
+        return;
+      }
+
+      const contentLength = res.headers["content-length"];
+      if (contentLength) {
+        const len = Number(contentLength);
+        if (!Number.isNaN(len) && len > maxBytes) {
+          res.destroy();
+          settleOk(
+            err(
+              new AppError(
+                "EXTERNAL_API_ERROR",
+                "Target job page is too large to import."
+              )
+            )
+          );
+          return;
+        }
+      }
+
+      const chunks: Buffer[] = [];
+      let total = 0;
+
+      res.on("data", (chunk: Buffer | string) => {
+        if (settled) return;
+        const buf = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
+        total += buf.byteLength;
+        if (total > maxBytes) {
+          res.destroy();
+          settleOk(
+            err(
+              new AppError(
+                "EXTERNAL_API_ERROR",
+                "Target job page is too large to import."
+              )
+            )
+          );
+          return;
+        }
+        chunks.push(buf);
+      });
+
+      res.on("end", () => {
+        settleOk(
+          ok({
+            kind: "body",
+            contentType,
+            text: Buffer.concat(chunks).toString("utf-8"),
+          })
+        );
+      });
+
+      res.on("error", (errObj) => {
+        if (!settled) {
+          settleErr(errObj);
+        }
+      });
+    };
+
+    const req = isHttps
+      ? https.request(
+          { ...baseOptions, servername: targetUrl.hostname },
+          handleResponse
+        )
+      : http.request(baseOptions, handleResponse);
+
+    timeout.id = setTimeout(() => {
+      const timeoutErr = createTimeoutError();
+      if (!settled) {
+        settled = true;
+        req.destroy(timeoutErr);
+        reject(timeoutErr);
+      }
+    }, remainingMs);
+
+    req.on("error", (errObj) => {
+      settleErr(errObj);
+    });
+
+    req.end();
+  });
 }
 
 /**
- * Fetches an external job URL safely (SSRF-guarded) and extracts structured JobPosting data
- * or cleaned HTML text for AI parsing.
+ * Fetches an external job URL safely (SSRF-guarded with connection-time IP pinning)
+ * and extracts structured JobPosting data or cleaned HTML text for AI parsing.
  */
 export async function fetchAndExtractJobUrl(
   rawUrl: string
@@ -335,27 +536,27 @@ export async function fetchAndExtractJobUrl(
   if (!initialValidation.ok) return err(initialValidation.error);
 
   let currentUrl = initialValidation.value;
+  const deadline = Date.now() + FETCH_TIMEOUT_MS;
 
   try {
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-      const dnsCheck = await assertHostResolvesPublicly(currentUrl.hostname);
+      const dnsCheck = await assertHostResolvesPublicly(
+        currentUrl.hostname,
+        getRemainingMs(deadline)
+      );
       if (!dnsCheck.ok) return err(dnsCheck.error);
 
-      const response = await fetch(currentUrl.toString(), {
-        method: "GET",
-        redirect: "manual",
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (compatible; JobpilotImporter/1.0; +https://jobpilot.app)",
-          Accept:
-            "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
-        },
-      });
+      const responseRes = await requestPinnedUrl(
+        currentUrl,
+        dnsCheck.value,
+        MAX_RESPONSE_BYTES,
+        deadline
+      );
+      if (!responseRes.ok) return err(responseRes.error);
 
-      if (response.status >= 300 && response.status < 400) {
-        const location = response.headers.get("location");
-        if (!location || hop === MAX_REDIRECTS) {
+      const responsePayload = responseRes.value;
+      if (responsePayload.kind === "redirect") {
+        if (!responsePayload.location || hop === MAX_REDIRECTS) {
           return err(
             new AppError(
               "EXTERNAL_API_ERROR",
@@ -364,48 +565,35 @@ export async function fetchAndExtractJobUrl(
           );
         }
         const nextUrlResult = validateExternalJobUrl(
-          new URL(location, currentUrl).toString()
+          new URL(responsePayload.location, currentUrl).toString()
         );
         if (!nextUrlResult.ok) return err(nextUrlResult.error);
         currentUrl = nextUrlResult.value;
         continue;
       }
 
-      if (!response.ok) {
-        return err(
-          new AppError(
-            "EXTERNAL_API_ERROR",
-            `This site blocked or failed the request (HTTP ${response.status}). Copy-paste the job text or upload a PDF instead.`
-          )
-        );
-      }
-
-      const contentType = (response.headers.get("content-type") || "").toLowerCase();
-      if (
-        contentType &&
-        !contentType.includes("text/html") &&
-        !contentType.includes("application/xhtml+xml") &&
-        !contentType.includes("application/json") &&
-        !contentType.includes("text/plain")
-      ) {
-        return err(
-          new AppError(
-            "EXTERNAL_API_ERROR",
-            "The URL did not return a readable job webpage."
-          )
-        );
-      }
-
-      const bodyRes = await readResponseWithLimit(response, MAX_RESPONSE_BYTES);
-      if (!bodyRes.ok) return err(bodyRes.error);
-
+      const { contentType, text: bodyText } = responsePayload;
       const finalUrl = currentUrl.toString();
+
+      if (isBlockedAuthWallPath(finalUrl)) {
+        return err(
+          new AppError(
+            "EXTERNAL_API_ERROR",
+            "This page requires sign-in or blocked automated access. Copy-paste the job text instead."
+          )
+        );
+      }
 
       if (contentType.includes("application/json")) {
         try {
-          const parsed: unknown = JSON.parse(bodyRes.value);
-          if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
-            const mapped = mapJobObjectToFields(parsed as Record<string, unknown>);
+          const parsed: unknown = JSON.parse(bodyText);
+          const candidate =
+            findJobPostingInJsonLd(parsed) ??
+            (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+              ? (parsed as Record<string, unknown>)
+              : null);
+          if (candidate) {
+            const mapped = mapJobObjectToFields(candidate);
             if (mapped.title || mapped.description) {
               return ok({
                 structured: { ...mapped, url: mapped.url || finalUrl },
@@ -419,20 +607,16 @@ export async function fetchAndExtractJobUrl(
         }
         return ok({
           structured: null,
-          plainText: bodyRes.value.slice(0, MAX_PLAIN_TEXT_CHARS),
+          plainText: bodyText.slice(0, MAX_PLAIN_TEXT_CHARS),
           finalUrl,
         });
       }
 
-      const extracted = extractJobFromHtml(bodyRes.value, finalUrl);
+      const extracted = extractJobFromHtml(bodyText, finalUrl);
       if (
         !extracted.structured &&
         (extracted.plainText.trim().length < 40 ||
-          detectBlockedOrAuthWallPage(
-            finalUrl,
-            bodyRes.value,
-            extracted.plainText
-          ))
+          detectBlockedOrAuthWallPage(finalUrl, bodyText, extracted.plainText))
       ) {
         return err(
           new AppError(

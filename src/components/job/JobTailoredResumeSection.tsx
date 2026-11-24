@@ -27,6 +27,7 @@ interface JobTailoredResumeSectionProps {
   onJobUpdated: (updated: JobSelect) => void;
   selectedResumeId?: string;
   onResumePromoted?: (newPersona: MasterResumeSelect) => void;
+  onResumeReverted?: (previousResumeId: string) => void;
 }
 
 /** Provides tailored-resume generation, Structured/Markdown editing, saving, and PDF export. */
@@ -35,6 +36,7 @@ export function JobTailoredResumeSection({
   onJobUpdated,
   selectedResumeId,
   onResumePromoted,
+  onResumeReverted,
 }: JobTailoredResumeSectionProps) {
   const t = useTranslations("jobDetail");
   const tCommon = useTranslations("common");
@@ -235,6 +237,7 @@ export function JobTailoredResumeSection({
               tailoredResumeRecordId={job.tailoredResumeRecordId}
               defaultLabel={`${job.company} — ${job.title}`}
               onPromoted={onResumePromoted}
+              onReverted={onResumeReverted}
             />
           </div>
         </div>

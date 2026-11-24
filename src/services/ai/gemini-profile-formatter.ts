@@ -1,13 +1,15 @@
 import "server-only";
 import { z } from "zod";
 import { generateText, Output } from "ai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { createOpenAI } from "@ai-sdk/openai";
-import { createAnthropic } from "@ai-sdk/anthropic";
-import { gateway } from "@ai-sdk/gateway";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
-import { AI_MODEL } from "@/lib/ai";
+import {
+  getActiveLanguageModel,
+  getGlobalAiModel,
+  SUPPORTED_AI_PROVIDERS,
+  type GlobalAiProvider,
+} from "@/services/ai/provider-config";
+import { resolveLanguageModel } from "@/services/skills.service";
 
 export interface ExperienceItem {
   role: string;
@@ -88,39 +90,19 @@ SECTION RULES:
 3. "extractedSkills" — Array of ALL technical skills, tools, frameworks, programming languages, and domain competencies mentioned.
 4. "cleanFormattedResume" — A clean markdown text containing STRICTLY THREE SECTIONS: Summary, Work Experience, and Skills. DO NOT include Education or Projects.`;
 
-function getFormatterModel(preferredProvider?: string) {
-  const provider = (
-    preferredProvider ||
-    process.env.AI_PROVIDER ||
-    "gemini"
-  ).toLowerCase();
-
-  if (provider === "gateway") {
-    const modelName = process.env.AI_GATEWAY_MODEL || "openai/gpt-4o";
-    return gateway(modelName);
+async function getFormatterModel(preferredProvider?: string) {
+  if (!preferredProvider) {
+    const { model } = await getActiveLanguageModel();
+    return model;
   }
 
-  if (provider === "openai" && process.env.OPENAI_API_KEY) {
-    const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    return openai("gpt-4o");
+  const normalized = preferredProvider.trim().toLowerCase() as GlobalAiProvider;
+  if ((SUPPORTED_AI_PROVIDERS as readonly string[]).includes(normalized)) {
+    const modelId = await getGlobalAiModel(normalized);
+    return resolveLanguageModel(normalized, modelId).model;
   }
 
-  if (provider === "claude" && process.env.ANTHROPIC_API_KEY) {
-    const anthropic = createAnthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    });
-    return anthropic("claude-3-5-sonnet-latest");
-  }
-
-  const geminiKey =
-    process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-  if (geminiKey) {
-    const google = createGoogleGenerativeAI({ apiKey: geminiKey });
-    return google(AI_MODEL);
-  }
-
-  // Fallback to gateway if deployed with Vercel OIDC or no direct key
-  return gateway(process.env.AI_GATEWAY_MODEL || "openai/gpt-4o");
+  return resolveLanguageModel(preferredProvider).model;
 }
 
 export async function formatResumeWithGemini(
@@ -133,7 +115,7 @@ export async function formatResumeWithGemini(
 ${resumeText}
 """`;
 
-    const model = getFormatterModel(providerOverride);
+    const model = await getFormatterModel(providerOverride);
 
     const { output: object } = await generateText({
       model,

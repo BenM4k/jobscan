@@ -18,11 +18,15 @@ export function notifyCreditsUpdated(): void {
  */
 export function useLiveCreditBalance(initialBalance: number): number {
   const pathname = usePathname();
-  const [synced, setSynced] = useState<{ base: number; value: number } | null>(
-    null
-  );
+  const [prevInitialBalance, setPrevInitialBalance] = useState(initialBalance);
+  const [fetchedBalance, setFetchedBalance] = useState<number | null>(null);
   const prevPathnameRef = useRef<string | null>(null);
   const activeControllerRef = useRef<AbortController | null>(null);
+
+  if (initialBalance !== prevInitialBalance) {
+    setPrevInitialBalance(initialBalance);
+    setFetchedBalance(null);
+  }
 
   useEffect(() => {
     const fetchLatestBalance = async () => {
@@ -41,7 +45,7 @@ export function useLiveCreditBalance(initialBalance: number): number {
           value?: { balance?: number };
         };
         if (json?.ok && typeof json.value?.balance === "number") {
-          setSynced({ base: initialBalance, value: json.value.balance });
+          setFetchedBalance(json.value.balance);
         }
       } catch {
         // Ignore abort or transient offline errors; SSR value remains displayed.
@@ -66,7 +70,7 @@ export function useLiveCreditBalance(initialBalance: number): number {
       window.removeEventListener("focus", onRefresh);
       window.removeEventListener(CREDITS_UPDATED_EVENT, onRefresh);
     };
-  }, [pathname, initialBalance]);
+  }, [pathname]);
 
-  return synced?.base === initialBalance ? synced.value : initialBalance;
+  return fetchedBalance ?? initialBalance;
 }

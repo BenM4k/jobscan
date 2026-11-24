@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useTranslations } from "next-intl";
 import type { EducationItem, ExperienceItem } from "@/lib/ai";
 import type { TailoredResumeDocument } from "@/lib/tailored-resume-document";
@@ -21,6 +21,7 @@ export function TailoredResumeStructuredForm({
   onDocChange,
 }: TailoredResumeStructuredFormProps) {
   const t = useTranslations("jobDetail");
+  const [languagesDraft, setLanguagesDraft] = useState<string | null>(null);
 
   const experienceItems: ExperienceItem[] = doc.experience.map((r) => ({
     title: r.title,
@@ -61,15 +62,25 @@ export function TailoredResumeStructuredForm({
     });
   };
 
+  const normalizeLanguages = (raw: string): string[] =>
+    raw
+      .split("|")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
   return (
     <div className="space-y-5">
       {/* Header Identity */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
         <div className="space-y-1">
-          <label className="block text-[11px] font-semibold text-slate-600 dark:text-zinc-400">
+          <label
+            htmlFor="tailored-resume-fullname"
+            className="block text-[11px] font-semibold text-slate-600 dark:text-zinc-400"
+          >
             {t("fieldFullName")}
           </label>
           <input
+            id="tailored-resume-fullname"
             type="text"
             value={doc.fullName}
             onChange={(e) => onDocChange({ ...doc, fullName: e.target.value })}
@@ -78,10 +89,14 @@ export function TailoredResumeStructuredForm({
           />
         </div>
         <div className="space-y-1">
-          <label className="block text-[11px] font-semibold text-slate-600 dark:text-zinc-400">
+          <label
+            htmlFor="tailored-resume-headline"
+            className="block text-[11px] font-semibold text-slate-600 dark:text-zinc-400"
+          >
             {t("fieldHeadline")}
           </label>
           <input
+            id="tailored-resume-headline"
             type="text"
             value={doc.headline}
             onChange={(e) => onDocChange({ ...doc, headline: e.target.value })}
@@ -90,10 +105,14 @@ export function TailoredResumeStructuredForm({
           />
         </div>
         <div className="space-y-1">
-          <label className="block text-[11px] font-semibold text-slate-600 dark:text-zinc-400">
+          <label
+            htmlFor="tailored-resume-contact"
+            className="block text-[11px] font-semibold text-slate-600 dark:text-zinc-400"
+          >
             {t("fieldContact")}
           </label>
           <input
+            id="tailored-resume-contact"
             type="text"
             value={doc.contactLine}
             onChange={(e) => onDocChange({ ...doc, contactLine: e.target.value })}
@@ -105,10 +124,14 @@ export function TailoredResumeStructuredForm({
 
       {/* Summary */}
       <div className="space-y-1.5">
-        <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+        <label
+          htmlFor="tailored-resume-summary"
+          className="block text-xs font-semibold text-slate-700 dark:text-zinc-300"
+        >
           {t("summary")}
         </label>
         <textarea
+          id="tailored-resume-summary"
           rows={7}
           value={doc.summary}
           onChange={(e) => onDocChange({ ...doc, summary: e.target.value })}
@@ -118,10 +141,14 @@ export function TailoredResumeStructuredForm({
 
       {/* Core Skills */}
       <div className="space-y-1.5">
-        <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+        <label
+          htmlFor="tailored-resume-skills"
+          className="block text-xs font-semibold text-slate-700 dark:text-zinc-300"
+        >
           {t("skillsSectionHeading")}
         </label>
         <textarea
+          id="tailored-resume-skills"
           rows={4}
           value={doc.skillsText}
           onChange={(e) => onDocChange({ ...doc, skillsText: e.target.value })}
@@ -144,10 +171,14 @@ export function TailoredResumeStructuredForm({
       {/* Certifications & Languages */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+          <label
+            htmlFor="tailored-resume-certifications"
+            className="block text-xs font-semibold text-slate-700 dark:text-zinc-300"
+          >
             {t("certificationsHeading")}
           </label>
           <textarea
+            id="tailored-resume-certifications"
             rows={2}
             value={doc.certifications.join("\n")}
             onChange={(e) =>
@@ -161,21 +192,33 @@ export function TailoredResumeStructuredForm({
           />
         </div>
         <div className="space-y-1.5">
-          <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+          <label
+            htmlFor="tailored-resume-languages"
+            className="block text-xs font-semibold text-slate-700 dark:text-zinc-300"
+          >
             {t("languagesHeading")}
           </label>
           <input
+            id="tailored-resume-languages"
             type="text"
-            value={doc.languages.join(" | ")}
-            onChange={(e) =>
+            value={languagesDraft ?? doc.languages.join(" | ")}
+            onChange={(e) => {
+              const raw = e.target.value;
+              setLanguagesDraft(raw);
               onDocChange({
                 ...doc,
-                languages: e.target.value
-                  .split("|")
-                  .map((s) => s.trim())
-                  .filter(Boolean),
-              })
-            }
+                languages: normalizeLanguages(raw),
+              });
+            }}
+            onBlur={() => {
+              if (languagesDraft !== null) {
+                onDocChange({
+                  ...doc,
+                  languages: normalizeLanguages(languagesDraft),
+                });
+                setLanguagesDraft(null);
+              }
+            }}
             placeholder="English (Native) | French (Fluent)"
             className={inputClass}
           />

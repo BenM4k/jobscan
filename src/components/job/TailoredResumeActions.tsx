@@ -24,6 +24,7 @@ interface TailoredResumeActionsProps {
   tailoredResumeRecordId?: string;
   defaultLabel?: string;
   onPromoted?: (newPersona: MasterResumeSelect) => void;
+  onReverted?: (previousResumeId: string) => void;
 }
 
 /** Provides promotion of a tailored resume into an active master persona with undo support. */
@@ -31,6 +32,7 @@ export function TailoredResumeActions({
   tailoredResumeRecordId,
   defaultLabel = "Promoted Persona",
   onPromoted,
+  onReverted,
 }: TailoredResumeActionsProps) {
   const t = useTranslations("jobDetail");
   const tCommon = useTranslations("common");
@@ -67,6 +69,7 @@ export function TailoredResumeActions({
             onClick: async () => {
               const undoRes = await revertActiveResumeAction(previousActiveId);
               if (undoRes.success) {
+                onReverted?.(previousActiveId);
                 toast.success(t("promoteRevertSuccess"));
               } else {
                 toast.error(undoRes.error || t("promoteRevertError"));

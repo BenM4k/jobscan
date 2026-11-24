@@ -11,7 +11,7 @@ import { diffSkills } from "./skills.service";
 import { ingestFromSource } from "./adapters";
 import type { IngestResult, IngestionAggregatedResult } from "./adapters/types";
 import { getScoringProvider } from "./scoring/factory";
-import { getGlobalAiProvider } from "./ai/provider-config";
+import { getGlobalAiModel, getGlobalAiProvider } from "./ai/provider-config";
 import { getCachedScore, setCachedScore } from "./ai/score-cache";
 import { withAiTracking } from "./ai/tracker";
 import type { ScoreResult } from "./scoring/types";
@@ -21,8 +21,22 @@ import { AppError } from "@/lib/errors";
 const VALID_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
   new: ["saved", "applied", "interviewing", "offer", "rejected", "withdrawn"],
   saved: ["applied", "interviewing", "offer", "rejected", "withdrawn"],
-  scored: ["saved", "applied", "interviewing", "offer", "rejected", "withdrawn"],
-  tailored: ["saved", "applied", "interviewing", "offer", "rejected", "withdrawn"],
+  scored: [
+    "saved",
+    "applied",
+    "interviewing",
+    "offer",
+    "rejected",
+    "withdrawn",
+  ],
+  tailored: [
+    "saved",
+    "applied",
+    "interviewing",
+    "offer",
+    "rejected",
+    "withdrawn",
+  ],
   applied: ["saved", "interviewing", "offer", "rejected", "withdrawn"],
   interviewing: ["saved", "applied", "offer", "rejected", "withdrawn"],
   rejected: ["saved", "applied", "interviewing", "offer", "withdrawn"],
@@ -52,7 +66,7 @@ export async function fetchAndUpsertJobsAcrossSources(
   const sources: IngestResult[] = [];
 
   const results = await Promise.all(
-    sourceIds.map((sourceId) => ingestFromSource(sourceId, { target, userId }))
+    sourceIds.map((sourceId) => ingestFromSource(sourceId, { target, userId })),
   );
 
   for (let i = 0; i < sourceIds.length; i++) {
@@ -103,7 +117,12 @@ export async function scoreJobWithAI(
     const resumeRes = await resumeDal.getMasterResumeById(resumeId, userId);
     if (!resumeRes.ok) return err(resumeRes.error);
     if (!resumeRes.value) {
-      return err(new AppError("NOT_FOUND", `Requested resume persona ${resumeId} not found`));
+      return err(
+        new AppError(
+          "NOT_FOUND",
+          `Requested resume persona ${resumeId} not found`,
+        ),
+      );
     }
     activeResume = resumeRes.value;
   } else {
@@ -143,7 +162,7 @@ export async function scoreJobWithAI(
       } else if (byEntry.error.code === "NOT_FOUND") {
         const byJob = await pipelineDal.getPipelineEntryByUserAndJob(
           userId,
-          jobId
+          jobId,
         );
         if (!byJob.ok) {
           return err(byJob.error);
@@ -158,12 +177,11 @@ export async function scoreJobWithAI(
 
       const simRes = await jobsDal.getJobResumeSimilarity(
         canonicalJobId,
-        activeResume.id
+        activeResume.id,
       );
       if (simRes.ok && simRes.value !== null) {
-        const { scoreJobForResume } = await import(
-          "@/services/scoring/score-job"
-        );
+        const { scoreJobForResume } =
+          await import("@/services/scoring/score-job");
         const hybridRes = await scoreJobForResume(
           {
             id: canonicalJobId,
@@ -179,11 +197,14 @@ export async function scoreJobWithAI(
           },
           resolvedPipelineEntryId,
           userId,
-          { precomputedCosineSimilarity: simRes.value }
+          { precomputedCosineSimilarity: simRes.value },
         );
 
         if (hybridRes.ok) {
-          return await jobsDal.getJobById(hybridRes.value.pipelineEntryId, userId);
+          return await jobsDal.getJobById(
+            hybridRes.value.pipelineEntryId,
+            userId,
+          );
         }
 
         if (
@@ -193,8 +214,8 @@ export async function scoreJobWithAI(
           return err(
             new AppError(
               "RATE_LIMITED",
-              `Rate limit exceeded for AI scoring. Please wait ${hybridRes.error.retryAfterSeconds}s before retrying.`
-            )
+              `Rate limit exceeded for AI scoring. Please wait ${hybridRes.error.retryAfterSeconds}s before retrying.`,
+            ),
           );
         }
       }
@@ -202,7 +223,8 @@ export async function scoreJobWithAI(
   }
 
   const activeProvider = await getGlobalAiProvider();
-  const provider = getScoringProvider(activeProvider);
+  const activeModelId = await getGlobalAiModel(activeProvider);
+  const provider = getScoringProvider(activeProvider, activeModelId);
   const resumeVersion = activeResume.version;
   const modelVersion = provider.modelId;
 
@@ -211,7 +233,7 @@ export async function scoreJobWithAI(
     job.id,
     activeResume.id,
     resumeVersion,
-    modelVersion
+    modelVersion,
   );
   let score: ScoreResult;
 
@@ -255,7 +277,7 @@ export async function scoreJobWithAI(
       activeResume.id,
       resumeVersion,
       modelVersion,
-      score
+      score,
     );
   }
 
@@ -315,7 +337,7 @@ export async function scoreJobWithAI(
     userId,
     undefined,
     undefined,
-    activeResume.id
+    activeResume.id,
   );
 }
 
@@ -405,7 +427,10 @@ export async function scoreJobHybrid(
   if (entryRes.ok) {
     canonicalJobId = entryRes.value.jobId;
   } else if (entryRes.error.code === "NOT_FOUND") {
-    const entryByJob = await pipelineDal.getPipelineEntryByUserAndJob(userId, jobId);
+    const entryByJob = await pipelineDal.getPipelineEntryByUserAndJob(
+      userId,
+      jobId,
+    );
     if (!entryByJob.ok) {
       return err(entryByJob.error);
     }
@@ -429,7 +454,8 @@ export async function scoreJobHybrid(
     );
   }
 
-  const jobLanguage = ((job as { language?: string }).language as "en" | "fr") || "en";
+  const jobLanguage =
+    ((job as { language?: string }).language as "en" | "fr") || "en";
   const resumeLanguage =
     ((activeResume as { language?: string }).language as "en" | "fr") || "en";
   const isLanguageMatch = jobLanguage === resumeLanguage;
@@ -524,7 +550,7 @@ export async function transitionJobStatus(
   } else if (byEntryRes.error.code === "NOT_FOUND") {
     const byJobRes = await pipelineDal.getPipelineEntryByUserAndJob(
       userId,
-      jobId
+      jobId,
     );
     if (!byJobRes.ok) return err(byJobRes.error);
     existingEntry = byJobRes.value;
@@ -540,8 +566,8 @@ export async function transitionJobStatus(
       return err(
         new AppError(
           "VALIDATION_ERROR",
-          `Invalid status transition from unsaved job to '${targetStatus}'. Allowed target statuses: [saved]`
-        )
+          `Invalid status transition from unsaved job to '${targetStatus}'. Allowed target statuses: [saved]`,
+        ),
       );
     }
 

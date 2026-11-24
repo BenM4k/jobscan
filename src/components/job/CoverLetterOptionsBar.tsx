@@ -45,11 +45,12 @@ export function CoverLetterOptionsBar({
         <span className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
           {t("coverLetterToneLabel")}
         </span>
-        <div className="flex flex-wrap gap-1.5">
+        <div role="group" aria-label={t("coverLetterToneLabel")} className="flex flex-wrap gap-1.5">
           {TONES.map((item) => (
             <button
               key={item}
               type="button"
+              aria-pressed={tone === item}
               disabled={isStreaming}
               onClick={() => setTone(item)}
               className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors duration-300 ease-out cursor-pointer ${

@@ -5,44 +5,100 @@ import { useRouter } from "next/navigation";
 import { Bot, Check, AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { setGlobalAiProviderAction } from "@/actions/admin.actions";
+import {
+  listAiProviderModelsAction,
+  setGlobalAiProviderAction,
+} from "@/actions/admin.actions";
 import type { GlobalAiProvider } from "@/services/ai/provider-config";
+import type { ProviderModelCatalog } from "@/services/ai/model-catalog";
+import { AdminAiModelSelector } from "./AdminAiModelSelector";
 
 interface AdminAiProviderCardProps {
   currentProvider: GlobalAiProvider;
+  currentModelsByProvider: Record<GlobalAiProvider, string>;
+  initialCatalog: ProviderModelCatalog;
   configuredProviders: Record<GlobalAiProvider, boolean>;
 }
 
-const PROVIDER_METADATA: ReadonlyArray<{
-  id: GlobalAiProvider;
-  label: string;
-  modelHint: string;
-}> = [
-  { id: "gemini", label: "Google Gemini", modelHint: "Default platform model" },
-  { id: "claude", label: "Anthropic Claude", modelHint: "claude-3-5-sonnet-latest" },
-  { id: "openai", label: "OpenAI", modelHint: "gpt-4o" },
-  { id: "gateway", label: "AI Gateway", modelHint: "Managed multi-provider gateway" },
+const PROVIDER_LABELS: ReadonlyArray<{ id: GlobalAiProvider; label: string }> = [
+  { id: "gemini", label: "Google Gemini" },
+  { id: "claude", label: "Anthropic Claude" },
+  { id: "openai", label: "OpenAI" },
+  { id: "gateway", label: "AI Gateway" },
 ];
 
-/** Admin-only selector for the application-wide AI provider. */
+/** Admin-only selector for the application-wide AI provider and model. */
 export function AdminAiProviderCard({
   currentProvider,
+  currentModelsByProvider,
+  initialCatalog,
   configuredProviders,
 }: AdminAiProviderCardProps) {
   const router = useRouter();
   const [selected, setSelected] = useState<GlobalAiProvider>(currentProvider);
   const [active, setActive] = useState<GlobalAiProvider>(currentProvider);
+  const [selectedModels, setSelectedModels] = useState<
+    Record<GlobalAiProvider, string>
+  >(currentModelsByProvider);
+  const [activeModels, setActiveModels] = useState<
+    Record<GlobalAiProvider, string>
+  >(currentModelsByProvider);
+  const [catalogByProvider, setCatalogByProvider] = useState<
+    Partial<Record<GlobalAiProvider, ProviderModelCatalog>>
+  >({ [initialCatalog.provider]: initialCatalog });
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [isPending, startTransition] = useTransition();
 
+  const selectedModel = selectedModels[selected] || "";
+  const activeCatalog = catalogByProvider[selected];
+  const hasChanges =
+    selected !== active || selectedModel.trim() !== activeModels[active];
+
+  const loadModels = async (provider: GlobalAiProvider, forceRefresh = false) => {
+    setIsLoadingModels(true);
+    try {
+      const res = await listAiProviderModelsAction(provider, forceRefresh);
+      if (res.ok) {
+        setCatalogByProvider((prev) => ({ ...prev, [provider]: res.value }));
+        if (forceRefresh) {
+          toast.success(`Refreshed ${provider} model list`);
+        }
+      } else if (forceRefresh) {
+        toast.error(res.error || "Failed to refresh models");
+      }
+    } finally {
+      setIsLoadingModels(false);
+    }
+  };
+
+  const handleSelectProvider = (nextProvider: GlobalAiProvider) => {
+    setSelected(nextProvider);
+    if (!catalogByProvider[nextProvider]) {
+      void loadModels(nextProvider, false);
+    }
+  };
+
   const handleSave = () => {
+    const trimmedModel = selectedModel.trim();
+    if (!trimmedModel) {
+      toast.error("Please select or enter a valid model ID");
+      return;
+    }
+
     startTransition(async () => {
-      const res = await setGlobalAiProviderAction(selected);
+      const res = await setGlobalAiProviderAction(selected, trimmedModel);
       if (!res.ok) {
-        toast.error(res.error || "Failed to update global AI provider");
+        toast.error(res.error || "Failed to update global AI configuration");
         return;
       }
       setActive(res.value.provider);
-      toast.success(`Global AI provider updated to ${res.value.provider}`);
+      setActiveModels((prev) => ({
+        ...prev,
+        [res.value.provider]: res.value.modelId,
+      }));
+      toast.success(
+        `Global AI updated to ${res.value.provider} (${res.value.modelId})`
+      );
       router.refresh();
     });
   };
@@ -53,11 +109,11 @@ export function AdminAiProviderCard({
         <div>
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
             <Bot className="w-4 h-4 text-purple-500" />
-            <span>Global AI Provider</span>
+            <span>Global AI Provider & Model</span>
           </div>
           <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
-            Controls which AI provider powers scoring, tailoring, and interview
-            prep for all users. Defaults to Google Gemini.
+            Controls which AI provider and model power scoring, extraction,
+            tailoring, and interview prep for all users.
           </p>
         </div>
 
@@ -65,10 +121,13 @@ export function AdminAiProviderCard({
           type="button"
           size="sm"
           disabled={
-            isPending || selected === active || !configuredProviders[selected]
+            isPending ||
+            !hasChanges ||
+            !configuredProviders[selected] ||
+            !selectedModel.trim()
           }
           onClick={handleSave}
-          className="shrink-0"
+          className="shrink-0 cursor-pointer"
         >
           {isPending ? (
             <>
@@ -82,18 +141,19 @@ export function AdminAiProviderCard({
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {PROVIDER_METADATA.map((item) => {
+        {PROVIDER_LABELS.map((item) => {
           const isSelected = selected === item.id;
           const isActive = active === item.id;
           const isConfigured = configuredProviders[item.id];
+          const savedModel = selectedModels[item.id];
 
           return (
             <button
               key={item.id}
               type="button"
-              onClick={() => setSelected(item.id)}
+              onClick={() => handleSelectProvider(item.id)}
               aria-pressed={isSelected}
-              className={`text-left p-3.5 rounded-xl border transition-all ${
+              className={`text-left p-3.5 rounded-xl border transition-colors cursor-pointer ${
                 isSelected
                   ? "border-purple-500 bg-purple-50/70 dark:bg-purple-950/30 ring-1 ring-purple-500/40"
                   : "border-slate-200 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700"
@@ -111,8 +171,8 @@ export function AdminAiProviderCard({
                 )}
               </div>
 
-              <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-1">
-                {item.modelHint}
+              <p className="text-[11px] font-mono text-slate-500 dark:text-zinc-400 mt-1 truncate">
+                {savedModel}
               </p>
 
               <div className="mt-2.5 flex items-center gap-1 text-[10px] font-medium">
@@ -131,6 +191,17 @@ export function AdminAiProviderCard({
           );
         })}
       </div>
+
+      <AdminAiModelSelector
+        selectedModel={selectedModel}
+        models={activeCatalog?.models || []}
+        catalogSource={activeCatalog?.source || "fallback"}
+        isLoadingModels={isLoadingModels}
+        onSelectModel={(modelId) =>
+          setSelectedModels((prev) => ({ ...prev, [selected]: modelId }))
+        }
+        onRefreshModels={() => void loadModels(selected, true)}
+      />
     </div>
   );
 }
