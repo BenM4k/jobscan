@@ -2,6 +2,7 @@ import { inngest } from "@/inngest/client";
 import {
   scheduledJobFetch,
   jobFetchRequested,
+  drcJobFetchRequested,
   scheduledDigestCron,
   sendDigestEmail,
   scoreJobOnCreation,
@@ -23,26 +24,53 @@ async function runInngestUnitTests() {
   // 1. Inngest Client Verification
   {
     console.log("1. Verifying Inngest client configuration...");
-    assert(inngest.id === "jobpilot", `Expected inngest.id to be 'jobpilot', got '${inngest.id}'`);
+    assert(
+      inngest.id === "jobpilot",
+      `Expected inngest.id to be 'jobpilot', got '${inngest.id}'`,
+    );
     console.log("   ✅ Inngest client ID verified as 'jobpilot'.");
   }
 
   // 2. Inngest Function Definitions & Triggers
   {
     console.log("2. Verifying Inngest function triggers & metadata...");
-    const { ingestAllSources, ALL_JOB_SOURCES } = await import("@/inngest/functions/job-fetch");
+    const { ingestAllSources, ALL_JOB_SOURCES } =
+      await import("@/inngest/functions/job-fetch");
 
     assert(Boolean(ingestAllSources), "ingestAllSources function must exist");
     assert(Boolean(scheduledJobFetch), "scheduledJobFetch function must exist");
     assert(Boolean(jobFetchRequested), "jobFetchRequested function must exist");
-    assert(Boolean(scheduledDigestCron), "scheduledDigestCron function must exist");
+    assert(
+      Boolean(drcJobFetchRequested),
+      "drcJobFetchRequested function must exist",
+    );
+    assert(
+      Boolean(scheduledDigestCron),
+      "scheduledDigestCron function must exist",
+    );
     assert(Boolean(sendDigestEmail), "sendDigestEmail function must exist");
-    assert(Boolean(scoreJobOnCreation), "scoreJobOnCreation function must exist");
+    assert(
+      Boolean(scoreJobOnCreation),
+      "scoreJobOnCreation function must exist",
+    );
     const { embedResumeOnUpdate } = await import("@/inngest/functions");
-    assert(Boolean(embedResumeOnUpdate), "embedResumeOnUpdate function must exist");
+    assert(
+      Boolean(embedResumeOnUpdate),
+      "embedResumeOnUpdate function must exist",
+    );
 
-    assert(ALL_JOB_SOURCES.length === 8, `Expected 8 sources in ALL_JOB_SOURCES, got ${ALL_JOB_SOURCES.length}`);
-    console.log("   ✅ All 8 sources configured for ingestAllSources:", ALL_JOB_SOURCES.join(", "));
+    assert(
+      ALL_JOB_SOURCES.length === 9,
+      `Expected 9 sources in ALL_JOB_SOURCES, got ${ALL_JOB_SOURCES.length}`,
+    );
+    assert(
+      ALL_JOB_SOURCES.includes("reliefweb"),
+      "ALL_JOB_SOURCES must include reliefweb",
+    );
+    console.log(
+      "   ✅ All 9 sources configured for ingestAllSources:",
+      ALL_JOB_SOURCES.join(", "),
+    );
 
     console.log("   ✅ All Inngest background functions defined and exported.");
   }
@@ -52,6 +80,7 @@ async function runInngestUnitTests() {
     console.log("3. Verifying Inngest typed events...");
     const {
       jobFetchRequestedEvent,
+      drcJobFetchRequestedEvent,
       digestEmailScheduledEvent,
       jobCreatedEvent,
       resumeUpdatedEvent,
@@ -64,13 +93,28 @@ async function runInngestUnitTests() {
       userId: "user-123",
     });
     assert(fetchEvent.name === "job.fetch.requested", "Event name must match");
-    assert(fetchEvent.data.source === "greenhouse", "Payload source must match");
+
+    const drcFetchEvent = drcJobFetchRequestedEvent.create({
+      keyword: "engineer",
+      userId: "user-123",
+    });
+    assert(
+      drcFetchEvent.name === "job.drc.fetch.requested",
+      "DRC event name must match",
+    );
+    assert(
+      fetchEvent.data.source === "greenhouse",
+      "Payload source must match",
+    );
 
     const digestEvent = digestEmailScheduledEvent.create({
       userId: "user-456",
       frequency: "weekly",
     });
-    assert(digestEvent.name === "digest.email.scheduled", "Event name must match");
+    assert(
+      digestEvent.name === "digest.email.scheduled",
+      "Event name must match",
+    );
     assert(digestEvent.data.userId === "user-456", "Payload userId must match");
 
     const createEvent = jobCreatedEvent.create({
@@ -91,7 +135,6 @@ async function runInngestUnitTests() {
 
     console.log("   ✅ Typed event creators validated successfully.");
   }
-
 
   // 3. Digest Email HTML Builder
   {
@@ -119,23 +162,40 @@ async function runInngestUnitTests() {
 
     const html = buildDigestHtml("Alice", sampleJobs, "https://jobpilot.ai");
 
-    assert(html.includes("JobPilot Opportunity Digest"), "HTML must contain header");
+    assert(
+      html.includes("JobPilot Opportunity Digest"),
+      "HTML must contain header",
+    );
     assert(html.includes("Alice"), "HTML must be personalized with user name");
-    assert(html.includes("Senior Fullstack Engineer"), "HTML must include job title 1");
+    assert(
+      html.includes("Senior Fullstack Engineer"),
+      "HTML must include job title 1",
+    );
     assert(html.includes("Acme DRC"), "HTML must include company 1");
     assert(html.includes("Kinshasa"), "HTML must include location 1");
     assert(html.includes("DevOps Specialist"), "HTML must include job title 2");
-    assert(html.includes("https://jobpilot.ai/dashboard/jobs/job-2"), "Fallback URL for null url must point to dashboard job detail");
+    assert(
+      html.includes("https://jobpilot.ai/dashboard/jobs/job-2"),
+      "Fallback URL for null url must point to dashboard job detail",
+    );
 
-    console.log("   ✅ Digest HTML correctly formatted with job cards and fallback URLs.");
+    console.log(
+      "   ✅ Digest HTML correctly formatted with job cards and fallback URLs.",
+    );
   }
 
   // 4. Verification of decoupled dashboard service
   {
     console.log("4. Verifying dashboard feed decoupling...");
-    const { getDashboardFeedData } = await import("@/services/dashboard.service");
-    assert(typeof getDashboardFeedData === "function", "getDashboardFeedData must be a function");
-    console.log("   ✅ Dashboard feed function correctly resolved without synchronous crawler dependency.");
+    const { getDashboardFeedData } =
+      await import("@/services/dashboard.service");
+    assert(
+      typeof getDashboardFeedData === "function",
+      "getDashboardFeedData must be a function",
+    );
+    console.log(
+      "   ✅ Dashboard feed function correctly resolved without synchronous crawler dependency.",
+    );
   }
 
   console.log("\n=================================================");

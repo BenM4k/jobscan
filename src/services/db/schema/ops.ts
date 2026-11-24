@@ -7,6 +7,7 @@ import {
   numeric,
   boolean,
   timestamp,
+  jsonb,
   pgEnum,
   index,
   uniqueIndex,
@@ -127,4 +128,49 @@ export const adapterCircuitBreaker = pgTable("adapter_circuit_breaker", {
 export type AdapterCircuitBreakerSelect = typeof adapterCircuitBreaker.$inferSelect;
 export type AdapterCircuitBreakerInsert = typeof adapterCircuitBreaker.$inferInsert;
 export type CircuitBreakerState = (typeof circuitBreakerStateEnum.enumValues)[number];
+
+// ─────────────────────────────────────────────────────────────
+// Admin Audit Trail
+// ─────────────────────────────────────────────────────────────
+
+export const adminAuditLog = pgTable(
+  "admin_audit_log",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    adminUserId: uuid("admin_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    targetUserId: uuid("target_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    action: text("action").notNull(),
+    reason: text("reason"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    ...timestamps,
+  },
+  (t) => [
+    index("admin_audit_log_created_idx").on(t.createdAt.desc()),
+    index("admin_audit_log_target_idx").on(t.targetUserId, t.createdAt.desc()),
+  ]
+);
+
+export type AdminAuditLogSelect = typeof adminAuditLog.$inferSelect;
+export type AdminAuditLogInsert = typeof adminAuditLog.$inferInsert;
+
+// ─────────────────────────────────────────────────────────────
+// Application-Wide Settings (Admin Controlled)
+// ─────────────────────────────────────────────────────────────
+
+export const appSetting = pgTable("app_setting", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  key: text("key").notNull().unique(),
+  value: text("value").notNull(),
+  updatedBy: uuid("updated_by").references(() => user.id, {
+    onDelete: "set null",
+  }),
+  ...timestamps,
+});
+
+export type AppSettingSelect = typeof appSetting.$inferSelect;
+export type AppSettingInsert = typeof appSetting.$inferInsert;
 

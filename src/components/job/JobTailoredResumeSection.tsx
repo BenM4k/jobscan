@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { JobSelect } from "@/dal/jobs.dal";
 import {
   FileText,
@@ -11,10 +11,12 @@ import {
   Save,
   Check,
   X,
+  History,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useTailoredResume } from "./useTailoredResume";
 import { TailoredResumeActions } from "./TailoredResumeActions";
+import { DocumentVersionHistoryDialog } from "./DocumentVersionHistoryDialog";
 import { RetryProgressBadge } from "@/components/ui/RetryProgressBadge";
 import { InsufficientCreditsDialog } from "@/components/billing/InsufficientCreditsDialog";
 
@@ -32,6 +34,7 @@ export function JobTailoredResumeSection({
 }: JobTailoredResumeSectionProps) {
   const t = useTranslations("jobDetail");
   const tCommon = useTranslations("common");
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const {
     isGenerating,
@@ -225,7 +228,27 @@ export function JobTailoredResumeSection({
               <RotateCcw className="size-3.5 shrink-0" />
               <span>{t("regenerateResume")}</span>
             </button>
+
+            {job.pipelineEntryId && (
+              <button
+                type="button"
+                onClick={() => setHistoryOpen(true)}
+                className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 p-0 bg-transparent border-0 cursor-pointer font-sans"
+              >
+                <History className="size-3.5 shrink-0" />
+                <span>{t("versionHistory")}</span>
+              </button>
+            )}
           </div>
+
+          {job.pipelineEntryId && (
+            <DocumentVersionHistoryDialog
+              open={historyOpen}
+              onOpenChange={setHistoryOpen}
+              pipelineEntryId={job.pipelineEntryId}
+              type="resume"
+            />
+          )}
 
           {/* Persona Promotion & Resumes Navigation */}
           <div className="ml-7.5">

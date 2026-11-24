@@ -9,7 +9,11 @@ import { JobDetailHeader } from "./JobDetailHeader";
 import { JobScoreSection } from "./JobScoreSection";
 import { JobTailoredResumeSection } from "./JobTailoredResumeSection";
 import { JobCoverLetterSection } from "./JobCoverLetterSection";
+import { JobInterviewPrepSection } from "./JobInterviewPrepSection";
 import { JobDescriptionSection } from "./JobDescriptionSection";
+import { PipelineTimelineSection } from "./PipelineTimelineSection";
+import type { InterviewQuestionItem } from "@/dal/interview.dal";
+import type { PipelineTimelineItem } from "@/services/job-history.service";
 import { useJobScoring } from "./useJobScoring";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -30,21 +34,65 @@ interface JobDetailViewProps {
   initialJob: JobSelect;
   initialResumes?: MasterResumeSelect[];
   sanitizedDescriptionHtml?: string;
+  initialInterviewQuestions?: InterviewQuestionItem[];
+  initialQuestionSetId?: string;
+  initialQuestionsGeneratedAt?: string;
+  initialTimeline?: PipelineTimelineItem[];
+}
+
+interface PendingTimelineItem extends PipelineTimelineItem {
+  jobId: string;
+}
+
+function isLocalTimelineConfirmed(
+  localEvent: PipelineTimelineItem,
+  serverEvents: PipelineTimelineItem[],
+): boolean {
+  const localMs = new Date(localEvent.changedAt).getTime();
+  return serverEvents.some(
+    (s) =>
+      s.status === localEvent.status &&
+      new Date(s.changedAt).getTime() >= localMs - 10_000,
+  );
+}
+
+function reconcileTimeline(
+  serverEvents: PipelineTimelineItem[],
+  localEvents: PendingTimelineItem[],
+  currentJobId: string,
+): PipelineTimelineItem[] {
+  const unconfirmed = localEvents
+    .filter(
+      (localEvent) =>
+        localEvent.jobId === currentJobId &&
+        !isLocalTimelineConfirmed(localEvent, serverEvents),
+    )
+    .map(({ id, status, changedAt }) => ({ id, status, changedAt }));
+  return unconfirmed.length > 0 ? [...unconfirmed, ...serverEvents] : serverEvents;
 }
 
 export function JobDetailView({
   initialJob,
   initialResumes = [],
   sanitizedDescriptionHtml,
+  initialInterviewQuestions = [],
+  initialQuestionSetId,
+  initialQuestionsGeneratedAt,
+  initialTimeline = [],
 }: JobDetailViewProps) {
   const tCommon = useTranslations("common");
   const tDash = useTranslations("dashboard");
   const tJob = useTranslations("jobDetail");
   const [job, setJob] = useState<JobSelect>(initialJob);
+  const [pendingTimeline, setPendingTimeline] = useState<PendingTimelineItem[]>(
+    [],
+  );
   const [resumes, setResumes] = useState<MasterResumeSelect[]>(initialResumes);
+
+  const timeline = reconcileTimeline(initialTimeline, pendingTimeline, job.id);
   const initialActive = initialResumes.find((r) => r.isActive);
   const [selectedResumeId, setSelectedResumeId] = useState<string | undefined>(
-    initialActive?.id || initialResumes[0]?.id
+    initialActive?.id || initialResumes[0]?.id,
   );
   const [createResumeOpen, setCreateResumeOpen] = useState(false);
   const router = useRouter();
@@ -78,6 +126,15 @@ export function JobDetailView({
         status: newStatus,
         location: "detail",
       });
+      setPendingTimeline((prev) => [
+        {
+          id: `local-${Date.now()}`,
+          status: newStatus,
+          changedAt: new Date(),
+          jobId: job.id,
+        },
+        ...prev,
+      ]);
       toast.success(`Status updated to ${newStatus}`);
     }
   };
@@ -123,6 +180,22 @@ export function JobDetailView({
         selectedResumeId={selectedResumeId}
       />
 
+      <JobInterviewPrepSection
+        job={job}
+        selectedResumeId={selectedResumeId}
+        initialQuestions={initialInterviewQuestions}
+        initialQuestionSetId={initialQuestionSetId}
+        initialQuestionsGeneratedAt={initialQuestionsGeneratedAt}
+        onPipelineEntryResolved={(pipelineEntryId) =>
+          setJob((prev) => ({
+            ...prev,
+            id: pipelineEntryId,
+            pipelineEntryId,
+            canonicalJobId: prev.canonicalJobId ?? prev.id,
+          }))
+        }
+      />
+
       {/* AI Toolkit Area Disclaimer (single instance) */}
       <div className="py-3.5 flex items-center gap-2 text-sm text-muted-foreground font-normal font-sans">
         <Info className="size-4.5 text-muted-foreground/70 shrink-0" />
@@ -138,8 +211,13 @@ export function JobDetailView({
         }
       />
 
+      <PipelineTimelineSection events={timeline} />
+
       {/* Missing Master Resume Modal */}
-      <Dialog open={scoring.missingResumeOpen} onOpenChange={scoring.setMissingResumeOpen}>
+      <Dialog
+        open={scoring.missingResumeOpen}
+        onOpenChange={scoring.setMissingResumeOpen}
+      >
         <DialogContent className="sm:max-w-md p-6 space-y-4">
           <DialogHeader>
             <div className="flex items-center gap-2">

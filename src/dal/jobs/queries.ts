@@ -120,6 +120,7 @@ export async function getJobById(
 
     return ok({
       id: found.id,
+      canonicalJobId: found.id,
       userId: userId || "",
       source: found.source,
       externalId: found.externalId || "",

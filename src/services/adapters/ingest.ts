@@ -24,6 +24,7 @@ import * as congojob from "./congojob.adapter";
 import * as emploicd from "./emploicd.adapter";
 import * as fecrdc from "./fecrdc.adapter";
 import * as unjobs from "./unjobs.adapter";
+import * as reliefweb from "./reliefweb.adapter";
 
 export const FUNCTIONAL_ADAPTERS: Record<string, FunctionalJobAdapter> = {
   ashby: { id: "ashby", fetchRaw: ashby.fetchRaw, normalize: ashby.normalize },
@@ -62,6 +63,11 @@ export const FUNCTIONAL_ADAPTERS: Record<string, FunctionalJobAdapter> = {
     id: "unjobs",
     fetchRaw: unjobs.fetchRaw,
     normalize: unjobs.normalize,
+  },
+  reliefweb: {
+    id: "reliefweb",
+    fetchRaw: reliefweb.fetchRaw,
+    normalize: reliefweb.normalize,
   },
 };
 

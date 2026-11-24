@@ -28,6 +28,8 @@ export function CreditLedgerHistory({ entries }: CreditLedgerHistoryProps) {
         return t("actionInterviewPrep");
       case "refund":
         return t("actionRefund");
+      case "admin_grant":
+        return t("actionAdminGrant");
       default:
         return action;
     }

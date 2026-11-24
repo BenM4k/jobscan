@@ -17,7 +17,12 @@ export interface InterviewQuestionItem {
 export async function createInterviewQuestionSet(
   pipelineEntryId: string,
   questions: InterviewQuestionItem[]
-): Promise<Result<{ id: string; pipelineEntryId: string; questions: unknown }, AppError>> {
+): Promise<
+  Result<
+    { id: string; pipelineEntryId: string; questions: unknown; createdAt: Date },
+    AppError
+  >
+> {
   try {
     const [row] = await db
       .insert(interviewQuestionSet)
@@ -38,12 +43,13 @@ export async function createInterviewQuestionSet(
 export async function getInterviewQuestionSetByEntryId(
   pipelineEntryId: string,
   userId: string
-): Promise<Result<{ id: string; questions: unknown } | null, AppError>> {
+): Promise<Result<{ id: string; questions: unknown; createdAt: Date } | null, AppError>> {
   try {
     const [row] = await db
       .select({
         id: interviewQuestionSet.id,
         questions: interviewQuestionSet.questions,
+        createdAt: interviewQuestionSet.createdAt,
       })
       .from(interviewQuestionSet)
       .innerJoin(

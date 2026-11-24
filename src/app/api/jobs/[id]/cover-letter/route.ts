@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { streamText, toTextStream, createTextStreamResponse } from "ai";
-import { getGoogleModel } from "@/lib/ai";
+import { getActiveLanguageModel } from "@/services/ai/provider-config";
 import { requireSession } from "@/lib/auth-guard";
 import { checkAiRateLimit } from "@/services/rate-limit";
 import * as jobsDal from "@/dal/jobs.dal";
@@ -269,7 +269,11 @@ export async function POST(
     const isRegeneration = Boolean(isRegenerateRequested);
     const resumeText = activeResume.content;
     const resumeSkills: string[] = skillsResult.ok ? skillsResult.value : [];
-    const model = getGoogleModel();
+    const {
+      model,
+      provider: activeProvider,
+      modelId: activeModelId,
+    } = await getActiveLanguageModel();
 
     const instructions = buildCoverLetterInstructions({
       isRegeneration,
@@ -396,8 +400,8 @@ export async function POST(
             await opsDal.logAiCall({
               userId,
               feature: "tailored_cover_letter",
-              provider: "google",
-              model: model.modelId ?? "gemini",
+              provider: activeProvider,
+              model: activeModelId,
               costEstimateUsd: "0.001",
             });
 

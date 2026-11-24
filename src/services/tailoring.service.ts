@@ -1,7 +1,8 @@
 import "server-only";
 
 import { generateText, Output } from "ai";
-import { getGoogleModel, TailoredResumeSchema } from "@/lib/ai";
+import { TailoredResumeSchema } from "@/lib/ai";
+import { getActiveLanguageModel } from "@/services/ai/provider-config";
 import * as jobsDal from "@/dal/jobs.dal";
 import * as resumeDal from "@/dal/resume.dal";
 import * as tailoringDal from "@/dal/tailoring.dal";
@@ -120,7 +121,11 @@ export async function generateTailoredResume(
     if (!contextRes.ok) return contextRes;
     const { job, resume, resumeSkills, outputLanguage, location } = contextRes.value;
 
-    const model = getGoogleModel();
+    const {
+      model,
+      provider: activeProvider,
+      modelId: activeModelId,
+    } = await getActiveLanguageModel();
     const instructions = buildResumeTailoringInstructions(outputLanguage);
     const prompt = buildResumeTailoringPrompt({
       resumeText: resume.content,
@@ -140,8 +145,8 @@ export async function generateTailoredResume(
         {
           userId,
           feature: "tailored_resume",
-          provider: "google",
-          model: model.modelId ?? "gemini",
+          provider: activeProvider,
+          model: activeModelId,
         },
         () =>
           generateText({
@@ -238,7 +243,11 @@ export async function generateTailoredCoverLetter(
 
     const previousCoverLetter = job.coverLetterDraft || null;
     const isRegeneration = Boolean(opts.regenerate);
-    const model = getGoogleModel();
+    const {
+      model,
+      provider: activeProvider,
+      modelId: activeModelId,
+    } = await getActiveLanguageModel();
 
     const instructions = buildCoverLetterInstructions({
       isRegeneration,
@@ -268,8 +277,8 @@ export async function generateTailoredCoverLetter(
         {
           userId,
           feature: "tailored_cover_letter",
-          provider: "google",
-          model: model.modelId ?? "gemini",
+          provider: activeProvider,
+          model: activeModelId,
         },
         () =>
           generateText({

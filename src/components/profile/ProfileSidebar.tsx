@@ -1,13 +1,12 @@
 "use client";
 
 import React from "react";
-import { FileText, Briefcase, GraduationCap, Zap, Bot } from "lucide-react";
+import { FileText, Briefcase, GraduationCap, Zap } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { AiUsageProgress } from "@/components/shared/AiUsageProgress";
 import type { UserAiUsage } from "@/services/ai/usage.service";
 
 interface ProfileSidebarProps {
-  aiProvider: string;
   skillsCount: number;
   resumeLength: number;
   experienceCount?: number;
@@ -20,15 +19,7 @@ interface ProfileSidebarProps {
   resumeSource?: string;
 }
 
-const AI_ENGINE_LABELS: Record<string, string> = {
-  gemini: "Gemini 3.8 Flash",
-  gateway: "AI Gateway",
-  openai: "OpenAI GPT-4o",
-  claude: "Claude 3.5 Sonnet",
-};
-
 export function ProfileSidebar({
-  aiProvider,
   skillsCount,
   resumeLength,
   experienceCount = 0,
@@ -41,9 +32,6 @@ export function ProfileSidebar({
   resumeSource,
 }: ProfileSidebarProps) {
   const t = useTranslations("profile");
-  const engineLabel =
-    AI_ENGINE_LABELS[aiProvider?.toLowerCase()] ||
-    (aiProvider ? aiProvider.charAt(0).toUpperCase() + aiProvider.slice(1) : "Gemini 3.8 Flash");
 
   const strengthPercentage = Math.min(
     100,
@@ -113,19 +101,6 @@ export function ProfileSidebar({
               </p>
               <p className="text-xs text-slate-500 dark:text-zinc-400">
                 {skillsCount} {t("skillsTracked")}
-              </p>
-            </div>
-          </div>
-
-          {/* Active AI Engine Callout Box */}
-          <div className="bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-900/50 rounded-xl p-3 flex items-center gap-3 mt-4">
-            <Bot className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
-            <div className="space-y-0.5">
-              <p className="text-xs font-medium text-slate-900 dark:text-zinc-100">
-                {t("activeAiEngine")}
-              </p>
-              <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 font-sans">
-                {engineLabel}
               </p>
             </div>
           </div>

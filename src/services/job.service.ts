@@ -11,6 +11,7 @@ import { diffSkills } from "./skills.service";
 import { ingestFromSource } from "./adapters";
 import type { IngestResult, IngestionAggregatedResult } from "./adapters/types";
 import { getScoringProvider } from "./scoring/factory";
+import { getGlobalAiProvider } from "./ai/provider-config";
 import { getCachedScore, setCachedScore } from "./ai/score-cache";
 import { withAiTracking } from "./ai/tracker";
 import type { ScoreResult } from "./scoring/types";
@@ -35,8 +36,9 @@ export async function fetchAndUpsertJobs(
   sourceId: string,
   target?: string,
   userId?: string,
+  keyword?: string,
 ): Promise<Result<IngestResult, AppError>> {
-  return await ingestFromSource(sourceId, { target, userId });
+  return await ingestFromSource(sourceId, { target, keyword, userId });
 }
 
 export async function fetchAndUpsertJobsAcrossSources(
@@ -199,7 +201,8 @@ export async function scoreJobWithAI(
     }
   }
 
-  const provider = getScoringProvider(preferredProvider);
+  const activeProvider = await getGlobalAiProvider();
+  const provider = getScoringProvider(activeProvider);
   const resumeVersion = activeResume.version;
   const modelVersion = provider.modelId;
 
@@ -271,7 +274,7 @@ export async function scoreJobWithAI(
       job.title,
       job.description || "",
       resumeText,
-      preferredProvider,
+      activeProvider,
     );
     if (extRes.ok) {
       if (extractedJobSkills.length === 0) {

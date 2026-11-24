@@ -68,6 +68,9 @@ export function FetchJobsPopover({
         if (!res.success) {
           throw new Error(res.error || "Failed to crawl DRC job sources");
         }
+        if ("queued" in res && res.queued) {
+          return { queued: true as const, total: 0, sources: [] as SourceResult[] };
+        }
         const sources: SourceResult[] = res.data?.sources || [];
         const open = sources.filter((s) => s.skipped && s.reason === "circuit_open");
         const failed = sources.filter((s) => s.skipped && s.reason === "fetch_failed");
@@ -85,7 +88,7 @@ export function FetchJobsPopover({
           );
         }
 
-        return { total, sources };
+        return { queued: false as const, total, sources };
       } else {
         const formData = new FormData();
         formData.append("sourceId", selectedSource);
@@ -123,9 +126,13 @@ export function FetchJobsPopover({
         source: selectedSource,
         jobs_upserted: result.total,
       });
-      onSuccess(`Successfully fetched ${result.total} job(s) from ${selectedSource.toUpperCase()}!`);
+      if ("queued" in result && result.queued) {
+        onSuccess("DRC job crawl queued in the background. New postings will appear shortly.");
+      } else {
+        onSuccess(`Successfully fetched ${result.total} job(s) from ${selectedSource.toUpperCase()}!`);
+        setTimeout(() => window.location.reload(), 1200);
+      }
       setIsOpen(false);
-      setTimeout(() => window.location.reload(), 1200);
     }
   };
 

@@ -1,14 +1,14 @@
+"use client";
+
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
-import { getTranslations } from "next-intl/server";
+import { useTranslations } from "next-intl";
 
-export async function DashboardFooter() {
+export function DashboardFooter() {
   const currentYear = 2026;
-  const [tNav, tPrivacy, tTerms] = await Promise.all([
-    getTranslations("nav"),
-    getTranslations("privacy"),
-    getTranslations("terms"),
-  ]);
+  const tNav = useTranslations("nav");
+  const tPrivacy = useTranslations("privacy");
+  const tTerms = useTranslations("terms");
 
   const legalLinks = [
     { href: "/privacy", label: tPrivacy("title") },

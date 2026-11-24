@@ -31,7 +31,7 @@ export class GeminiProvider implements ScoringProvider {
         return err(
           new AppError(
             "EXTERNAL_API_ERROR",
-            "GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY environment variable is not configured.",
+            "AI scoring service is currently unavailable. Please try again later.",
           ),
         );
       }
@@ -62,7 +62,7 @@ export class GeminiProvider implements ScoringProvider {
       console.error(E);
       const message = E instanceof Error ? E.message : "Unknown error";
       return err(
-        new AppError("EXTERNAL_API_ERROR", `Gemini scoring failed: ${message}`),
+        new AppError("EXTERNAL_API_ERROR", `AI scoring failed: ${message}`),
       );
     }
   }

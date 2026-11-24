@@ -52,10 +52,7 @@ export class GatewayProvider implements ScoringProvider {
       console.error(E);
       const message = E instanceof Error ? E.message : "Unknown error";
       return err(
-        new AppError(
-          "EXTERNAL_API_ERROR",
-          `AI Gateway scoring failed: ${message}`
-        )
+        new AppError("EXTERNAL_API_ERROR", `AI scoring failed: ${message}`)
       );
     }
   }

@@ -104,7 +104,6 @@ async function ProfileFormContent() {
       }
       initialResumeText={resumeText}
       initialSkills={skills}
-      initialAiProvider="gemini"
       initialSummary={parsed.summary}
       initialEducation={parsed.education}
       initialExperience={parsed.experience}

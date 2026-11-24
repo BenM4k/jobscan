@@ -7,6 +7,7 @@ import { CongoJobAdapter } from "./congojob.adapter";
 import { EmploiCdAdapter } from "./emploicd.adapter";
 import { FecRdcAdapter } from "./fecrdc.adapter";
 import { UnJobsAdapter } from "./unjobs.adapter";
+import { ReliefWebAdapter } from "./reliefweb.adapter";
 
 export function getJobSourceAdapter(sourceId: string): JobSourceAdapter {
   const normalizedId = sourceId.replace(/-/g, "_") as SupportedJobSource;
@@ -27,6 +28,8 @@ export function getJobSourceAdapter(sourceId: string): JobSourceAdapter {
       return new FecRdcAdapter() as unknown as JobSourceAdapter;
     case "unjobs":
       return new UnJobsAdapter() as unknown as JobSourceAdapter;
+    case "reliefweb":
+      return new ReliefWebAdapter() as unknown as JobSourceAdapter;
     default:
       throw new Error(`Unsupported job source adapter: ${sourceId}`);
   }

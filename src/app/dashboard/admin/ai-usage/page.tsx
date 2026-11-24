@@ -2,7 +2,12 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth-guard";
 import { getAdminAiTelemetry } from "@/services/admin/admin.service";
+import {
+  getGlobalAiProvider,
+  getConfiguredAiProviders,
+} from "@/services/ai/provider-config";
 import { AiUsageTable } from "@/components/admin/AiUsageTable";
+import { AdminAiProviderCard } from "@/components/admin/AdminAiProviderCard";
 import { Cpu, Zap, DollarSign } from "lucide-react";
 
 interface AiUsagePageProps {
@@ -36,11 +41,15 @@ async function TelemetryContent({
   const page = parseInt(params.page || "1", 10) || 1;
   const feature = params.feature || undefined;
 
-  const res = await getAdminAiTelemetry({
-    page,
-    limit: PAGE_SIZE,
-    feature,
-  });
+  const [res, currentProvider] = await Promise.all([
+    getAdminAiTelemetry({
+      page,
+      limit: PAGE_SIZE,
+      feature,
+    }),
+    getGlobalAiProvider(),
+  ]);
+  const configuredProviders = getConfiguredAiProviders();
 
   const data = res.ok
     ? res.value
@@ -48,6 +57,11 @@ async function TelemetryContent({
 
   return (
     <div className="space-y-6">
+      <AdminAiProviderCard
+        currentProvider={currentProvider}
+        configuredProviders={configuredProviders}
+      />
+
       {/* Cost summary card */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="p-5 rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 shadow-sm">

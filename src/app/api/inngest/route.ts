@@ -3,6 +3,7 @@ import { inngest } from "@/inngest/client";
 import {
   ingestAllSources,
   jobFetchRequested,
+  drcJobFetchRequested,
   scheduledDigestCron,
   sendDigestEmail,
   scoreJobOnCreation,
@@ -16,6 +17,7 @@ export const { GET, POST, PUT } = serve({
   functions: [
     ingestAllSources,
     jobFetchRequested,
+    drcJobFetchRequested,
     scheduledDigestCron,
     sendDigestEmail,
     scoreJobOnCreation,

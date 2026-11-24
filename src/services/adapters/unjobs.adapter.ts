@@ -111,7 +111,19 @@ export async function fetchRaw(options?: {
     });
   });
 
-  return rawItems;
+  const kw = options?.keyword?.trim().toLowerCase();
+  if (!kw) {
+    return rawItems;
+  }
+
+  return rawItems.filter((item) => {
+    const normalized = normalize(item.payload);
+    return (
+      normalized.title.toLowerCase().includes(kw) ||
+      normalized.company.toLowerCase().includes(kw) ||
+      normalized.description.toLowerCase().includes(kw)
+    );
+  });
 }
 
 /**

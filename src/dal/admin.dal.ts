@@ -12,8 +12,9 @@ import {
   aiCallLog as aiCallLogTable,
   aiFeatureEnum,
   adapterCircuitBreaker as circuitBreakerTable,
+  adminAuditLog as adminAuditLogTable,
 } from "@/services/db/schema";
-import { eq, desc, sql, and, or, ilike, count, sum, gt } from "drizzle-orm";
+import { eq, desc, sql, and, or, ilike, count, sum, gt, inArray } from "drizzle-orm";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 
@@ -496,5 +497,120 @@ export async function getAdminJobSourcesSummary(): Promise<
   } catch (error) {
     console.error("[Admin DAL] Failed to fetch job sources summary:", error);
     return err(new AppError("DB_ERROR", "Failed to fetch job sources summary", error));
+  }
+}
+
+export interface AdminAuditLogEntry {
+  id: string;
+  adminUserId: string | null;
+  targetUserId: string | null;
+  action: string;
+  reason: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: Date;
+  adminEmail: string | null;
+  targetEmail: string | null;
+}
+
+/** Appends an administrative action record to `admin_audit_log`. */
+export async function insertAdminAuditLog(input: {
+  adminUserId: string;
+  targetUserId?: string | null;
+  action: string;
+  reason?: string | null;
+  metadata?: Record<string, unknown> | null;
+}): Promise<Result<void, AppError>> {
+  try {
+    await db.insert(adminAuditLogTable).values({
+      adminUserId: input.adminUserId,
+      targetUserId: input.targetUserId ?? null,
+      action: input.action,
+      reason: input.reason ?? null,
+      metadata: input.metadata ?? null,
+    });
+    return ok(undefined);
+  } catch (error) {
+    console.error("[Admin DAL] Failed to insert audit log:", error);
+    return err(new AppError("DB_ERROR", "Failed to insert admin audit log", error));
+  }
+}
+
+/** Lists paginated administrative audit log records with optional action filter. */
+export async function getAdminAuditLogs(filter: {
+  page?: number;
+  limit?: number;
+  action?: string;
+}): Promise<
+  Result<
+    {
+      items: AdminAuditLogEntry[];
+      totalCount: number;
+      page: number;
+      totalPages: number;
+    },
+    AppError
+  >
+> {
+  try {
+    const page = Math.max(1, filter.page ?? 1);
+    const limit = Math.min(100, Math.max(1, filter.limit ?? 25));
+    const offset = (page - 1) * limit;
+
+    const whereClause = filter.action
+      ? eq(adminAuditLogTable.action, filter.action)
+      : undefined;
+
+    const [totalRes, rows] = await Promise.all([
+      db.select({ count: count() }).from(adminAuditLogTable).where(whereClause),
+      db
+        .select()
+        .from(adminAuditLogTable)
+        .where(whereClause)
+        .orderBy(desc(adminAuditLogTable.createdAt))
+        .limit(limit)
+        .offset(offset),
+    ]);
+
+    const userIds = Array.from(
+      new Set(
+        rows
+          .flatMap((r) => [r.adminUserId, r.targetUserId])
+          .filter((id): id is string => Boolean(id))
+      )
+    );
+
+    const userEmailMap = new Map<string, string>();
+    if (userIds.length > 0) {
+      const userRows = await db
+        .select({ id: userTable.id, email: userTable.email })
+        .from(userTable)
+        .where(inArray(userTable.id, userIds));
+      for (const u of userRows) {
+        userEmailMap.set(u.id, u.email);
+      }
+    }
+
+    const totalCount = Number(totalRes[0]?.count ?? 0);
+    const totalPages = Math.ceil(totalCount / limit) || 1;
+
+    return ok({
+      items: rows.map((r) => ({
+        id: r.id,
+        adminUserId: r.adminUserId,
+        targetUserId: r.targetUserId,
+        action: r.action,
+        reason: r.reason,
+        metadata: r.metadata ?? null,
+        createdAt: r.createdAt,
+        adminEmail: r.adminUserId ? (userEmailMap.get(r.adminUserId) ?? null) : null,
+        targetEmail: r.targetUserId ? (userEmailMap.get(r.targetUserId) ?? null) : null,
+      })),
+      totalCount,
+      page,
+      totalPages,
+    });
+  } catch (error) {
+    console.error("[Admin DAL] Failed to fetch audit logs:", error);
+    return err(new AppError("DB_ERROR", "Failed to fetch admin audit logs", error));
   }
 }

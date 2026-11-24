@@ -197,6 +197,20 @@
       "when": 1795530593734,
       "tag": "0027_broken_marten_broadcloak",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1795531505958,
+      "tag": "0028_broad_doctor_strange",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1795533722148,
+      "tag": "0029_red_dust",
+      "breakpoints": true
     }
   ]
 }

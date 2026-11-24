@@ -83,7 +83,7 @@ export async function saveMasterResumeAction(data: {
     experience: validData.experience,
     rawText: validData.rawText || formattedResume,
     resumeText: formattedResume,
-    aiProvider: validData.aiProvider || "gemini",
+    aiProvider: "gemini",
   });
 
   if (!result.ok) {

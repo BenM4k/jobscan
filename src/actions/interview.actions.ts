@@ -4,25 +4,33 @@ import { requireSession } from "@/lib/auth-guard";
 import { z } from "zod";
 import { checkAiRateLimit } from "@/services/rate-limit";
 import { runWithIdempotency } from "@/services/idempotency.service";
-import { generateInterviewQuestions } from "@/services/interview.service";
-import * as interviewDal from "@/dal/interview.dal";
-import { getPipelineEntryById } from "@/dal/pipeline.dal";
+import {
+  generateInterviewQuestions,
+  getInterviewQuestionsForEntry,
+  resolveInterviewPipelineEntry,
+} from "@/services/interview.service";
 import { spendCredits, grantCredits } from "@/services/billing/billing.service";
 import { ok, err } from "@/lib/result";
 import { AppError } from "@/lib/errors";
-import { BILLING_TAG, NAVBAR_TAG, revalidateTags } from "@/lib/cache-tags";
+import {
+  BILLING_TAG,
+  DASHBOARD_FEED_TAG,
+  NAVBAR_TAG,
+  jobTag,
+  revalidateTags,
+} from "@/lib/cache-tags";
 
 const interviewActionSchema = z.object({
   jobId: z.string().uuid("Invalid job ID"),
-  pipelineEntryId: z.string().uuid("Invalid pipeline entry ID"),
+  pipelineEntryId: z.string().uuid("Invalid pipeline entry ID").optional(),
   idempotencyKey: z.string().uuid("Invalid idempotency key"),
   resumeId: z.string().uuid().optional(),
 });
 
-/** Generates a billed, idempotent interview-question set for a pipeline entry. */
+/** Generates a billed, idempotent interview-question set for a job/pipeline entry. */
 export async function generateInterviewQuestionsAction(data: {
   jobId: string;
-  pipelineEntryId: string;
+  pipelineEntryId?: string;
   idempotencyKey: string;
   resumeId?: string;
 }) {
@@ -38,16 +46,17 @@ export async function generateInterviewQuestionsAction(data: {
 
   const userId = session.value.user.id;
 
-  // 1. Verify pipeline entry belongs to user and matches submitted jobId
-  const entryRes = await getPipelineEntryById(parsed.data.pipelineEntryId, userId);
-  if (!entryRes.ok || !entryRes.value) {
-    return { success: false, error: "Pipeline entry not found" };
-  }
-  if (entryRes.value.jobId !== parsed.data.jobId) {
-    return { success: false, error: "Pipeline entry does not match submitted job" };
+  const entryRes = await resolveInterviewPipelineEntry(
+    userId,
+    parsed.data.jobId,
+    parsed.data.pipelineEntryId
+  );
+  if (!entryRes.ok) {
+    return { success: false, error: entryRes.error.message };
   }
 
-  // 2. Rate limit check
+  const { pipelineEntryId, canonicalJobId } = entryRes.value;
+
   const rateLimitRes = await checkAiRateLimit(userId, "interview_prep");
   if (!rateLimitRes.allowed) {
     return {
@@ -58,44 +67,42 @@ export async function generateInterviewQuestionsAction(data: {
     };
   }
 
-  // 3. Idempotent execution
   const result = await runWithIdempotency({
     userId,
     action: "interview_prep",
     key: parsed.data.idempotencyKey,
-    targetId: parsed.data.pipelineEntryId,
+    targetId: pipelineEntryId,
     execute: async () => {
-      // 4. Spend credits before AI call
-      const spendRes = await spendCredits(userId, "interview_prep", parsed.data.pipelineEntryId);
+      const spendRes = await spendCredits(userId, "interview_prep", pipelineEntryId);
       if (!spendRes.ok) return err(spendRes.error);
 
       const genRes = await generateInterviewQuestions(
-        parsed.data.jobId,
+        canonicalJobId,
         userId,
-        parsed.data.pipelineEntryId,
+        pipelineEntryId,
         parsed.data.resumeId
       );
 
       if (!genRes.ok) {
         if (spendRes.value.cost > 0) {
-          await grantCredits(userId, spendRes.value.cost, "refund", parsed.data.pipelineEntryId);
+          await grantCredits(userId, spendRes.value.cost, "refund", pipelineEntryId);
           revalidateTags([BILLING_TAG, NAVBAR_TAG]);
         }
         return genRes;
       }
 
       return ok({
-        data: genRes.value,
+        data: { ...genRes.value, pipelineEntryId },
         resultRef: genRes.value.id,
       });
     },
     resolveExisting: async (record) => {
-      const entryId = record.targetId || parsed.data.pipelineEntryId;
-      const existing = await interviewDal.getInterviewQuestionSetByEntryId(entryId, userId);
+      const targetEntryId = record.targetId || pipelineEntryId;
+      const existing = await getInterviewQuestionsForEntry(targetEntryId, userId);
       if (!existing.ok || !existing.value) {
         return err(new AppError("NOT_FOUND", "Existing interview questions not found"));
       }
-      return ok(existing.value);
+      return ok({ ...existing.value, pipelineEntryId: targetEntryId });
     },
   });
 
@@ -111,7 +118,13 @@ export async function generateInterviewQuestionsAction(data: {
     return { success: false, error: result.error.message };
   }
 
-  revalidateTags([BILLING_TAG, NAVBAR_TAG]);
+  revalidateTags([
+    BILLING_TAG,
+    NAVBAR_TAG,
+    DASHBOARD_FEED_TAG,
+    jobTag(canonicalJobId),
+    jobTag(pipelineEntryId),
+  ]);
 
   return {
     success: true,
