@@ -115,7 +115,7 @@ export async function getJobById(
 
     const alsoPostedOn = await pipelineDal.getAlsoPostedOnForJob(
       found.id,
-      found.source
+      found.source,
     );
 
     return ok({
@@ -190,7 +190,7 @@ export async function listJobs(
       .select()
       .from(job)
       .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(desc(job.postedAt), desc(job.createdAt))
+      .orderBy(sql`${job.postedAt} DESC NULLS LAST`, desc(job.createdAt))
       .limit(limit)
       .offset(offset);
 
@@ -557,7 +557,7 @@ export async function findJobsRankedByKeyword(
           eq(job.status, "active"),
           buildManualJobVisibilityCondition(userId),
           sql`${job.descriptionTsv} @@ ${tsquery}`,
-        )
+        ),
       )
       .orderBy(desc(rankExpr))
       .limit(limit);
@@ -566,15 +566,11 @@ export async function findJobsRankedByKeyword(
       rows.map((r) => ({
         ...r.job,
         bm25Rank: Number(r.rank),
-      }))
+      })),
     );
   } catch (error) {
     return err(
-      new AppError(
-        "DB_ERROR",
-        "Failed to find jobs ranked by keyword",
-        error,
-      ),
+      new AppError("DB_ERROR", "Failed to find jobs ranked by keyword", error),
     );
   }
 }

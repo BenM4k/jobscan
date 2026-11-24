@@ -13,7 +13,7 @@ import {
   aiFeatureEnum,
   adapterCircuitBreaker as circuitBreakerTable,
 } from "@/services/db/schema";
-import { eq, desc, sql, and, or, ilike, count, sum } from "drizzle-orm";
+import { eq, desc, sql, and, or, ilike, count, sum, gt } from "drizzle-orm";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 
@@ -64,7 +64,15 @@ export async function getAdminOverviewStats(): Promise<Result<AdminOverviewStats
       aiCountRes,
     ] = await Promise.all([
       db.select({ count: count() }).from(userTable),
-      db.select({ count: count() }).from(subscriptionTable).where(eq(subscriptionTable.status, "active")),
+      db
+        .select({ count: count() })
+        .from(subscriptionTable)
+        .where(
+          and(
+            eq(subscriptionTable.status, "active"),
+            gt(subscriptionTable.currentPeriodEnd, new Date())
+          )
+        ),
       db
         .select({
           issued: sum(sql<number>`CASE WHEN ${creditLedgerTable.amount} > 0 THEN ${creditLedgerTable.amount} ELSE 0 END`),

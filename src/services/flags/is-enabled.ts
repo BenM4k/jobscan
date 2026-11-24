@@ -118,15 +118,25 @@ export async function invalidateFeatureFlagCache(
       // Global flag-change flow: invalidate anonymous entry and all cached user evaluations
       const anonKey = getFeatureFlagCacheKey(flagKey, null);
       const keysToDel: string[] = [anonKey];
+      const usersSetKey = `flag:${flagKey}:users`;
       const client = getRedisClient();
       if (client) {
-        const users = await client.smembers(`flag:${flagKey}:users`).catch(() => []);
-        if (Array.isArray(users) && users.length > 0) {
-          for (const u of users) {
-            keysToDel.push(getFeatureFlagCacheKey(flagKey, u));
+        let cursor = "0";
+        for (let iter = 0; iter < 50; iter++) {
+          const [nextCursor, members] = await client
+            .sscan(usersSetKey, cursor, { count: 200 })
+            .catch(() => ["0", []] as [string, string[]]);
+          if (Array.isArray(members)) {
+            for (const u of members) {
+              keysToDel.push(getFeatureFlagCacheKey(flagKey, String(u)));
+            }
           }
+          if (!nextCursor || String(nextCursor) === "0") {
+            break;
+          }
+          cursor = String(nextCursor);
         }
-        keysToDel.push(`flag:${flagKey}:users`);
+        keysToDel.push(usersSetKey);
       }
       await cacheDel(...keysToDel);
     }

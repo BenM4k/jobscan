@@ -46,9 +46,9 @@ export function ForgotPasswordForm() {
         </div>
 
         <div className="space-y-2">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">
+          <h1 className="text-xl font-bold text-gray-900 dark:text-slate-100">
             {t("resetLinkSentTitle")}
-          </h2>
+          </h1>
           <p className="text-xs text-gray-500 dark:text-slate-400 leading-relaxed">
             {t("resetLinkSentSubtitle", { email })}
           </p>
@@ -77,9 +77,9 @@ export function ForgotPasswordForm() {
   return (
     <>
       <div className="text-center space-y-1">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">
+        <h1 className="text-xl font-bold text-gray-900 dark:text-slate-100">
           {t("forgotPasswordTitle")}
-        </h2>
+        </h1>
         <p className="text-xs text-gray-500 dark:text-slate-400">
           {t("forgotPasswordSubtitle")}
         </p>
@@ -94,11 +94,15 @@ export function ForgotPasswordForm() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider mb-1">
+          <label
+            htmlFor="forgot-password-email"
+            className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider mb-1"
+          >
             {t("emailLabel")}
           </label>
           <div className="relative flex items-center">
             <input
+              id="forgot-password-email"
               type="email"
               required
               autoComplete="email"

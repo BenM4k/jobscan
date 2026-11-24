@@ -1,16 +1,14 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { sanitizeExternalUrl } from "@/lib/safe-url";
-import { Button } from "@/components/ui/button";
-import { CreditPackSelect } from "@/dal/billing.dal";
-import {
-  initiateCreditPurchaseAction,
-  checkPurchaseStatusAction,
-} from "@/actions/billing.actions";
+import { CreditPackGrid } from "@/components/billing/CreditPackGrid";
+import { useBillingStatusPolling } from "@/hooks/useBillingStatusPolling";
+import type { CreditPackSelect } from "@/dal/billing.dal";
+import { initiateCreditPurchaseAction } from "@/actions/billing.actions";
 import { toast } from "sonner";
-import { Coins, Loader2, CheckCircle2, Phone } from "lucide-react";
+import { Coins } from "lucide-react";
 
 interface CreditPurchaseSectionProps {
   packs: CreditPackSelect[];
@@ -40,61 +38,37 @@ export function CreditPurchaseSection({
   } | null>(null);
 
   const selectedPack = packs.find((p) => p.id === effectivePackId);
-  const selectedPackRef = useRef(selectedPack);
-  useEffect(() => {
-    selectedPackRef.current = selectedPack;
-  }, [selectedPack]);
 
   // Keep a single client idempotency key per purchase attempt (initialized lazily on submit)
   const idempotencyKeyRef = useRef<string | null>(null);
 
-  // Poll status while pending with unmount cleanup and timeout cap
-  useEffect(() => {
-    if (!pollingRef || purchaseStatus !== "pending") return;
-
-    let cancelled = false;
-    let attempts = 0;
-    const MAX_POLL_ATTEMPTS = 60;
-
-    const interval = setInterval(async () => {
-      if (cancelled) return;
-      attempts += 1;
-      if (attempts > MAX_POLL_ATTEMPTS) {
-        clearInterval(interval);
-        setPurchaseStatus("timed_out");
-        toast.error(t("paymentTimedOut"));
-        return;
-      }
-
-      const res = await checkPurchaseStatusAction(pollingRef);
-      if (cancelled) return;
-      if (res.success && res.data) {
-        if (res.data.status === "confirmed") {
-          const amount =
-            pendingAttempt?.creditAmount ??
-            selectedPackRef.current?.creditAmount ??
-            "";
-          setPurchaseStatus("idle");
-          setPollingRef(null);
-          setPendingAttempt(null);
-          toast.success(t("purchaseConfirmed", { amount }));
-          idempotencyKeyRef.current = crypto.randomUUID(); // Fresh key for next purchase
-          onBalanceUpdated?.(res.data.balance);
-        } else if (res.data.status === "failed") {
-          setPurchaseStatus("idle");
-          setPollingRef(null);
-          setPendingAttempt(null);
-          toast.error(t("purchaseFailed"));
-          idempotencyKeyRef.current = crypto.randomUUID();
-        }
-      }
-    }, 2000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [pollingRef, purchaseStatus, pendingAttempt, onBalanceUpdated, t]);
+  useBillingStatusPolling({
+    pollingRef,
+    enabled: purchaseStatus === "pending",
+    onConfirmed: (data) => {
+      const amount =
+        pendingAttempt?.creditAmount ??
+        selectedPack?.creditAmount ??
+        "";
+      setPurchaseStatus("idle");
+      setPollingRef(null);
+      setPendingAttempt(null);
+      toast.success(t("purchaseConfirmed", { amount }));
+      idempotencyKeyRef.current = crypto.randomUUID();
+      onBalanceUpdated?.(data.balance);
+    },
+    onFailed: () => {
+      setPurchaseStatus("idle");
+      setPollingRef(null);
+      setPendingAttempt(null);
+      toast.error(t("purchaseFailed"));
+      idempotencyKeyRef.current = crypto.randomUUID();
+    },
+    onTimedOut: () => {
+      setPurchaseStatus("timed_out");
+      toast.error(t("paymentTimedOut"));
+    },
+  });
 
   const handleResumeStatusCheck = () => {
     if (!pendingAttempt) return;
@@ -193,107 +167,18 @@ export function CreditPurchaseSection({
         </p>
       </div>
 
-      {/* Packs Selection (Clean Flat Options with generous spacing) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-        {packs.map((pack) => {
-          const isSelected = (pendingAttempt?.packId ?? effectivePackId) === pack.id;
-          const priceFormatted = (pack.priceCents / 100).toFixed(2);
-          return (
-            <button
-              key={pack.id}
-              type="button"
-              onClick={() => setSelectedPackId(pack.id)}
-              disabled={purchaseStatus === "pending" || pendingAttempt !== null}
-              className={`p-5 rounded-xl border text-left transition-all relative ${
-                isSelected
-                  ? "border-blue-600 bg-blue-50/40 dark:bg-blue-950/20 ring-1 ring-blue-500/30"
-                  : "border-border/60 hover:border-border bg-card/40 hover:bg-muted/20"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  {pack.name}
-                </span>
-                {isSelected && (
-                  <span className="size-2 rounded-full bg-blue-600" />
-                )}
-              </div>
-              <div className="text-2xl sm:text-3xl font-extrabold mt-1.5 text-foreground tracking-tight">
-                ${priceFormatted}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">
-                {pack.creditAmount} {t("credits").toLowerCase()}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Phone Number Input & Secondary Action */}
-      <div className="space-y-4 pt-2 max-w-xl">
-        <div className="space-y-1.5">
-          <label className="text-xs sm:text-sm font-medium text-foreground flex items-center gap-1.5">
-            <Phone className="size-3.5 text-muted-foreground" />
-            <span>{t("phoneNumberLabel")}</span>
-          </label>
-          <input
-            type="tel"
-            placeholder={t("phoneNumberPlaceholder")}
-            value={phoneNumber}
-            onChange={(e) => setPhoneNumber(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                handlePurchase();
-              }
-            }}
-            disabled={purchaseStatus === "pending" || pendingAttempt !== null}
-            className="w-full px-3.5 h-10 rounded-lg border border-input bg-transparent text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
-          />
-        </div>
-
-        {/* Status or Secondary Button */}
-        {purchaseStatus === "pending" ? (
-          <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center gap-3 text-xs sm:text-sm">
-            <Loader2 className="size-4.5 animate-spin shrink-0" />
-            <span>{t("processingPayment")}</span>
-          </div>
-        ) : purchaseStatus === "timed_out" && pendingAttempt ? (
-          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs sm:text-sm">
-            <span>{t("paymentTimedOut")}</span>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={handleResumeStatusCheck}
-              className="shrink-0"
-            >
-              {t("checkPaymentStatus")}
-            </Button>
-          </div>
-        ) : purchaseStatus === "confirmed" ? (
-          <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center gap-3 text-xs sm:text-sm">
-            <CheckCircle2 className="size-4.5 shrink-0" />
-            <span>{t("purchaseConfirmed", { amount: "" })}</span>
-          </div>
-        ) : (
-          <Button
-            variant="secondary"
-            onClick={handlePurchase}
-            disabled={isInitiating || !phoneNumber.trim() || !effectivePackId}
-            className="h-10 px-6 rounded-lg text-sm font-medium border border-border/80 bg-secondary/80 hover:bg-secondary text-secondary-foreground transition-colors shadow-2xs"
-          >
-            {isInitiating ? (
-              <span className="flex items-center gap-2">
-                <Loader2 className="size-4 animate-spin" />
-                <span>{t("initiating")}</span>
-              </span>
-            ) : (
-              t("payWithMobileMoney")
-            )}
-          </Button>
-        )}
-      </div>
+      <CreditPackGrid
+        packs={packs}
+        selectedPackId={effectivePackId}
+        onSelectPack={setSelectedPackId}
+        phoneNumber={phoneNumber}
+        onPhoneNumberChange={setPhoneNumber}
+        purchaseStatus={purchaseStatus}
+        pendingAttempt={pendingAttempt}
+        isInitiating={isInitiating}
+        onPurchase={handlePurchase}
+        onResumeStatusCheck={handleResumeStatusCheck}
+      />
     </section>
   );
 }

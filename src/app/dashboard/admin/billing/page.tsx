@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/auth-guard";
 import { getAdminLedger } from "@/services/admin/admin.service";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Coins } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 
 interface BillingPageProps {
   searchParams: Promise<{
@@ -116,11 +116,14 @@ async function LedgerContent({
               href={`/dashboard/admin/billing?page=${page - 1}${
                 params.userId ? `&userId=${encodeURIComponent(params.userId)}` : ""
               }`}
+              className={buttonVariants({
+                size: "sm",
+                variant: "outline",
+                className: "h-8 px-2 text-xs",
+              })}
             >
-              <Button size="sm" variant="outline" className="h-8 px-2 text-xs">
-                <ChevronLeft className="w-4 h-4 mr-1" />
-                Previous
-              </Button>
+              <ChevronLeft className="w-4 h-4 mr-1" />
+              Previous
             </Link>
           ) : (
             <Button size="sm" variant="outline" disabled className="h-8 px-2 text-xs">
@@ -138,11 +141,14 @@ async function LedgerContent({
               href={`/dashboard/admin/billing?page=${page + 1}${
                 params.userId ? `&userId=${encodeURIComponent(params.userId)}` : ""
               }`}
+              className={buttonVariants({
+                size: "sm",
+                variant: "outline",
+                className: "h-8 px-2 text-xs",
+              })}
             >
-              <Button size="sm" variant="outline" className="h-8 px-2 text-xs">
-                Next
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
+              Next
+              <ChevronRight className="w-4 h-4 ml-1" />
             </Link>
           ) : (
             <Button size="sm" variant="outline" disabled className="h-8 px-2 text-xs">

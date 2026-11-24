@@ -108,9 +108,9 @@ export function SignInForm() {
   return (
     <>
       <div className="text-center space-y-1">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">
+        <h1 className="text-xl font-bold text-gray-900 dark:text-slate-100">
           {t("signInTitle")}
-        </h2>
+        </h1>
         <p className="text-xs text-gray-500 dark:text-slate-400">
           {t("signInSubtitle")}
         </p>
@@ -125,10 +125,14 @@ export function SignInForm() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider mb-1">
+          <label
+            htmlFor="signin-email"
+            className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider mb-1"
+          >
             {t("emailLabel")}
           </label>
           <input
+            id="signin-email"
             type="email"
             required
             autoComplete="username webauthn"
@@ -141,7 +145,10 @@ export function SignInForm() {
 
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider">
+            <label
+              htmlFor="signin-password"
+              className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider"
+            >
               {t("passwordLabel")}
             </label>
             <Link
@@ -152,6 +159,7 @@ export function SignInForm() {
             </Link>
           </div>
           <PasswordInput
+            id="signin-password"
             required
             autoComplete="current-password webauthn"
             placeholder={t("passwordPlaceholder")}

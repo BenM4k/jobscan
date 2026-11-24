@@ -29,8 +29,8 @@ export interface PipelineEntryWithDetails extends PipelineEntrySelect {
   alsoPostedOn?: string[];
 }
 
-function latestScoreSubquery() {
-  return db
+function latestScoreSubquery(userId?: string) {
+  const baseQuery = db
     .selectDistinctOn([score.pipelineEntryId], {
       id: score.id,
       pipelineEntryId: score.pipelineEntryId,
@@ -45,7 +45,17 @@ function latestScoreSubquery() {
       createdAt: score.createdAt,
       updatedAt: score.updatedAt,
     })
-    .from(score)
+    .from(score);
+
+  if (userId) {
+    return baseQuery
+      .innerJoin(pipelineEntry, eq(score.pipelineEntryId, pipelineEntry.id))
+      .where(eq(pipelineEntry.userId, userId))
+      .orderBy(score.pipelineEntryId, desc(score.createdAt))
+      .as("latest_score");
+  }
+
+  return baseQuery
     .orderBy(score.pipelineEntryId, desc(score.createdAt))
     .as("latest_score");
 }
@@ -88,7 +98,7 @@ export async function getPipelineEntryById(
   userId: string
 ): Promise<Result<PipelineEntryWithDetails, AppError>> {
   try {
-    const latestScore = latestScoreSubquery();
+    const latestScore = latestScoreSubquery(userId);
     const rows = await db
       .select({
         entry: pipelineEntry,
@@ -132,7 +142,7 @@ export async function getPipelineEntryByUserAndJob(
   jobId: string
 ): Promise<Result<PipelineEntryWithDetails | null, AppError>> {
   try {
-    const latestScore = latestScoreSubquery();
+    const latestScore = latestScoreSubquery(userId);
     const rows = await db
       .select({
         entry: pipelineEntry,
@@ -230,7 +240,7 @@ export async function listPipelineEntries(
     const limit = filter?.limit ?? 20;
     const offset = filter?.offset ?? 0;
 
-    const latestScore = latestScoreSubquery();
+    const latestScore = latestScoreSubquery(userId);
     const rows = await db
       .select({
         entry: pipelineEntry,
@@ -245,7 +255,7 @@ export async function listPipelineEntries(
       .leftJoin(tailoredResume, eq(tailoredResume.pipelineEntryId, pipelineEntry.id))
       .leftJoin(tailoredCoverLetter, eq(tailoredCoverLetter.pipelineEntryId, pipelineEntry.id))
       .where(and(...conditions))
-      .orderBy(desc(job.postedAt), desc(pipelineEntry.createdAt))
+      .orderBy(sql`${job.postedAt} DESC NULLS LAST`, desc(pipelineEntry.createdAt))
       .limit(limit)
       .offset(offset);
 

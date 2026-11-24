@@ -10,7 +10,7 @@ import {
   getCachedBillingData,
 } from "@/lib/cached-data";
 import { hasProAccess } from "@/services/billing/billing.service";
-import * as authDal from "@/dal/auth.dal";
+import * as authService from "@/services/auth/auth.service";
 import { AccountSettingsCard } from "@/components/settings/AccountSettingsCard";
 import { SessionManagementCard } from "@/components/settings/SessionManagementCard";
 import type { SessionData } from "@/components/settings/session-utils";
@@ -52,8 +52,8 @@ async function SettingsContent() {
     getCachedUserPreferences(user.id),
     getCachedAiUsage(user.id),
     getCachedBillingData(user.id),
-    authDal.getActiveSessionsForUser(user.id),
-    authDal.getUserPasskeys(user.id),
+    authService.getUserActiveSessions(user.id),
+    authService.getUserRegisteredPasskeys(user.id),
   ]);
   const isPro = hasProAccess(billingData.subscription);
 

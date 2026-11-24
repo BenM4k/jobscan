@@ -19,8 +19,6 @@ export function NavLinks({ links }: NavLinksProps) {
 
   return (
     <div
-      role="navigation"
-      aria-label="Dashboard sections"
       className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/70 p-1 rounded-xl border border-slate-300 dark:border-slate-700/60"
     >
       {links.map((link) => {

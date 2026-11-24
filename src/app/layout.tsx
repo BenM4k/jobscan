@@ -22,8 +22,8 @@ export const metadata: Metadata = {
   },
 };
 
-// TODO: Cache Components adoption. Refactor this route so this opt-out can be removed.
-// See: https://nextjs.org/docs/app/guides/migrating-to-cache-components
+// Deliberate Block: RootLayout reads the request NEXT_LOCALE cookie via getLocale()/getMessages()
+// to set <html lang={locale}> and provide next-intl messages across the entire document tree.
 export const instant = false;
 
 export default async function RootLayout({

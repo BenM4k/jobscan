@@ -26,7 +26,8 @@
     "admin": "Admin",
     "signIn": "Sign In",
     "signUp": "Get Started",
-    "signOut": "Sign Out"
+    "signOut": "Sign Out",
+    "menu": "Navigation Menu"
   },
   "landing": {
     "stickyNote": "Auto-score jobs against my resume with Gemini 3.8 Flash!",
@@ -520,7 +521,11 @@
     "deleting": "Deleting...",
     "passkeyDeletedSuccess": "Passkey removed.",
     "passkeyDeletedError": "Failed to remove passkey.",
-    "passkeySessionNotFresh": "Please confirm your sign-in to add a passkey."
+    "passkeySessionNotFresh": "Please confirm your sign-in to add a passkey.",
+    "passkeyDialogTitle": "Register a Passkey",
+    "passkeyDialogDescription": "Give this device passkey a recognizable name so you can manage it later.",
+    "passkeyNameLabel": "Device Name",
+    "registerPasskey": "Register Passkey"
   },
   "billing": {
     "credits": "Credits",
@@ -580,5 +585,13 @@
     "balanceAriaLabel": "Credit balance: {balance}",
     "paymentTimedOut": "Payment confirmation timed out. You can re-check the status below.",
     "checkPaymentStatus": "Check Payment Status"
+  },
+  "errors": {
+    "dashboardTitle": "Something went wrong",
+    "dashboardDescription": "We encountered an error loading your workspace. You can retry or return to the main pipeline.",
+    "adminTitle": "Admin Console Error",
+    "adminDescription": "An error occurred while loading this administration view.",
+    "tryAgain": "Try Again",
+    "backToDashboard": "Back to Pipeline"
   }
 }

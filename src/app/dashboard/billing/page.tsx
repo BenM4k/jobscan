@@ -2,6 +2,7 @@ import React, { Suspense } from "react";
 import { requireSession } from "@/lib/auth-guard";
 import { redirect } from "next/navigation";
 import { getCachedBillingData } from "@/lib/cached-data";
+import { getBillingOverviewData } from "@/services/billing/billing.service";
 import { BillingDashboardView } from "@/components/billing/BillingDashboardView";
 import { BillingSkeleton } from "@/components/billing/BillingSkeleton";
 
@@ -20,7 +21,13 @@ async function BillingContent() {
 
   const userId = session.value.user.id;
 
-  const data = await getCachedBillingData(userId);
+  let data = await getCachedBillingData(userId);
+  if (data.packs.length === 0 || data.plans.length === 0) {
+    const overviewRes = await getBillingOverviewData(userId);
+    if (overviewRes.ok) {
+      data = overviewRes.value;
+    }
+  }
 
   return (
     <BillingDashboardView

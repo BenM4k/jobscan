@@ -118,6 +118,9 @@ export async function withCostTracking<T>(
 
     if (result && typeof result === "object") {
       let res = result as Record<string, unknown>;
+      if (res.ok === false) {
+        return result;
+      }
       if (res.ok === true && res.value && typeof res.value === "object") {
         res = res.value as Record<string, unknown>;
       }

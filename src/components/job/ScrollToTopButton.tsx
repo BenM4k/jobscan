@@ -50,6 +50,9 @@ export function ScrollToTopButton({
       variant="outline"
       size="icon"
       onClick={scrollToTop}
+      disabled={!isVisible}
+      tabIndex={isVisible ? 0 : -1}
+      aria-hidden={!isVisible}
       aria-label="Scroll to top"
       className={cn(
         "fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-50 size-11 rounded-full shadow-lg shadow-black/10 dark:shadow-black/40 border-slate-200/80 dark:border-zinc-800/80 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:text-slate-900 dark:hover:text-white transition-all duration-300 ease-out focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 hover:scale-105 active:scale-95",

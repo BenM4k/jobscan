@@ -55,7 +55,6 @@ export async function saveMasterResumeAction(data: {
   }
 
   const validData = parsed.data;
-  const profileDal = await import("@/dal/profile.dal");
   
   // Format readable text from structured fields if provided, otherwise fallback to resumeText or rawText
   const hasStructuredFields = Boolean(
@@ -77,7 +76,7 @@ export async function saveMasterResumeAction(data: {
 
   const userId = sessionResult.value.user.id;
 
-  const result = await profileDal.upsertProfile(userId, {
+  const result = await profileService.updateProfileDetails(userId, {
     summary: validData.summary,
     skills: validData.skills,
     education: validData.education,

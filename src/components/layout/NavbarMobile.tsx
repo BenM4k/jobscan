@@ -4,10 +4,18 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { Menu } from "lucide-react";
 import { PreferencesWidget } from "@/components/PreferencesWidget";
 import { useSignOut } from "@/hooks/useSignOut";
 import { NavLinkItem } from "@/components/layout/NavLinks";
 import { isNavActive } from "@/lib/nav";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface NavbarMobileProps {
   navLinks: NavLinkItem[];
@@ -16,7 +24,7 @@ interface NavbarMobileProps {
   isAdmin?: boolean;
 }
 
-/** Renders the mobile dashboard menu, credit balance, and account controls. */
+/** Renders the mobile dashboard menu inside an accessible shadcn Dialog. */
 export function NavbarMobile({
   navLinks,
   userEmail,
@@ -35,25 +43,43 @@ export function NavbarMobile({
     await handleSignOut();
   };
 
+  const accountLinks = [
+    { href: "/dashboard/settings", label: t("settings"), icon: "⚙️", badge: "Flags" },
+    { href: "/dashboard/billing", label: t("billing"), icon: "💳", badge: `${creditBalance} credits` },
+    { href: "/dashboard/profile", label: t("profile"), icon: "👤" },
+    ...(isAdmin
+      ? [{ href: "/dashboard/admin", label: t("admin"), icon: "🛡️", badge: "Console", highlight: true }]
+      : []),
+  ];
+
   return (
     <div className="flex items-center gap-2 md:hidden">
       <PreferencesWidget />
 
       <button
         type="button"
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={() => setOpen(true)}
         aria-expanded={open}
-        aria-label="Toggle mobile menu"
+        aria-label={t("menu")}
         className="p-2 rounded-xl text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer"
       >
-        <span className="text-xl font-bold">{open ? "✕" : "☰"}</span>
+        <Menu className="size-5" aria-hidden="true" />
       </button>
 
-      {open && (
-        <div className="absolute top-16 left-0 right-0 w-full border-t border-b border-gray-200 dark:border-zinc-800 bg-white/95 dark:bg-[#0A0A0C]/95 backdrop-blur-2xl px-6 py-4 space-y-4 shadow-xl text-left z-50">
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="top-4 translate-y-0 w-[calc(100%-1.5rem)] max-w-md rounded-2xl bg-white dark:bg-[#0A0A0C] border-gray-200 dark:border-zinc-800 p-5 gap-4">
+          <DialogHeader className="text-left">
+            <DialogTitle className="text-sm font-bold text-gray-900 dark:text-zinc-100">
+              {t("menu")}
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              {t("menu")}
+            </DialogDescription>
+          </DialogHeader>
+
           {userEmail ? (
-            <>
-              <div className="flex items-center justify-between p-2 bg-gray-50 dark:bg-zinc-900 rounded-xl border border-gray-200/60 dark:border-zinc-800">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-2.5 bg-gray-50 dark:bg-zinc-900 rounded-xl border border-gray-200/60 dark:border-zinc-800">
                 <div className="flex items-center gap-3 overflow-hidden">
                   <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center uppercase shadow-xs shrink-0">
                     {userEmail.slice(0, 2)}
@@ -71,7 +97,7 @@ export function NavbarMobile({
                 </Link>
               </div>
 
-              <div className="flex flex-col space-y-1">
+              <nav aria-label={t("menu")} className="flex flex-col space-y-1">
                 {navLinks.map((link) => {
                   const isActive = isNavActive(link.href, pathname);
                   return (
@@ -92,36 +118,7 @@ export function NavbarMobile({
                   );
                 })}
 
-                {[
-                  {
-                    href: "/dashboard/settings",
-                    label: t("settings"),
-                    icon: "⚙️",
-                    badge: "Flags",
-                  },
-                  {
-                    href: "/dashboard/billing",
-                    label: t("billing"),
-                    icon: "💳",
-                    badge: `${creditBalance} credits`,
-                  },
-                  {
-                    href: "/dashboard/profile",
-                    label: t("profile"),
-                    icon: "👤",
-                  },
-                  ...(isAdmin
-                    ? [
-                        {
-                          href: "/dashboard/admin",
-                          label: t("admin"),
-                          icon: "🛡️",
-                          badge: "Console",
-                          highlight: true,
-                        },
-                      ]
-                    : []),
-                ].map((item) => {
+                {accountLinks.map((item) => {
                   const isActive = isNavActive(item.href, pathname);
                   return (
                     <Link
@@ -155,7 +152,7 @@ export function NavbarMobile({
                     </Link>
                   );
                 })}
-              </div>
+              </nav>
 
               <button
                 type="button"
@@ -164,7 +161,7 @@ export function NavbarMobile({
               >
                 {t("signOut")}
               </button>
-            </>
+            </div>
           ) : (
             <div className="flex flex-col space-y-2 pt-1">
               <Link
@@ -183,8 +180,8 @@ export function NavbarMobile({
               </Link>
             </div>
           )}
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

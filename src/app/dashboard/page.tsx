@@ -7,6 +7,7 @@ import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { JobListSkeleton } from "@/components/job/JobListSkeleton";
 import { ScrollToTopButton } from "@/components/job/ScrollToTopButton";
 import { getCachedDashboardFeed } from "@/lib/cached-data";
+import { dispatchEmptyFeedFetchIfNeeded } from "@/services/dashboard.service";
 
 import { requireSession } from "@/lib/auth-guard";
 
@@ -38,6 +39,15 @@ async function DashboardFeed({
     queryFilter,
     limit: 20,
     offset: 0,
+    userId,
+  });
+
+  const hasFilters = Boolean(
+    statusFilter || sourceFilter || startDate || endDate || queryFilter
+  );
+  dispatchEmptyFeedFetchIfNeeded({
+    jobsCount: jobs.length,
+    hasFilters,
     userId,
   });
 

@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Navbar } from "@/components/layout/Navbar";
+import { NavbarSkeleton } from "@/components/layout/Navbar";
+import { PublicNavbar } from "@/components/layout/PublicNavbar";
 import { DashboardFooter } from "@/components/layout/DashboardFooter";
 import { Suspense } from "react";
 import type { Metadata } from "next";
@@ -28,12 +29,8 @@ export default async function TermsOfServicePage() {
         }}
       />
 
-      <Suspense
-        fallback={
-          <div className="h-16 border-b border-slate-300 dark:border-zinc-800 bg-white/80 dark:bg-[#0A0A0C]/90" />
-        }
-      >
-        <Navbar />
+      <Suspense fallback={<NavbarSkeleton />}>
+        <PublicNavbar />
       </Suspense>
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-12 sm:py-16 z-10">

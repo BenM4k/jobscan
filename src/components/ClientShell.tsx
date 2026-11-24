@@ -3,7 +3,6 @@
 import React, { useState, Suspense } from "react";
 import { FilterBar, FilterBarSkeleton } from "@/components/FilterBar";
 import { FetchJobsPopover } from "@/components/FetchJobsPopover";
-import { JobListSkeleton } from "@/components/job/JobListSkeleton";
 import {
   FilterTransitionProvider,
   useFilterTransition,
@@ -93,15 +92,14 @@ function ClientShellContent({ children }: ClientShellProps) {
         </Suspense>
       </div>
 
-      {/* Rendered Job List with instant visual feedback */}
-      <div className="pt-2">
-        {isPending ? (
-          <JobListSkeleton />
-        ) : (
-          <div className="animate-in fade-in duration-150">
-            {children}
-          </div>
-        )}
+      {/* Rendered Job List without unmounting mounted client state during transitions */}
+      <div
+        aria-busy={isPending}
+        className={`pt-2 transition-opacity duration-150 ${
+          isPending ? "opacity-60 pointer-events-none" : "opacity-100"
+        }`}
+      >
+        {children}
       </div>
     </div>
   );
