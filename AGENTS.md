@@ -99,28 +99,32 @@ src/
         sources/            # Job source adapters & circuit breakers
         ai-usage/           # AI telemetry & token cost tracking
         flags/              # Feature flags rollout console
+        audit/              # Administrative audit log console
     api/
       auth/[...all]/        # better-auth route handler
+      digest/unsubscribe/   # Signed one-click email digest unsubscribe endpoint
       inngest/              # Inngest background function serve endpoint
 
   components/               # React UI components
     ui/                     # Official shadcn/ui primitives (dropdown-menu, dialog, button, sonner)
     shared/                 # Reusable domain components composed from ui/
     layout/                 # App navigation (Navbar, PublicNavbar, NavbarMobile, NavbarUserDropdown)
-    job/                    # JobScoreSection, MatchExplanation, SkillGapBreakdown, JobCard, JobDescriptionSection
+    job/                    # JobScoreSection, MatchExplanation, SkillGapBreakdown, JobCard, JobDescriptionSection, JobInterviewPrepSection, DocumentVersionHistoryDialog, PipelineTimelineSection
     billing/                # CreditBalanceIndicator, CreditPurchaseCard, CreditPackGrid, SubscriptionCard, SubscriptionActionArea, InsufficientCreditsDialog
     settings/               # Settings, AddPasskeyDialog, PasskeyManagementCard & feature flag cards
-    admin/                  # AdminNav, AdminStatCard, AdminUsersTable, AdminUserRow, AiUsageTable, GrantCreditsDialog, GiftSubscriptionDialog, BanUserDialog, AdminFeatureFlagsManager, GlobalFlagsCard, UserFlagOverrideForm, ActiveOverridesTable
+    admin/                  # AdminNav, AdminStatCard, AdminUsersTable, AdminUserRow, AiUsageTable, AdminAiProviderCard, GrantCreditsDialog, GiftSubscriptionDialog, BanUserDialog, AdminFeatureFlagsManager, GlobalFlagsCard, UserFlagOverrideForm, ActiveOverridesTable
 
   actions/                  # Server actions (validation + auth boundary → service layer)
     admin.actions.ts        # Admin feature flags actions
     admin-management.actions.ts # Admin user role, ban, credit grant, and subscription gift actions
+    interview.actions.ts    # Interview question generation actions
+    job-history.actions.ts  # Document version history server actions
   services/                 # Service layer (business logic, orchestration, external integrations)
     admin/                  # Admin business logic & metrics orchestration
     billing/                # Payment provider abstraction, mock mobile money, credit & subscription business logic
-    adapters/               # ATS on-demand adapters (Ashby, Greenhouse, Lever, RemoteOK)
-    crawler/sources/        # Regional & scraper sources (CongoJob, Emploi.cd, FECRDC, UNJobs, ReliefWeb)
-    ai/                     # Vercel AI SDK clients, embeddings, score-cache, rate-limiting, tracker
+    adapters/               # Unified job adapters (Ashby, Greenhouse, Lever, RemoteOK, CongoJob, Emploi.cd, FECRDC, UNJobs, ReliefWeb)
+    crawler/sources/        # Regional & scraper fetch helpers (CongoJob, Emploi.cd, FECRDC, UNJobs, ReliefWeb)
+    ai/                     # Vercel AI SDK clients, embeddings, score-cache, rate-limiting, tracker, global admin AI provider config (provider-config.ts)
     scoring/                # Scoring factory, hybrid match calculator, scoreJobForResume orchestrator
     ranking/                # Display ranking recency exponential decay
     flags/                  # Feature flags service with 60s Redis caching

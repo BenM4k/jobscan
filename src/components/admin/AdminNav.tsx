@@ -9,6 +9,7 @@ import {
   Database,
   Cpu,
   Flag,
+  ScrollText,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -18,6 +19,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/admin/sources", label: "Job Sources", icon: Database },
   { href: "/dashboard/admin/ai-usage", label: "AI Usage", icon: Cpu },
   { href: "/dashboard/admin/flags", label: "Feature Flags", icon: Flag },
+  { href: "/dashboard/admin/audit", label: "Audit Log", icon: ScrollText },
 ];
 
 export function AdminNav() {

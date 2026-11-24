@@ -7,7 +7,6 @@ import { MasterResumeUpload } from "@/components/profile/MasterResumeUpload";
 import { MasterResumeEditor } from "@/components/profile/MasterResumeEditor";
 import { ProfileViewMode } from "@/components/profile/ProfileViewMode";
 import { ProfileEditHeader } from "@/components/profile/ProfileEditHeader";
-import { ProfileAiEngineSelect } from "@/components/profile/ProfileAiEngineSelect";
 import { DeleteResumeModal } from "@/components/profile/DeleteResumeModal";
 import { EducationItem, ExperienceItem, ResumeProfileData } from "@/lib/ai";
 import { formatResumeToMarkdown, parseResumeContent } from "@/lib/resume-format";
@@ -20,7 +19,6 @@ export interface ProfileFormProps {
   userName?: string;
   initialResumeText?: string;
   initialSkills?: string[];
-  initialAiProvider?: string;
   initialSummary?: string;
   initialEducation?: EducationItem[];
   initialExperience?: ExperienceItem[];
@@ -37,7 +35,6 @@ export function ProfileForm({
   userName = "Candidate",
   initialResumeText = "",
   initialSkills = [],
-  initialAiProvider = "gemini",
   initialSummary = "",
   initialEducation = [],
   initialExperience = [],
@@ -55,7 +52,6 @@ export function ProfileForm({
   const [education, setEducation] = useState<EducationItem[]>(initialEducation);
   const [experience, setExperience] = useState<ExperienceItem[]>(initialExperience);
   const [rawText, setRawText] = useState(initialResumeText);
-  const [aiProvider, setAiProvider] = useState(initialAiProvider);
   const [isEditing, setIsEditing] = useState(!initialResumeText.trim());
   const [isSaving, setIsSaving] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -103,13 +99,11 @@ export function ProfileForm({
       experience,
       rawText: rawText || formattedContent,
       resumeText: formattedContent,
-      aiProvider,
     });
     setIsSaving(false);
 
     if (res.success && res.data) {
       posthog.capture("master_resume_saved", {
-        ai_provider: aiProvider,
         skills_count: parsedSkillsList.length,
         experience_count: experience.length,
         education_count: education.length,
@@ -149,7 +143,6 @@ export function ProfileForm({
           experience={experience}
           resumeText={resumeText}
           parsedSkillsList={parsedSkillsList}
-          aiProvider={aiProvider}
           aiUsage={initialAiUsage}
           aiUsageError={aiUsageError}
           resumeLabel={resumeLabel}
@@ -181,11 +174,6 @@ export function ProfileForm({
         onExtracted={handleExtracted}
         disabled={isSaving}
         isReplacing={Boolean(resumeText.trim())}
-      />
-
-      <ProfileAiEngineSelect
-        aiProvider={aiProvider}
-        onAiProviderChange={setAiProvider}
       />
 
       <MasterResumeEditor

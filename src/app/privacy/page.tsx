@@ -15,25 +15,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 
-export default async function PrivacyPolicyPage() {
+async function PrivacyContent() {
   const t = await getTranslations("privacy");
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0A0A0C] text-gray-900 dark:text-zinc-100 font-sans flex flex-col relative overflow-x-clip transition-colors duration-300">
-      {/* Subtle Dot Grid Background Pattern */}
-      <div
-        className="absolute inset-0 pointer-events-none opacity-40 dark:opacity-20"
-        style={{
-          backgroundImage: `radial-gradient(#CBD5E1 1px, transparent 1px)`,
-          backgroundSize: `24px 24px`,
-        }}
-      />
-
-      <Suspense fallback={<NavbarSkeleton />}>
-        <PublicNavbar />
-      </Suspense>
-
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-12 sm:py-16 z-10">
+    <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-12 sm:py-16 z-10">
         {/* Page Header */}
         <div className="mb-10 space-y-2">
           <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-zinc-500 font-mono mb-4">
@@ -84,41 +70,6 @@ export default async function PrivacyPolicyPage() {
 
           <Section title={t("s4Title")}>
             <p>{t("s4P1")}</p>
-            <ul>
-              <li>
-                <strong>Google Gemini</strong> —{" "}
-                <a
-                  href="https://policies.google.com/privacy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-violet-600 dark:text-violet-400 underline underline-offset-2"
-                >
-                  Google Privacy Policy
-                </a>
-              </li>
-              <li>
-                <strong>Anthropic Claude</strong> —{" "}
-                <a
-                  href="https://www.anthropic.com/legal/privacy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-violet-600 dark:text-violet-400 underline underline-offset-2"
-                >
-                  Anthropic Privacy Policy
-                </a>
-              </li>
-              <li>
-                <strong>OpenAI</strong> —{" "}
-                <a
-                  href="https://openai.com/privacy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-violet-600 dark:text-violet-400 underline underline-offset-2"
-                >
-                  OpenAI Privacy Policy
-                </a>
-              </li>
-            </ul>
             <p>{t("s4P2")}</p>
           </Section>
 
@@ -184,6 +135,27 @@ export default async function PrivacyPolicyPage() {
           </Link>
         </div>
       </main>
+  );
+}
+
+export default function PrivacyPolicyPage() {
+  return (
+    <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0A0A0C] text-gray-900 dark:text-zinc-100 font-sans flex flex-col relative overflow-x-clip transition-colors duration-300">
+      <div
+        className="absolute inset-0 pointer-events-none opacity-40 dark:opacity-20"
+        style={{
+          backgroundImage: `radial-gradient(#CBD5E1 1px, transparent 1px)`,
+          backgroundSize: `24px 24px`,
+        }}
+      />
+
+      <Suspense fallback={<NavbarSkeleton />}>
+        <PublicNavbar />
+      </Suspense>
+
+      <Suspense fallback={<main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-12 sm:py-16 z-10" />}>
+        <PrivacyContent />
+      </Suspense>
 
       <DashboardFooter />
     </div>

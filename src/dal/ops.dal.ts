@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "@/services/db";
-import { aiCallLog, aiFeatureEnum } from "@/services/db/schema";
+import { aiCallLog, aiFeatureEnum, appSetting } from "@/services/db/schema";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 import * as flagsDal from "./flags.dal";
@@ -127,5 +127,51 @@ export async function isFeatureEnabled(
     return flag.enabledGlobally;
   } catch {
     return false;
+  }
+}
+
+export async function getAppSetting(
+  key: string,
+): Promise<Result<string | null, AppError>> {
+  try {
+    const [row] = await db
+      .select({ value: appSetting.value })
+      .from(appSetting)
+      .where(eq(appSetting.key, key))
+      .limit(1);
+    return ok(row?.value ?? null);
+  } catch (error) {
+    return err(
+      new AppError("DB_ERROR", "Failed to read application setting", error),
+    );
+  }
+}
+
+export async function upsertAppSetting(
+  key: string,
+  value: string,
+  updatedBy?: string | null,
+): Promise<Result<void, AppError>> {
+  try {
+    await db
+      .insert(appSetting)
+      .values({
+        key,
+        value,
+        updatedBy: updatedBy ?? null,
+      })
+      .onConflictDoUpdate({
+        target: appSetting.key,
+        set: {
+          value,
+          updatedBy: updatedBy ?? null,
+          updatedAt: new Date(),
+        },
+      });
+    return ok(undefined);
+  } catch (error) {
+    return err(
+      new AppError("DB_ERROR", "Failed to save application setting", error),
+    );
   }
 }

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth-guard";
 import { getCachedMasterResumes } from "@/lib/cached-data";
 import { ResumesManager } from "@/components/resumes/ResumesManager";
-import { FileText } from "lucide-react";
+import { ResumesPageHeader } from "@/components/resumes/ResumesPageHeader";
 import { getTranslations } from "next-intl/server";
 import { ResumesSkeleton } from "@/components/resumes/ResumesSkeleton";
 
@@ -37,24 +37,10 @@ async function ResumesContent() {
 }
 
 /** Renders the localized master-resume management page. */
-export default async function ResumesPage() {
-  const t = await getTranslations("resumes");
-
+export default function ResumesPage() {
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 w-full space-y-8 z-10">
-      {/* Header */}
-      <div className="space-y-1.5 border-b border-border/80 pb-6">
-        <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-md bg-muted text-muted-foreground border border-border text-xs font-medium font-sans">
-          <FileText className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-          <span>{t("headerBadge")}</span>
-        </div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-sans">
-          {t("title")}
-        </h1>
-        <p className="text-sm text-muted-foreground max-w-2xl">
-          {t("subtitle")}
-        </p>
-      </div>
+      <ResumesPageHeader />
 
       {/* Dynamic Content */}
       <Suspense fallback={<ResumesSkeleton />}>

@@ -61,7 +61,7 @@ export async function spendCredits(
 export async function grantCredits(
   userId: string,
   amount: number,
-  action: "purchase" | "signup_grant" | "refund",
+  action: "purchase" | "signup_grant" | "refund" | "admin_grant",
   relatedId?: string | null,
 ): Promise<Result<{ balanceAfter: number }, AppError>> {
   return await billingDal.grantCreditsWithLock(

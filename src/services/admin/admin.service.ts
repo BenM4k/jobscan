@@ -71,6 +71,13 @@ export async function changeUserRole(
     return err(updateRes.error);
   }
 
+  await recordAdminAuditEvent({
+    adminUserId,
+    targetUserId,
+    action: "role_change",
+    metadata: { newRole },
+  });
+
   return ok({ targetUserId, newRole });
 }
 
@@ -102,6 +109,14 @@ export async function changeUserBanStatus(
     return err(updateRes.error);
   }
 
+  await recordAdminAuditEvent({
+    adminUserId,
+    targetUserId,
+    action: banned ? "ban_user" : "unban_user",
+    reason: reason ?? null,
+    metadata: expires ? { expires: expires.toISOString() } : null,
+  });
+
   return ok({ targetUserId, banned });
 }
 
@@ -123,10 +138,18 @@ export async function grantCreditsToUser(
     );
   }
 
-  const grantRes = await grantCredits(targetUserId, amount, "refund", null);
+  const grantRes = await grantCredits(targetUserId, amount, "admin_grant", null);
   if (!grantRes.ok) {
     return err(grantRes.error);
   }
+
+  await recordAdminAuditEvent({
+    adminUserId,
+    targetUserId,
+    action: "admin_grant",
+    reason: reason ?? null,
+    metadata: { amount, balanceAfter: grantRes.value.balanceAfter },
+  });
 
   console.log(
     `[Admin] User ${adminUserId} granted ${amount} credits to user ${targetUserId}. Reason: ${reason || "none"}`
@@ -213,6 +236,14 @@ export async function giftSubscriptionToUser(
     );
   }
 
+  await recordAdminAuditEvent({
+    adminUserId,
+    targetUserId,
+    action: "gift_subscription",
+    reason: reason ?? null,
+    metadata: { durationDays, planName: plan.name },
+  });
+
   console.log(
     `[Admin] Admin ${adminUserId} gifted a ${durationDays}-day ${plan.name} subscription to user ${targetUserId}. Reason: ${reason || "none"}`
   );
@@ -222,6 +253,30 @@ export async function giftSubscriptionToUser(
     newPeriodEnd: giftRes.value.newPeriodEnd,
     planName: plan.name,
   });
+}
+
+/** Records an administrative audit event (best-effort; never throws across boundary). */
+export async function recordAdminAuditEvent(input: {
+  adminUserId: string;
+  targetUserId?: string | null;
+  action: string;
+  reason?: string | null;
+  metadata?: Record<string, unknown> | null;
+}): Promise<void> {
+  try {
+    await adminDal.insertAdminAuditLog(input);
+  } catch (err) {
+    console.warn("[Admin Service] Audit log insert failed:", err);
+  }
+}
+
+/** Queries paginated administrative audit logs for the admin console. */
+export async function getAdminAuditLogPage(filter: {
+  page?: number;
+  limit?: number;
+  action?: string;
+}) {
+  return adminDal.getAdminAuditLogs(filter);
 }
 
 /**

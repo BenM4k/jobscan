@@ -29,7 +29,7 @@ export class OpenAIProvider implements ScoringProvider {
         return err(
           new AppError(
             "EXTERNAL_API_ERROR",
-            "OPENAI_API_KEY environment variable is not configured. Please set OPENAI_API_KEY in .env file."
+            "AI scoring service is currently unavailable. Please try again later."
           )
         );
       }
@@ -60,10 +60,7 @@ export class OpenAIProvider implements ScoringProvider {
       console.error(E);
       const message = E instanceof Error ? E.message : "Unknown error";
       return err(
-        new AppError(
-          "EXTERNAL_API_ERROR",
-          `OpenAI scoring failed: ${message}`
-        )
+        new AppError("EXTERNAL_API_ERROR", `AI scoring failed: ${message}`)
       );
     }
   }

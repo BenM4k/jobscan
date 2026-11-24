@@ -15,25 +15,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 
-export default async function TermsOfServicePage() {
+async function TermsContent() {
   const t = await getTranslations("terms");
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0A0A0C] text-gray-900 dark:text-zinc-100 font-sans flex flex-col relative overflow-x-clip transition-colors duration-300">
-      {/* Subtle Dot Grid Background Pattern */}
-      <div
-        className="absolute inset-0 pointer-events-none opacity-40 dark:opacity-20"
-        style={{
-          backgroundImage: `radial-gradient(#CBD5E1 1px, transparent 1px)`,
-          backgroundSize: `24px 24px`,
-        }}
-      />
-
-      <Suspense fallback={<NavbarSkeleton />}>
-        <PublicNavbar />
-      </Suspense>
-
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-12 sm:py-16 z-10">
+    <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-12 sm:py-16 z-10">
         {/* Page Header */}
         <div className="mb-10 space-y-2">
           <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-zinc-500 font-mono mb-4">
@@ -133,6 +119,27 @@ export default async function TermsOfServicePage() {
           </Link>
         </div>
       </main>
+  );
+}
+
+export default function TermsOfServicePage() {
+  return (
+    <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0A0A0C] text-gray-900 dark:text-zinc-100 font-sans flex flex-col relative overflow-x-clip transition-colors duration-300">
+      <div
+        className="absolute inset-0 pointer-events-none opacity-40 dark:opacity-20"
+        style={{
+          backgroundImage: `radial-gradient(#CBD5E1 1px, transparent 1px)`,
+          backgroundSize: `24px 24px`,
+        }}
+      />
+
+      <Suspense fallback={<NavbarSkeleton />}>
+        <PublicNavbar />
+      </Suspense>
+
+      <Suspense fallback={<main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-12 sm:py-16 z-10" />}>
+        <TermsContent />
+      </Suspense>
 
       <DashboardFooter />
     </div>

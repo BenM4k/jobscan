@@ -31,8 +31,10 @@ Jobpilot uses **Drizzle ORM** with PostgreSQL. Schema definitions are organized 
 | `idempotency_key` | `schema/ops.ts` | Client UUID tracking preventing duplicate paid AI mutation executions. |
 | `adapter_circuit_breaker` | `schema/ops.ts` | Adapter health tracking, failure counters, and backoff states. |
 | `ai_call_log` | `schema/ops.ts` | Telemetry audit log recording token counts, latency, and estimated cost per call. |
+| `admin_audit_log` | `schema/ops.ts` | Immutable audit trail of admin role changes, bans, credit grants, gifted subscriptions, flag updates, and AI provider changes. |
+| `app_setting` | `schema/ops.ts` | Key-value global platform settings (e.g. admin-selected global `ai_provider`, defaulting to `gemini`). |
 | `feature_flag` / `feature_flag_assignment` | `schema/ops.ts` | Global flag toggles and per-user overrides. |
-| `credit_balance` / `credit_ledger` / `credit_purchase` | `schema/billing.ts` | User credit balances, append-only credit audit journal, and purchase lifecycle records. |
+| `credit_balance` / `credit_ledger` / `credit_purchase` | `schema/billing.ts` | User credit balances, append-only credit audit journal (including `admin_grant`), and purchase lifecycle records. |
 | `subscription` / `subscription_payment` | `schema/billing.ts` | Active subscription state per user and per-attempt payment tracking preventing reference replay. |
 | `user` / `session` / `account` | `schema/auth.ts` | better-auth tables for identity, credentials, and session management. |
 

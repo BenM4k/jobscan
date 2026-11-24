@@ -170,7 +170,7 @@ export async function scoreJobAction(
       const scoreRes = await jobService.scoreJobWithAI(
         parsed.data.jobId,
         userId,
-        parsed.data.provider,
+        undefined,
         parsed.data.resumeId,
       );
       if (!scoreRes.ok) return scoreRes;
@@ -681,21 +681,28 @@ export async function triggerDrcCrawlAction(keyword?: string) {
     };
 
   try {
-    const { runDrcCrawler } = await import("@/services/crawler/run");
-    const crawlResult = await runDrcCrawler(
-      keyword,
-      sessionResult.value.user.id,
-    );
-    if (!crawlResult.success) {
-      return {
-        success: false,
-        error: crawlResult.error || "DRC crawl search failed",
-      };
-    }
-    return { success: true, data: crawlResult };
+    const { inngest } = await import("@/inngest/client");
+    const target = keyword?.trim() || undefined;
+    await inngest.send({
+      name: "job.fetch.requested",
+      data: {
+        source: "drc",
+        target,
+        userId: sessionResult.value.user.id,
+      },
+    });
+    return {
+      success: true,
+      queued: true,
+      data: {
+        queued: true,
+        totalUpserted: 0,
+        sources: [],
+      },
+    };
   } catch (E) {
     console.error(E);
-    const message = E instanceof Error ? E.message : "DRC crawl search failed";
+    const message = E instanceof Error ? E.message : "Failed to queue DRC job fetch";
     return { success: false, error: message };
   }
 }

@@ -1,5 +1,7 @@
 import { Suspense } from "react";
 import { getCachedJobById, getCachedMasterResumes } from "@/lib/cached-data";
+import { getInterviewQuestionsForEntry, type InterviewQuestionItem } from "@/services/interview.service";
+import { getJobPipelineTimeline } from "@/services/job-history.service";
 import { requireSession } from "@/lib/auth-guard";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -63,6 +65,20 @@ async function JobDetailContent({
     ? sanitizeJobDescriptionHtml(jobResult.value.description)
     : undefined;
 
+  const entryId = jobResult.value.pipelineEntryId;
+  const [questionsRes, timelineRes] = entryId
+    ? await Promise.all([
+        getInterviewQuestionsForEntry(entryId, userId),
+        getJobPipelineTimeline(entryId, userId),
+      ])
+    : [null, null];
+
+  const initialInterviewQuestions =
+    questionsRes?.ok && Array.isArray(questionsRes.value?.questions)
+      ? (questionsRes.value.questions as InterviewQuestionItem[])
+      : [];
+  const initialTimeline = timelineRes?.ok ? timelineRes.value : [];
+
   return (
     <JobDetailView
       initialJob={jobResult.value}
@@ -70,6 +86,8 @@ async function JobDetailContent({
       initialResumes={
         resumesResult.ok && resumesResult.value ? resumesResult.value : []
       }
+      initialInterviewQuestions={initialInterviewQuestions}
+      initialTimeline={initialTimeline}
     />
   );
 }

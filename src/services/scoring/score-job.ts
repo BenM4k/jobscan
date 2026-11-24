@@ -11,6 +11,7 @@ import { logAiCall } from "@/services/ai/with-cost-tracking";
 import * as skillsService from "@/services/skills.service";
 import { computeHybridScore } from "@/services/job.service";
 import { isHybridScoringEnabled } from "@/services/flags";
+import { getGlobalAiProvider } from "@/services/ai/provider-config";
 
 /**
  * Versioned label stored across hybrid score records.
@@ -175,11 +176,13 @@ export async function scoreJobForResume(
     );
 
     // C. Skill-gap + "Why this matched" explanation call (Step 13 combined)
+    const activeProvider = await getGlobalAiProvider();
     const matchRes = await skillsService.analyzeJobResumeMatch(
       job.description || "",
       resume.content,
       jobLanguage,
-      userId
+      userId,
+      activeProvider
     );
 
     let existingJobSkills: string[] = [];

@@ -169,7 +169,7 @@ export async function executeGrantCredits(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   userId: string,
   amount: number,
-  action: "purchase" | "signup_grant" | "refund",
+  action: "purchase" | "signup_grant" | "refund" | "admin_grant",
   relatedId?: string | null
 ): Promise<Result<{ balanceAfter: number }, AppError>> {
   if (amount <= 0) {
@@ -228,7 +228,7 @@ export async function executeGrantCredits(
 export async function grantCreditsWithLock(
   userId: string,
   amount: number,
-  action: "purchase" | "signup_grant" | "refund",
+  action: "purchase" | "signup_grant" | "refund" | "admin_grant",
   relatedId?: string | null
 ): Promise<Result<{ balanceAfter: number }, AppError>> {
   if (amount <= 0) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateObject } from "ai";
-import { AI_MODEL, getGoogleModel, ResumeProfileSchema } from "@/lib/ai";
+import { ResumeProfileSchema } from "@/lib/ai";
+import { getActiveLanguageModel } from "@/services/ai/provider-config";
 import { requireSession } from "@/lib/auth-guard";
 import { checkRateLimit } from "@/services/ai/rate-limit";
 import * as opsDal from "@/dal/ops.dal";
@@ -70,7 +71,11 @@ export async function POST(req: NextRequest) {
     }
 
     const sanitizedText = parsed.data.text.replace(/"""/g, "'''");
-    const model = getGoogleModel();
+    const {
+      model,
+      provider: activeProvider,
+      modelId: activeModelId,
+    } = await getActiveLanguageModel();
 
     const prompt = `CANDIDATE RESUME TEXT:
 """
@@ -89,8 +94,8 @@ ${sanitizedText}
       .logAiCall({
         userId,
         feature: "explanation",
-        provider: "gemini",
-        model: AI_MODEL,
+        provider: activeProvider,
+        model: activeModelId,
         inputTokens: usage?.inputTokens ?? null,
         outputTokens: usage?.outputTokens ?? null,
         costEstimateUsd: "0.0005",

@@ -15,7 +15,6 @@ interface ProfileViewModeProps {
   experience: ExperienceItem[];
   resumeText: string;
   parsedSkillsList: string[];
-  aiProvider: string;
   aiUsage?: UserAiUsage | null;
   aiUsageError?: boolean;
   resumeLabel?: string;
@@ -34,7 +33,6 @@ export function ProfileViewMode({
   experience,
   resumeText,
   parsedSkillsList,
-  aiProvider,
   aiUsage,
   aiUsageError = false,
   resumeLabel,
@@ -74,7 +72,6 @@ export function ProfileViewMode({
       />
 
       <ProfileSidebar
-        aiProvider={aiProvider}
         skillsCount={parsedSkillsList.length}
         resumeLength={resumeText.length}
         experienceCount={experience.length}

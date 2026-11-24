@@ -10,8 +10,8 @@ Jobpilot aggregates opportunities across several distinct channels:
 
 | Category | Sources | Implementation Location | Notes |
 | :--- | :--- | :--- | :--- |
-| **ATS On-Demand Adapters** | Ashby, Greenhouse, Lever, RemoteOK | `src/services/adapters/` | Standardized JSON/API interfaces. |
-| **Local / Scraped Boards** | CongoJob, Emploi.cd (`emploi_cd`), FECRDC (`fecrdc`), UNJobs, ReliefWeb | `src/services/crawler/sources/` | HTML scraping and semi-structured feeds (DRC and regional focus, expanding globally). `isDrcJob` excludes `"cd"` substring false positives like `"CI/CD"`. |
+| **ATS On-Demand Adapters** | Ashby, Greenhouse, Lever, RemoteOK | `src/services/adapters/` | Standardized JSON/API interfaces (env-configurable board tokens via `ATS_*_BOARDS`). |
+| **Local / Scraped Adapters** | CongoJob, Emploi.cd (`emploi_cd`), FECRDC (`fecrdc`), UNJobs, ReliefWeb | `src/services/adapters/` & `src/services/crawler/sources/` | Unified behind `FUNCTIONAL_ADAPTERS` / `getJobSourceAdapter` with circuit breakers and background Inngest execution (`job.fetch.requested`). `isDrcJob` excludes `"cd"` substring false positives like `"CI/CD"`. |
 | **Manual User Submissions** | Direct entry | `src/app/dashboard/add-job/` | Directly maps to canonical `Job` schema without adapter fetch. |
 
 All source adapters inherit from `BaseJobSourceAdapter` in `src/services/adapters/base.ts`, implementing `saveRaw()`, `normalizeFromStored()`, and `ingest()`.

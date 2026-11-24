@@ -82,7 +82,7 @@ export function MasterResumeUpload({ onExtracted, disabled, isReplacing }: Maste
         setStepLabel(
           attempt > 1
             ? `Structuring with AI (attempt ${attempt})...`
-            : "Structuring profile with Gemini AI..."
+            : "Structuring profile with AI..."
         );
 
         // 2. Call /api/resume/extract

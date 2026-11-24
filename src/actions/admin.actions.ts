@@ -9,7 +9,14 @@ import {
   getAdminFeatureFlagAssignments,
   type FeatureFlagAssignmentWithUser,
 } from "@/services/flags";
+import { recordAdminAuditEvent } from "@/services/admin/admin.service";
+import {
+  SUPPORTED_AI_PROVIDERS,
+  setGlobalAiProvider,
+  type GlobalAiProvider,
+} from "@/services/ai/provider-config";
 import { SETTINGS_TAG, ADMIN_OVERVIEW_TAG, revalidateTags } from "@/lib/cache-tags";
+import { ok, err, type Result } from "@/lib/result";
 import { z } from "zod";
 
 const searchUsersSchema = z.object({
@@ -30,6 +37,10 @@ const removeOverrideSchema = z.object({
 const setGlobalFlagSchema = z.object({
   flagKey: z.string().min(1),
   enabled: z.boolean(),
+});
+
+const setGlobalAiProviderSchema = z.object({
+  provider: z.enum(SUPPORTED_AI_PROVIDERS),
 });
 
 /**
@@ -86,6 +97,12 @@ export async function setUserFlagOverrideAction(
   );
 
   if (res.success) {
+    await recordAdminAuditEvent({
+      adminUserId: sessionResult.value.user.id,
+      targetUserId: parsed.data.targetUserId,
+      action: "flag_user_override",
+      metadata: { flagKey: parsed.data.flagKey, enabled: parsed.data.enabled },
+    });
     revalidateTags([SETTINGS_TAG, ADMIN_OVERVIEW_TAG]);
   }
 
@@ -121,6 +138,12 @@ export async function removeUserFlagOverrideAction(
   );
 
   if (res.success) {
+    await recordAdminAuditEvent({
+      adminUserId: sessionResult.value.user.id,
+      targetUserId: parsed.data.targetUserId,
+      action: "flag_user_override_removed",
+      metadata: { flagKey: parsed.data.flagKey },
+    });
     revalidateTags([SETTINGS_TAG, ADMIN_OVERVIEW_TAG]);
   }
 
@@ -152,6 +175,11 @@ export async function setGlobalFlagAction(
   const res = await setGlobalFlagState(parsed.data.flagKey, parsed.data.enabled);
 
   if (res.success) {
+    await recordAdminAuditEvent({
+      adminUserId: sessionResult.value.user.id,
+      action: "flag_global_toggle",
+      metadata: { flagKey: parsed.data.flagKey, enabled: parsed.data.enabled },
+    });
     revalidateTags([SETTINGS_TAG, ADMIN_OVERVIEW_TAG]);
   }
 
@@ -179,4 +207,36 @@ export async function getAdminOverridesAction(
 
   const overrides = await getAdminFeatureFlagAssignments(flagKey);
   return { success: true, overrides };
+}
+
+/**
+ * Admin action: Update the global AI provider used across the entire app.
+ */
+export async function setGlobalAiProviderAction(
+  provider: GlobalAiProvider
+): Promise<Result<{ provider: GlobalAiProvider }, string>> {
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok || !sessionResult.value) {
+    return err("Unauthorized");
+  }
+
+  if (!isAdmin(sessionResult.value.user)) {
+    return err("Forbidden: Admin privileges required");
+  }
+
+  const parsed = setGlobalAiProviderSchema.safeParse({ provider });
+  if (!parsed.success) {
+    return err("Invalid AI provider");
+  }
+
+  const updateRes = await setGlobalAiProvider(
+    parsed.data.provider,
+    sessionResult.value.user.id
+  );
+  if (!updateRes.ok) {
+    return err(updateRes.error.message || "Failed to update global AI provider");
+  }
+
+  revalidateTags([ADMIN_OVERVIEW_TAG]);
+  return ok(updateRes.value);
 }

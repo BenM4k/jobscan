@@ -23,6 +23,7 @@ export const creditLedgerActionEnum = pgEnum("credit_ledger_action", [
   "tailored_cover_letter",
   "interview_prep",
   "refund",
+  "admin_grant",
 ]);
 
 export const creditCostActionEnum = pgEnum("credit_cost_action", [

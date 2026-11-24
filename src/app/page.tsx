@@ -224,7 +224,7 @@ export default async function LandingPage() {
               <div className="p-3 bg-gray-50 dark:bg-slate-950 rounded-xl text-center border border-gray-100 dark:border-slate-800">
                 <span className="text-base block mb-1">🤖</span>
                 <span className="text-[10px] font-bold text-gray-700 dark:text-slate-300">
-                  Gemini Flash
+                  AI Matching
                 </span>
               </div>
             </div>

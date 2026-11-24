@@ -9,7 +9,11 @@ import { JobDetailHeader } from "./JobDetailHeader";
 import { JobScoreSection } from "./JobScoreSection";
 import { JobTailoredResumeSection } from "./JobTailoredResumeSection";
 import { JobCoverLetterSection } from "./JobCoverLetterSection";
+import { JobInterviewPrepSection } from "./JobInterviewPrepSection";
 import { JobDescriptionSection } from "./JobDescriptionSection";
+import { PipelineTimelineSection } from "./PipelineTimelineSection";
+import type { InterviewQuestionItem } from "@/dal/interview.dal";
+import type { PipelineTimelineItem } from "@/services/job-history.service";
 import { useJobScoring } from "./useJobScoring";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -30,21 +34,27 @@ interface JobDetailViewProps {
   initialJob: JobSelect;
   initialResumes?: MasterResumeSelect[];
   sanitizedDescriptionHtml?: string;
+  initialInterviewQuestions?: InterviewQuestionItem[];
+  initialTimeline?: PipelineTimelineItem[];
 }
 
 export function JobDetailView({
   initialJob,
   initialResumes = [],
   sanitizedDescriptionHtml,
+  initialInterviewQuestions = [],
+  initialTimeline = [],
 }: JobDetailViewProps) {
   const tCommon = useTranslations("common");
   const tDash = useTranslations("dashboard");
   const tJob = useTranslations("jobDetail");
   const [job, setJob] = useState<JobSelect>(initialJob);
+  const [timeline, setTimeline] =
+    useState<PipelineTimelineItem[]>(initialTimeline);
   const [resumes, setResumes] = useState<MasterResumeSelect[]>(initialResumes);
   const initialActive = initialResumes.find((r) => r.isActive);
   const [selectedResumeId, setSelectedResumeId] = useState<string | undefined>(
-    initialActive?.id || initialResumes[0]?.id
+    initialActive?.id || initialResumes[0]?.id,
   );
   const [createResumeOpen, setCreateResumeOpen] = useState(false);
   const router = useRouter();
@@ -78,6 +88,10 @@ export function JobDetailView({
         status: newStatus,
         location: "detail",
       });
+      setTimeline((prev) => [
+        { id: `local-${Date.now()}`, status: newStatus, changedAt: new Date() },
+        ...prev,
+      ]);
       toast.success(`Status updated to ${newStatus}`);
     }
   };
@@ -123,6 +137,20 @@ export function JobDetailView({
         selectedResumeId={selectedResumeId}
       />
 
+      <JobInterviewPrepSection
+        job={job}
+        selectedResumeId={selectedResumeId}
+        initialQuestions={initialInterviewQuestions}
+        onPipelineEntryResolved={(pipelineEntryId) =>
+          setJob((prev) => ({
+            ...prev,
+            id: pipelineEntryId,
+            pipelineEntryId,
+            canonicalJobId: prev.canonicalJobId ?? prev.id,
+          }))
+        }
+      />
+
       {/* AI Toolkit Area Disclaimer (single instance) */}
       <div className="py-3.5 flex items-center gap-2 text-sm text-muted-foreground font-normal font-sans">
         <Info className="size-4.5 text-muted-foreground/70 shrink-0" />
@@ -138,8 +166,13 @@ export function JobDetailView({
         }
       />
 
+      <PipelineTimelineSection events={timeline} />
+
       {/* Missing Master Resume Modal */}
-      <Dialog open={scoring.missingResumeOpen} onOpenChange={scoring.setMissingResumeOpen}>
+      <Dialog
+        open={scoring.missingResumeOpen}
+        onOpenChange={scoring.setMissingResumeOpen}
+      >
         <DialogContent className="sm:max-w-md p-6 space-y-4">
           <DialogHeader>
             <div className="flex items-center gap-2">

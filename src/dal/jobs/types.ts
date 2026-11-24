@@ -51,6 +51,8 @@ export type JobLanguage = (typeof jobLanguageEnum.enumValues)[number];
 
 export interface JobSelect {
   id: string;
+  pipelineEntryId?: string;
+  canonicalJobId?: string;
   userId: string;
   source: string;
   externalId: string;
@@ -82,6 +84,7 @@ export interface JobSelect {
   tailoredResume: string | null;
   tailoredResumeData: TailoredResumeData | null;
   tailoredResumeRecordId?: string;
+  tailoredCoverLetterRecordId?: string;
   resumeIdUsed?: string | null;
   status: JobStatus;
   createdAt: Date;
@@ -120,6 +123,8 @@ export function pipelineEntryToJobSelect(
 
   return {
     id: entry.id,
+    pipelineEntryId: entry.id,
+    canonicalJobId: entry.jobId,
     userId: entry.userId,
     source: entry.job.source,
     externalId: entry.job.externalId || "",
@@ -144,6 +149,7 @@ export function pipelineEntryToJobSelect(
     tailoredResume: entry.tailoredResume?.content || null,
     tailoredResumeData: null,
     tailoredResumeRecordId: entry.tailoredResume?.id,
+    tailoredCoverLetterRecordId: entry.tailoredCoverLetter?.id,
     resumeIdUsed: entry.resumeIdUsed,
     status: entry.status,
     createdAt: entry.createdAt,

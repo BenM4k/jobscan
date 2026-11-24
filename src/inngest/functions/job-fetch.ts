@@ -1,7 +1,6 @@
 import { inngest } from "../client";
 import { jobFetchRequestedEvent } from "../events";
 import { fetchAndUpsertJobs } from "@/services/job.service";
-import { runDrcCrawler } from "@/services/crawler/run";
 
 export const ALL_JOB_SOURCES = [
   "greenhouse",
@@ -12,6 +11,15 @@ export const ALL_JOB_SOURCES = [
   "emploi_cd",
   "fecrdc",
   "unjobs",
+  "reliefweb",
+] as const;
+
+export const DRC_JOB_SOURCES = [
+  "reliefweb",
+  "emploi_cd",
+  "congojob",
+  "unjobs",
+  "fecrdc",
 ] as const;
 
 export type SupportedSourceId = (typeof ALL_JOB_SOURCES)[number];
@@ -74,13 +82,46 @@ export const jobFetchRequested = inngest.createFunction(
     const { source = "all", target, userId } = event.data;
 
     if (source === "drc") {
-      return await step.run("fetch-drc", async () => {
-        const crawlResult = await runDrcCrawler(target, userId, { drcOnly: true });
-        return {
-          success: crawlResult.success,
-          totalUpserted: crawlResult.totalUpserted,
-        };
-      });
+      let totalUpserted = 0;
+      let totalFetched = 0;
+      let totalFailed = 0;
+      const results: Array<{
+        source: string;
+        success: boolean;
+        fetched?: number;
+        upserted?: number;
+        failed?: number;
+        error?: string;
+      }> = [];
+
+      for (const s of DRC_JOB_SOURCES) {
+        const stepRes = await step.run(`fetch-drc-${s}`, async () => {
+          const res = await fetchAndUpsertJobs(s, target, userId);
+          if (!res.ok) {
+            return {
+              source: s,
+              success: false,
+              fetched: 0,
+              upserted: 0,
+              failed: 0,
+              error: res.error.message,
+            };
+          }
+          return { success: true, ...res.value };
+        });
+        results.push(stepRes);
+        totalUpserted += stepRes.upserted || 0;
+        totalFetched += stepRes.fetched || 0;
+        totalFailed += stepRes.failed || 0;
+      }
+
+      return {
+        success: results.some((r) => r.success),
+        totalUpserted,
+        totalFetched,
+        totalFailed,
+        results,
+      };
     }
 
     if (source === "all") {
