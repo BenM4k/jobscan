@@ -83,13 +83,16 @@ src/
     (auth)/                 # Authentication route group (sign-in, sign-up)
     dashboard/              # Authenticated user dashboard
       page.tsx              # Job feed & pipeline state
-      profile/              # Resume management (transitional legacy mirror)
+      error.tsx             # Dashboard error boundary
+      loading.tsx           # Dashboard loading skeleton
+      profile/              # Resume management (canonical master_resume mirror)
       jobs/[jobId]/         # Job details, score breakdown, AI tailoring
       add-job/              # Manual job addition
-      billing/              # Credits & subscription billing hub
+      billing/              # Credits & subscription billing hub (+ loading.tsx)
       settings/             # Account preferences & user feature flags
       admin/                # Platform administration console
         layout.tsx          # Server-side admin role guard & sub-navigation tabs
+        error.tsx           # Admin console error boundary
         page.tsx            # Overview metrics dashboard
         users/              # User management (roles, bans, credits)
         billing/            # Financial credit audit ledger
@@ -103,11 +106,11 @@ src/
   components/               # React UI components
     ui/                     # Official shadcn/ui primitives (dropdown-menu, dialog, button, sonner)
     shared/                 # Reusable domain components composed from ui/
-    layout/                 # App navigation (Navbar, NavbarUserDropdown using shadcn DropdownMenu)
-    job/                    # JobScoreSection, MatchExplanation, SkillGapBreakdown, JobCard
-    billing/                # CreditBalanceIndicator, CreditPurchaseCard, SubscriptionCard, InsufficientCreditsDialog
-    settings/               # Settings & feature flag cards
-    admin/                  # AdminNav, AdminStatCard, AdminUsersTable, AdminUserRow, AiUsageTable, GrantCreditsDialog, GiftSubscriptionDialog, BanUserDialog, AdminFeatureFlagsManager
+    layout/                 # App navigation (Navbar, PublicNavbar, NavbarMobile, NavbarUserDropdown)
+    job/                    # JobScoreSection, MatchExplanation, SkillGapBreakdown, JobCard, JobDescriptionSection
+    billing/                # CreditBalanceIndicator, CreditPurchaseCard, CreditPackGrid, SubscriptionCard, SubscriptionActionArea, InsufficientCreditsDialog
+    settings/               # Settings, AddPasskeyDialog, PasskeyManagementCard & feature flag cards
+    admin/                  # AdminNav, AdminStatCard, AdminUsersTable, AdminUserRow, AiUsageTable, GrantCreditsDialog, GiftSubscriptionDialog, BanUserDialog, AdminFeatureFlagsManager, GlobalFlagsCard, UserFlagOverrideForm, ActiveOverridesTable
 
   actions/                  # Server actions (validation + auth boundary → service layer)
     admin.actions.ts        # Admin feature flags actions
@@ -123,7 +126,7 @@ src/
     flags/                  # Feature flags service with 60s Redis caching
     reliability/            # Adapter circuit breaker with exponential backoff
     cache/                  # Redis client (sole importer of @upstash/redis)
-    auth/                   # better-auth configuration & admin role verification
+    auth/                   # better-auth configuration, auth.service.ts & admin role verification
     db/schema/              # Modular Drizzle schemas (pipeline, resume, scoring, ops, auth, billing)
 
   dal/                      # Data Access Layer (the ONLY layer calling Drizzle directly: jobs, billing, growth, admin, etc.)

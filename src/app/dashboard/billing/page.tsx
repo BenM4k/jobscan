@@ -2,6 +2,7 @@ import React, { Suspense } from "react";
 import { requireSession } from "@/lib/auth-guard";
 import { redirect } from "next/navigation";
 import { getCachedBillingData } from "@/lib/cached-data";
+import { getBillingOverviewData } from "@/services/billing/billing.service";
 import { BillingDashboardView } from "@/components/billing/BillingDashboardView";
 import { BillingSkeleton } from "@/components/billing/BillingSkeleton";
 
@@ -20,7 +21,23 @@ async function BillingContent() {
 
   const userId = session.value.user.id;
 
-  const data = await getCachedBillingData(userId);
+  let data: Awaited<ReturnType<typeof getCachedBillingData>> | null = null;
+  try {
+    const cached = await getCachedBillingData(userId);
+    if (cached.packs.length > 0 && cached.plans.length > 0) {
+      data = cached;
+    }
+  } catch {
+    // Fall back to live overview loader so transient snapshot read errors can recover or propagate cleanly.
+  }
+
+  if (!data) {
+    const overviewRes = await getBillingOverviewData(userId);
+    if (!overviewRes.ok) {
+      throw overviewRes.error;
+    }
+    data = overviewRes.value;
+  }
 
   return (
     <BillingDashboardView

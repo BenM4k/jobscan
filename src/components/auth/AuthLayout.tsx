@@ -67,9 +67,9 @@ export function AuthLayout({ children }: AuthLayoutProps) {
       </div>
 
       {/* Card Form Wrapper */}
-      <div className="bg-white dark:bg-slate-900 border border-gray-200/90 dark:border-slate-800 p-8 rounded-3xl max-w-md w-full space-y-6 shadow-[0_20px_50px_rgba(0,0,0,0.08)] dark:shadow-none z-10 transition duration-300">
+      <main className="bg-white dark:bg-slate-900 border border-gray-200/90 dark:border-slate-800 p-8 rounded-3xl max-w-md w-full space-y-6 shadow-[0_20px_50px_rgba(0,0,0,0.08)] dark:shadow-none z-10 transition duration-300">
         {children}
-      </div>
+      </main>
     </div>
   );
 }

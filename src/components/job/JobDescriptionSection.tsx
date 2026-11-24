@@ -3,176 +3,22 @@
 import React, { useMemo } from "react";
 import { AlignLeft } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { sanitizeDescriptionClientFallback } from "@/lib/sanitize-job-html-client";
 
 interface JobDescriptionSectionProps {
   description?: string | null;
   sanitizedHtml?: string;
 }
 
-const ALLOWED_TAGS = new Set([
-  "P",
-  "BR",
-  "B",
-  "I",
-  "EM",
-  "STRONG",
-  "UL",
-  "OL",
-  "LI",
-]);
-
-const BLOCK_TAGS = new Set([
-  "DIV",
-  "H1",
-  "H2",
-  "H3",
-  "H4",
-  "H5",
-  "H6",
-  "SECTION",
-  "ARTICLE",
-  "HEADER",
-  "FOOTER",
-  "ASIDE",
-  "MAIN",
-  "NAV",
-  "BLOCKQUOTE",
-  "PRE",
-  "HR",
-  "TR",
-  "TD",
-  "TH",
-  "DT",
-  "DD",
-  "FIGCAPTION",
-]);
-
-const SELF_BREAKING_TAGS = new Set(["P", "UL", "OL", "BR"]);
-
-function isMeaningfulDomNode(node: Node): boolean {
-  if (node.nodeType === Node.TEXT_NODE) {
-    return Boolean(node.textContent?.trim());
-  }
-  return node.nodeType === Node.ELEMENT_NODE;
-}
-
-function getDomTag(node: Node | undefined): string | undefined {
-  if (!node || node.nodeType !== Node.ELEMENT_NODE) return undefined;
-  return (node as HTMLElement).tagName.toUpperCase();
-}
-
-function sanitizeDescriptionClientFallback(rawHtml?: string | null): string {
-  if (!rawHtml) return "";
-  if (typeof window === "undefined") {
-    return "";
-  }
-
-  try {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(rawHtml, "text/html");
-
-    const cleanNode = (node: Node) => {
-      const children = Array.from(node.childNodes);
-      for (const child of children) {
-        if (child.nodeType === Node.COMMENT_NODE) {
-          node.removeChild(child);
-          continue;
-        }
-        if (child.nodeType === Node.ELEMENT_NODE) {
-          const el = child as HTMLElement;
-          const tagName = el.tagName.toUpperCase();
-
-          if (!ALLOWED_TAGS.has(tagName)) {
-            if (
-              [
-                "SCRIPT",
-                "STYLE",
-                "IFRAME",
-                "OBJECT",
-                "EMBED",
-                "SVG",
-                "MATH",
-                "FORM",
-                "INPUT",
-                "TEXTAREA",
-                "SELECT",
-                "BUTTON",
-                "NOSCRIPT",
-              ].includes(tagName)
-            ) {
-              el.remove();
-              continue;
-            }
-            if (tagName === "HR") {
-              node.replaceChild(doc.createElement("br"), el);
-              continue;
-            }
-
-            const prevNodes: Node[] = [];
-            for (let p = el.previousSibling; p; p = p.previousSibling) {
-              if (isMeaningfulDomNode(p)) {
-                prevNodes.push(p);
-                break;
-              }
-            }
-            const nextNodes: Node[] = [];
-            for (let n = el.nextSibling; n; n = n.nextSibling) {
-              if (isMeaningfulDomNode(n)) {
-                nextNodes.push(n);
-                break;
-              }
-            }
-
-            const frag = doc.createDocumentFragment();
-            while (el.firstChild) {
-              frag.appendChild(el.firstChild);
-            }
-            cleanNode(frag);
-
-            if (BLOCK_TAGS.has(tagName)) {
-              const meaningful = Array.from(frag.childNodes).filter(isMeaningfulDomNode);
-              if (meaningful.length > 0) {
-                const firstTag = getDomTag(meaningful[0]);
-                const lastTag = getDomTag(meaningful[meaningful.length - 1]);
-                const prevTag = getDomTag(prevNodes[0]);
-                const nextTag = getDomTag(nextNodes[0]);
-
-                if (
-                  prevNodes.length > 0 &&
-                  (!firstTag || !SELF_BREAKING_TAGS.has(firstTag)) &&
-                  (!prevTag || !SELF_BREAKING_TAGS.has(prevTag))
-                ) {
-                  frag.insertBefore(doc.createElement("br"), frag.firstChild);
-                }
-                if (
-                  nextNodes.length > 0 &&
-                  (!lastTag || !SELF_BREAKING_TAGS.has(lastTag)) &&
-                  (!nextTag || !SELF_BREAKING_TAGS.has(nextTag))
-                ) {
-                  frag.appendChild(doc.createElement("br"));
-                }
-              }
-            }
-
-            node.replaceChild(frag, el);
-            continue;
-          }
-
-          for (const attr of Array.from(el.attributes)) {
-            el.removeAttribute(attr.name);
-          }
-
-          cleanNode(el);
-        }
-      }
-    };
-
-    cleanNode(doc.body);
-    return doc.body.innerHTML;
-  } catch {
-    return "";
-  }
-}
+const PLAIN_HEADING_PREFIXES = [
+  "Job Summary",
+  "What You'll Do",
+  "What You Bring",
+  "Requirements",
+  "Qualifications",
+  "Responsibilities",
+  "About ",
+];
 
 export function JobDescriptionSection({
   description,
@@ -190,7 +36,6 @@ export function JobDescriptionSection({
 
   return (
     <section aria-label={t("jobDescription")} className="py-4 space-y-3">
-      {/* Header Row: Icon (18px) + Title (text-sm font-medium) + Description (text-sm text-muted) */}
       <div className="flex items-start gap-3">
         <AlignLeft className="size-4.5 text-muted-foreground dark:text-zinc-400 shrink-0 mt-0.5" />
         <div className="space-y-0.5">
@@ -203,7 +48,6 @@ export function JobDescriptionSection({
         </div>
       </div>
 
-      {/* Content Block: indented ~30px under title, 2px border, 14px padding, text-sm font, leading-relaxed, capped height with auto overflow */}
       <div className="ml-7.5 border-l-2 border-border dark:border-zinc-800 pl-3.5 pr-3 text-sm leading-relaxed text-gray-600 dark:text-zinc-300 max-h-105 overflow-y-auto font-sans wrap-break-word min-w-0">
         {isHtml ? (
           <div
@@ -219,13 +63,7 @@ export function JobDescriptionSection({
                   .filter(Boolean)
                   .map((paragraph, index) => {
                     const isHeading =
-                      paragraph.startsWith("Job Summary") ||
-                      paragraph.startsWith("What You'll Do") ||
-                      paragraph.startsWith("What You Bring") ||
-                      paragraph.startsWith("Requirements") ||
-                      paragraph.startsWith("Qualifications") ||
-                      paragraph.startsWith("Responsibilities") ||
-                      paragraph.startsWith("About ") ||
+                      PLAIN_HEADING_PREFIXES.some((prefix) => paragraph.startsWith(prefix)) ||
                       paragraph.endsWith(":");
 
                     if (isHeading) {

@@ -1,11 +1,13 @@
 import "server-only";
 
 import * as billingDal from "@/dal/billing.dal";
+import { seedBillingDefaultsIfEmpty } from "@/dal/billing-seed.dal";
 import { setUserFeatureFlagOverride, FEATURE_FLAGS } from "@/services/flags";
 import { upsertUserPreferences } from "@/dal/growth.dal";
 import { ok, err, type Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 import { getPaymentProvider } from "./provider-factory";
+import { verifySasPayAmountAndCurrency } from "./saspay/saspay-provider";
 import { BILLING_TAG, NAVBAR_TAG, revalidateTags } from "@/lib/cache-tags";
 import { cacheGet, cacheSet } from "@/services/cache/redis-client";
 
@@ -532,4 +534,339 @@ export function canCreatePersona(
     };
   }
   return { allowed: true };
+}
+
+/** Ensures default billing SKUs and credit costs are seeded when empty. */
+export async function ensureBillingCatalogSeeded(): Promise<Result<void, AppError>> {
+  return await seedBillingDefaultsIfEmpty();
+}
+
+/** Retrieves a user's current credit balance via Billing DAL. */
+export async function getUserCreditBalance(
+  userId: string
+): Promise<Result<number, AppError>> {
+  return await billingDal.getCreditBalance(userId);
+}
+
+/** Retrieves recent credit ledger transactions for a user. */
+export async function getUserCreditLedger(
+  userId: string,
+  limit = 50
+): Promise<Result<billingDal.CreditLedgerSelect[], AppError>> {
+  return await billingDal.getCreditLedger(userId, limit);
+}
+
+/** Loads the user's credit balance, subscription, and active billing SKUs (seeding catalog if empty). */
+export async function getBillingOverviewData(userId: string): Promise<
+  Result<
+    {
+      balance: number;
+      subscription: billingDal.SubscriptionSelect | null;
+      packs: billingDal.CreditPackSelect[];
+      plans: billingDal.SubscriptionPlanSelect[];
+      ledger: billingDal.CreditLedgerSelect[];
+    },
+    AppError
+  >
+> {
+  const [balanceRes, subRes, initialPacksRes, initialPlansRes, ledgerRes] =
+    await Promise.all([
+      billingDal.getCreditBalance(userId),
+      billingDal.getUserSubscription(userId),
+      billingDal.getCreditPacks(true),
+      billingDal.getSubscriptionPlans(true),
+      billingDal.getCreditLedger(userId, 50),
+    ]);
+
+  if (!balanceRes.ok) return err(balanceRes.error);
+  if (!subRes.ok) return err(subRes.error);
+  if (!initialPacksRes.ok) return err(initialPacksRes.error);
+  if (!initialPlansRes.ok) return err(initialPlansRes.error);
+
+  let packs = initialPacksRes.value;
+  let plans = initialPlansRes.value;
+
+  if (packs.length === 0 || plans.length === 0) {
+    const seedRes = await seedBillingDefaultsIfEmpty();
+    const [refetchedPacks, refetchedPlans] = await Promise.all([
+      billingDal.getCreditPacks(true),
+      billingDal.getSubscriptionPlans(true),
+    ]);
+    if (refetchedPacks.ok && refetchedPacks.value.length > 0) {
+      packs = refetchedPacks.value;
+    }
+    if (refetchedPlans.ok && refetchedPlans.value.length > 0) {
+      plans = refetchedPlans.value;
+    }
+    if (packs.length === 0 || plans.length === 0) {
+      if (!refetchedPacks.ok) return err(refetchedPacks.error);
+      if (!refetchedPlans.ok) return err(refetchedPlans.error);
+      if (!seedRes.ok) return err(seedRes.error);
+      return err(
+        new AppError("DB_ERROR", "Billing catalog could not be initialized")
+      );
+    }
+  }
+
+  return ok({
+    balance: balanceRes.value,
+    subscription: subRes.value,
+    packs,
+    plans,
+    ledger: ledgerRes.ok ? ledgerRes.value : [],
+  });
+}
+
+/** Read-only cached billing snapshot without write side effects. */
+export async function readBillingSnapshot(userId: string): Promise<{
+  balance: number;
+  subscription: billingDal.SubscriptionSelect | null;
+  packs: billingDal.CreditPackSelect[];
+  plans: billingDal.SubscriptionPlanSelect[];
+  ledger: billingDal.CreditLedgerSelect[];
+}> {
+  const [balanceRes, subRes, packsRes, plansRes, ledgerRes] = await Promise.all([
+    billingDal.getCreditBalance(userId),
+    billingDal.getUserSubscription(userId),
+    billingDal.getCreditPacks(true),
+    billingDal.getSubscriptionPlans(true),
+    billingDal.getCreditLedger(userId, 50),
+  ]);
+
+  if (!balanceRes.ok) throw balanceRes.error;
+  if (!subRes.ok) throw subRes.error;
+  if (!packsRes.ok) throw packsRes.error;
+  if (!plansRes.ok) throw plansRes.error;
+
+  return {
+    balance: balanceRes.value,
+    subscription: subRes.value,
+    packs: packsRes.value,
+    plans: plansRes.value,
+    ledger: ledgerRes.ok ? ledgerRes.value : [],
+  };
+}
+
+/** Verifies payment provider status, validates amount/currency, and confirms delivery atomically. */
+export async function checkAndConfirmPurchaseStatus(
+  userId: string,
+  providerReference: string
+): Promise<
+  Result<
+    {
+      status: "pending" | "confirmed" | "failed";
+      balance?: number;
+      subscription?: billingDal.SubscriptionSelect | null;
+    },
+    AppError
+  >
+> {
+  const [purchaseRes, subPaymentRes, subRes] = await Promise.all([
+    billingDal.getCreditPurchaseByReference(providerReference),
+    billingDal.getSubscriptionPaymentByReference(providerReference),
+    billingDal.getSubscriptionByProviderReference(providerReference),
+  ]);
+
+  const purchase = purchaseRes.ok ? purchaseRes.value : null;
+  const subPayment = subPaymentRes.ok ? subPaymentRes.value : null;
+  const legacySub = !subPayment && subRes.ok ? subRes.value : null;
+
+  const ownerPurchase = purchase && purchase.userId === userId ? purchase : null;
+  const ownerSubPayment =
+    subPayment && subPayment.userId === userId ? subPayment : null;
+  const ownerLegacySub =
+    legacySub && legacySub.userId === userId ? legacySub : null;
+
+  if (!ownerPurchase && !ownerSubPayment && !ownerLegacySub) {
+    return err(
+      new AppError("NOT_FOUND", "Payment reference not found or access denied")
+    );
+  }
+
+  const isMockAllowed =
+    process.env.PAYMENT_PROVIDER === "mock" &&
+    (process.env.NODE_ENV !== "production" ||
+      process.env.ALLOW_MOCK_PAYMENTS === "true");
+
+  if (isMockAllowed && providerReference.startsWith("mock_")) {
+    if (ownerPurchase && ownerPurchase.status === "pending") {
+      const elapsed = Date.now() - new Date(ownerPurchase.createdAt).getTime();
+      if (elapsed >= 2000) {
+        const mockConfirmRes = await confirmCreditPurchase(providerReference);
+        if (!mockConfirmRes.ok) {
+          return err(
+            new AppError(
+              mockConfirmRes.error.code,
+              "Unable to confirm credit purchase right now. Please retry.",
+              mockConfirmRes.error
+            )
+          );
+        }
+      }
+    } else if (ownerSubPayment && ownerSubPayment.status === "pending") {
+      const elapsed = Date.now() - new Date(ownerSubPayment.createdAt).getTime();
+      if (elapsed >= 2000) {
+        const mockSubConfirmRes = await confirmSubscription(providerReference);
+        if (!mockSubConfirmRes.ok) {
+          return err(
+            new AppError(
+              mockSubConfirmRes.error.code,
+              "Unable to confirm subscription right now. Please retry.",
+              mockSubConfirmRes.error
+            )
+          );
+        }
+      }
+    } else if (
+      ownerLegacySub &&
+      (ownerLegacySub.status === "past_due" ||
+        ownerLegacySub.provider === "admin_gift")
+    ) {
+      const elapsed = Date.now() - new Date(ownerLegacySub.createdAt).getTime();
+      if (elapsed >= 2000) {
+        const mockLegacyConfirmRes = await confirmSubscription(providerReference);
+        if (!mockLegacyConfirmRes.ok) {
+          return err(
+            new AppError(
+              mockLegacyConfirmRes.error.code,
+              "Unable to confirm subscription right now. Please retry.",
+              mockLegacyConfirmRes.error
+            )
+          );
+        }
+      }
+    }
+  }
+
+  const provider = getPaymentProvider();
+  const verified = provider.verifyPaymentDetails
+    ? await provider.verifyPaymentDetails(providerReference)
+    : { status: await provider.checkPurchaseStatus(providerReference) };
+  const status = verified.status;
+
+  if (status === "confirmed") {
+    if (provider.name === "saspay") {
+      if (ownerPurchase) {
+        const packRes = await billingDal.getCreditPackById(
+          ownerPurchase.creditPackId
+        );
+        if (!packRes.ok || !packRes.value) {
+          return err(
+            new AppError(
+              "NOT_FOUND",
+              "Credit pack not found for verification"
+            )
+          );
+        }
+        const amountCheck = verifySasPayAmountAndCurrency(
+          {
+            currency: verified.currency,
+            requested_amount: verified.requestedAmount,
+            debited_amount: verified.debitedAmount,
+          },
+          packRes.value.priceCents
+        );
+        if (!amountCheck.valid) {
+          console.warn(
+            `[Billing Service] Rejecting polled purchase ${providerReference}: ${amountCheck.reason}`
+          );
+          return err(
+            new AppError(
+              "VALIDATION_ERROR",
+              "Verified payment amount or currency mismatch"
+            )
+          );
+        }
+      } else {
+        const planId = ownerSubPayment?.planId ?? ownerLegacySub?.planId ?? "";
+        const plansRes = await billingDal.getSubscriptionPlans(false);
+        const plan = plansRes.ok
+          ? plansRes.value.find((p) => p.id === planId)
+          : undefined;
+        if (!plan) {
+          return err(
+            new AppError(
+              "NOT_FOUND",
+              "Subscription plan not found for verification"
+            )
+          );
+        }
+        const amountCheck = verifySasPayAmountAndCurrency(
+          {
+            currency: verified.currency,
+            requested_amount: verified.requestedAmount,
+            debited_amount: verified.debitedAmount,
+          },
+          plan.priceCentsMonthly
+        );
+        if (!amountCheck.valid) {
+          console.warn(
+            `[Billing Service] Rejecting polled subscription ${providerReference}: ${amountCheck.reason}`
+          );
+          return err(
+            new AppError(
+              "VALIDATION_ERROR",
+              "Verified payment amount or currency mismatch"
+            )
+          );
+        }
+      }
+    }
+
+    if (ownerPurchase && ownerPurchase.status !== "confirmed") {
+      const confirmRes = await confirmCreditPurchase(providerReference);
+      if (!confirmRes.ok) {
+        return err(
+          new AppError(
+            confirmRes.error.code,
+            "Unable to confirm credit purchase right now. Please retry.",
+            confirmRes.error
+          )
+        );
+      }
+    } else if (ownerSubPayment && ownerSubPayment.status !== "confirmed") {
+      const confirmRes = await confirmSubscription(providerReference, {
+        verifiedProviderSuccess: provider.name === "saspay",
+      });
+      if (!confirmRes.ok) {
+        return err(
+          new AppError(
+            confirmRes.error.code,
+            "Unable to confirm subscription right now. Please retry.",
+            confirmRes.error
+          )
+        );
+      }
+    } else if (
+      ownerLegacySub &&
+      (ownerLegacySub.status !== "active" ||
+        ownerLegacySub.provider === "admin_gift")
+    ) {
+      const confirmRes = await confirmSubscription(providerReference, {
+        verifiedProviderSuccess: provider.name === "saspay",
+      });
+      if (!confirmRes.ok) {
+        return err(
+          new AppError(
+            confirmRes.error.code,
+            "Unable to confirm subscription right now. Please retry.",
+            confirmRes.error
+          )
+        );
+      }
+    }
+
+    const [balanceRes, latestSubRes] = await Promise.all([
+      billingDal.getCreditBalance(userId),
+      billingDal.getUserSubscription(userId),
+    ]);
+
+    return ok({
+      status: "confirmed",
+      balance: balanceRes.ok ? balanceRes.value : undefined,
+      subscription: latestSubRes.ok ? latestSubRes.value : undefined,
+    });
+  }
+
+  return ok({ status });
 }

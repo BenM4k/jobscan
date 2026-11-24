@@ -16,7 +16,7 @@ export default function RouteError({
   }, [error]);
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0A0A0C] text-gray-900 dark:text-zinc-100 font-sans flex items-center justify-center p-6 selection:bg-rose-500 selection:text-white relative overflow-hidden">
+    <main className="min-h-screen bg-[#FAFAFA] dark:bg-[#0A0A0C] text-gray-900 dark:text-zinc-100 font-sans flex items-center justify-center p-6 selection:bg-rose-500 selection:text-white relative overflow-hidden">
       {/* Subtle Dot Grid Background Pattern */}
       <div
         className="absolute inset-0 pointer-events-none opacity-40 dark:opacity-20"
@@ -62,6 +62,6 @@ export default function RouteError({
           </Link>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

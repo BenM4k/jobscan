@@ -45,6 +45,7 @@ export const pipelineEntry = pgTable(
   (t) => [
     uniqueIndex("pipeline_entry_user_job_idx").on(t.userId, t.jobId),
     index("pipeline_entry_user_idx").on(t.userId),
+    index("pipeline_entry_job_id_idx").on(t.jobId),
   ]
 );
 

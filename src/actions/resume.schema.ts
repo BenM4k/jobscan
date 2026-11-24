@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sanitizeExternalUrl } from "@/lib/safe-url";
 
 const resumeSkillItemSchema = z
   .string()
@@ -15,7 +16,14 @@ export const createMasterResumeSchema = z.object({
   label: z.string().min(1, "Label is required").max(60),
   content: z.string().min(10, "Resume content must be at least 10 characters"),
   language: z.enum(["en", "fr"]).default("en"),
-  fileUrl: z.string().url().optional(),
+  fileUrl: z
+    .string()
+    .url()
+    .refine(
+      (val) => sanitizeExternalUrl(val) !== null,
+      "URL must use http:// or https://"
+    )
+    .optional(),
   skills: resumeSkillsSchema,
 });
 

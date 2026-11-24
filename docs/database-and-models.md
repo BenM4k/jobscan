@@ -41,9 +41,8 @@ Jobpilot uses **Drizzle ORM** with PostgreSQL. Schema definitions are organized 
 ## 3. Legacy Schema Isolation
 
 - **Migration `0010_shocking_power_pack.sql`** permanently dropped the legacy `jobs`, `profile`, and `deleted_jobs` tables.
-- **Transitional Compatibility File `src/services/db/schema/legacy.ts`:** Retained solely as a compatibility file for `profile.dal.ts` during transitional `/dashboard/profile` UI usage.
-- **Canonical Store:** `master_resume` is the canonical store of record for candidate profiles and resumes. Any database access targeting the dropped legacy `profile` table is strictly best-effort and caught safely.
-- **Do Not Re-Export:** `schema/legacy.ts` is intentionally **NOT** exported from `schema/index.ts`. New features must never import or bind to legacy schema.
+- **Canonical Store:** `master_resume` and `resume_skill` are the canonical stores of record for candidate profiles and resumes. `profile.dal.ts` has been migrated to query canonical `master_resume` and `resume_skill` exclusively.
+- **Transitional Compatibility File `src/services/db/schema/legacy.ts`:** Intentionally **NOT** exported from `schema/index.ts`. New features must never import or bind to legacy schema.
 
 ---
 
@@ -79,9 +78,11 @@ Jobpilot uses **Drizzle ORM** with PostgreSQL. Schema definitions are organized 
 
 ---
 
-## 5. Schema Conventions & Migrations
+## 5. Schema Conventions, Indexes & Migrations
 
 - **Keys & Timestamps:** Every table must define an explicit `id` (UUID default random), `createdAt` (timestamp default now), and `updatedAt` (timestamp with automatic or application update).
+- **Performance Indexes (`0026_purple_morg.sql` & follow-up ordering migration):** Core hot paths are indexed across `job` (`job_posted_at_idx` matching `posted_at DESC NULLS LAST, created_at DESC`), `job_source_ref` (`job_source_ref_job_id_idx`), `pipeline_entry` (`pipeline_entry_job_id_idx`), `score` (`score_pipeline_entry_created_idx` matching `pipeline_entry_id ASC, created_at DESC`), `ai_call_log` (`ai_call_log_user_created_idx`), and `feature_flag_assignment` (`feature_flag_assignment_user_idx`).
+- **Index Migration Rollout Policy:** Because `drizzle-kit migrate` runs each SQL migration inside a transaction block (where PostgreSQL disallows `CREATE INDEX CONCURRENTLY`), ingestion and scoring background writers (Inngest cron/workers) should be paused before running `pnpm db:migrate` on index migrations and resumed once the migration commits.
 - **Migration Workflow:**
   1. Modify schemas in `src/services/db/schema/*.ts`.
   2. Inspect changes with `pnpm drizzle-kit generate`.

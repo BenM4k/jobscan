@@ -47,9 +47,9 @@ export function SignUpForm() {
   return (
     <>
       <div className="text-center space-y-1">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">
+        <h1 className="text-xl font-bold text-gray-900 dark:text-slate-100">
           {t("signUpTitle")}
-        </h2>
+        </h1>
         <p className="text-xs text-gray-500 dark:text-slate-400">
           {t("signUpSubtitle")}
         </p>
@@ -64,10 +64,14 @@ export function SignUpForm() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider mb-1">
+          <label
+            htmlFor="signup-name"
+            className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider mb-1"
+          >
             {t("fullNameLabel")}
           </label>
           <input
+            id="signup-name"
             type="text"
             required
             autoComplete="name"
@@ -79,10 +83,14 @@ export function SignUpForm() {
         </div>
 
         <div>
-          <label className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider mb-1">
+          <label
+            htmlFor="signup-email"
+            className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider mb-1"
+          >
             {t("emailLabel")}
           </label>
           <input
+            id="signup-email"
             type="email"
             required
             autoComplete="email"

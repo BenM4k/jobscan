@@ -5,7 +5,7 @@ import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
 import * as flagsDal from "./flags.dal";
 
-import { eq, and, gte } from "drizzle-orm";
+import { eq, and, gte, count, sql } from "drizzle-orm";
 
 export type AiFeature = (typeof aiFeatureEnum.enumValues)[number];
 
@@ -30,7 +30,7 @@ export interface UserAiUsageSummary {
 }
 
 const defaultLogAiCallImpl = async (
-  params: LogAiCallParams
+  params: LogAiCallParams,
 ): Promise<Result<void, AppError>> => {
   try {
     await db.insert(aiCallLog).values({
@@ -53,13 +53,13 @@ const defaultLogAiCallImpl = async (
 let logAiCallImpl = defaultLogAiCallImpl;
 
 export async function logAiCall(
-  params: LogAiCallParams
+  params: LogAiCallParams,
 ): Promise<Result<void, AppError>> {
   return logAiCallImpl(params);
 }
 
 export function setLogAiCallImplementation(
-  impl?: (params: LogAiCallParams) => Promise<Result<void, AppError>>
+  impl?: (params: LogAiCallParams) => Promise<Result<void, AppError>>,
 ) {
   logAiCallImpl = impl || defaultLogAiCallImpl;
 }
@@ -69,65 +69,58 @@ export function setLogAiCallImplementation(
  */
 export async function getUserAiUsageSummary(
   userId: string,
-  monthlyLimit: number = 50
+  monthlyLimit: number = 50,
 ): Promise<Result<UserAiUsageSummary, AppError>> {
   try {
     const now = new Date();
-    const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const periodStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+    );
 
-    const rows = await db
+    const [row] = await db
       .select({
-        inputTokens: aiCallLog.inputTokens,
-        outputTokens: aiCallLog.outputTokens,
-        costEstimateUsd: aiCallLog.costEstimateUsd,
-        cacheHit: aiCallLog.cacheHit,
+        usedCount: count(),
+        totalTokens: sql<number>`COALESCE(SUM(COALESCE(${aiCallLog.inputTokens}, 0) + COALESCE(${aiCallLog.outputTokens}, 0)), 0)`,
+        totalCost: sql<string>`COALESCE(SUM(COALESCE(${aiCallLog.costEstimateUsd}, 0)), 0)`,
+        cacheHitCount: sql<number>`COUNT(*) FILTER (WHERE ${aiCallLog.cacheHit} = true)`,
       })
       .from(aiCallLog)
       .where(
         and(
           eq(aiCallLog.userId, userId),
-          gte(aiCallLog.createdAt, periodStart)
-        )
+          gte(aiCallLog.createdAt, periodStart),
+        ),
       );
 
-    let totalTokens = 0;
-    let totalCost = 0;
-    let cacheHitCount = 0;
-
-    for (const r of rows) {
-      totalTokens += (r.inputTokens || 0) + (r.outputTokens || 0);
-      if (r.costEstimateUsd) {
-        totalCost += parseFloat(r.costEstimateUsd) || 0;
-      }
-      if (r.cacheHit) {
-        cacheHitCount++;
-      }
-    }
-
     return ok({
-      usedCount: rows.length,
+      usedCount: Number(row?.usedCount ?? 0),
       monthlyLimit,
-      totalTokens,
-      totalCostEstimateUsd: totalCost.toFixed(4),
-      cacheHitCount,
+      totalTokens: Number(row?.totalTokens ?? 0),
+      totalCostEstimateUsd: Number(row?.totalCost ?? 0).toFixed(4),
+      cacheHitCount: Number(row?.cacheHitCount ?? 0),
       periodStart,
     });
   } catch (error) {
     console.error("Failed to get user AI usage summary:", error);
-    return err(new AppError("DB_ERROR", "Failed to get user AI usage summary", error));
+    return err(
+      new AppError("DB_ERROR", "Failed to get user AI usage summary", error),
+    );
   }
 }
 
 export async function isFeatureEnabled(
   key: string,
-  userId?: string
+  userId?: string,
 ): Promise<boolean> {
   try {
     const flag = await flagsDal.getFeatureFlagByKey(key);
     if (!flag) return false;
 
     if (userId) {
-      const assignment = await flagsDal.getFeatureFlagAssignment(flag.id, userId);
+      const assignment = await flagsDal.getFeatureFlagAssignment(
+        flag.id,
+        userId,
+      );
       if (assignment) return assignment.enabled;
     }
 

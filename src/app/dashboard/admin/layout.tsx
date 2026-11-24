@@ -4,7 +4,7 @@ import { isAdmin } from "@/services/auth/admin";
 import { redirect } from "next/navigation";
 import { Shield, ShieldAlert } from "lucide-react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { AdminNav } from "@/components/admin/AdminNav";
 
 export const metadata = {
@@ -43,10 +43,11 @@ async function AdminGuard({ children }: { children: React.ReactNode }) {
           Your account does not have administrator privileges to view this console. If you believe this is an error, contact your system administrator.
         </p>
         <div className="pt-4">
-          <Link href="/dashboard">
-            <Button variant="outline" className="text-xs">
-              Return to Dashboard
-            </Button>
+          <Link
+            href="/dashboard"
+            className={buttonVariants({ variant: "outline", className: "text-xs" })}
+          >
+            Return to Dashboard
           </Link>
         </div>
       </main>
@@ -78,10 +79,6 @@ async function AdminGuard({ children }: { children: React.ReactNode }) {
     </main>
   );
 }
-
-// TODO: Cache Components adoption. Refactor this route so this opt-out can be removed.
-// See: https://nextjs.org/docs/app/guides/migrating-to-cache-components
-export const instant = false;
 
 export default function AdminLayout({
   children,

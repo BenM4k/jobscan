@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { JobSelect } from "@/dal/jobs.dal";
 import { toast } from "sonner";
@@ -45,6 +45,7 @@ export function useTailoredResume({ job, onJobUpdated, selectedResumeId }: UseTa
     requiredCost: number;
     currentBalance: number;
   }>({ requiredCost: 5, currentBalance: 0 });
+  const abortControllerRef = useRef<AbortController | null>(null);
   const pendingIdempotencyKeyRef = useRef<string | null>(null);
   const pendingResumeIdRef = useRef<string | undefined>(undefined);
 
@@ -59,10 +60,23 @@ export function useTailoredResume({ job, onJobUpdated, selectedResumeId }: UseTa
   });
 
   const cancelRetry = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
     pendingIdempotencyKeyRef.current = null;
     pendingResumeIdRef.current = undefined;
     retryRunner.cancelRetry();
   }, [retryRunner]);
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
+  }, []);
 
   const handleGenerate = async () => {
     if (
@@ -75,38 +89,49 @@ export function useTailoredResume({ job, onJobUpdated, selectedResumeId }: UseTa
     const idempotencyKey = pendingIdempotencyKeyRef.current;
 
     const result = await retryRunner.execute(async () => {
-      const res = await fetch(`/api/jobs/${job.id}/tailor-resume`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": idempotencyKey,
-        },
-        body: JSON.stringify({ idempotencyKey, resumeId: selectedResumeId }),
-      });
+      abortControllerRef.current?.abort();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
 
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        if (res.status === 402 || errJson.code === "insufficient_credits") {
-          setIsInsufficientCreditsOpen(true);
-          setInsufficientCreditsData({
-            requiredCost: errJson.details?.requiredCost ?? 5,
-            currentBalance: errJson.details?.currentBalance ?? 0,
-          });
+      try {
+        const res = await fetch(`/api/jobs/${job.id}/tailor-resume`, {
+          method: "POST",
+          signal: controller.signal,
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": idempotencyKey,
+          },
+          body: JSON.stringify({ idempotencyKey, resumeId: selectedResumeId }),
+        });
+
+        if (!res.ok) {
+          const errJson = await res.json().catch(() => ({}));
+          if (res.status === 402 || errJson.code === "insufficient_credits") {
+            setIsInsufficientCreditsOpen(true);
+            setInsufficientCreditsData({
+              requiredCost: errJson.details?.requiredCost ?? 5,
+              currentBalance: errJson.details?.currentBalance ?? 0,
+            });
+          }
+
+          const msg = errJson.error || `Tailoring failed with status ${res.status}`;
+          const errorObj = new Error(msg) as Error & {
+            status?: number;
+            code?: string;
+            retryAfterSeconds?: number;
+          };
+          errorObj.status = res.status;
+          errorObj.code = errJson.code;
+          errorObj.retryAfterSeconds = errJson.retryAfterSeconds;
+          throw errorObj;
         }
 
-        const msg = errJson.error || `Tailoring failed with status ${res.status}`;
-        const errorObj = new Error(msg) as Error & {
-          status?: number;
-          code?: string;
-          retryAfterSeconds?: number;
-        };
-        errorObj.status = res.status;
-        errorObj.code = errJson.code;
-        errorObj.retryAfterSeconds = errJson.retryAfterSeconds;
-        throw errorObj;
+        return await res.json();
+      } finally {
+        if (abortControllerRef.current === controller) {
+          abortControllerRef.current = null;
+        }
       }
-
-      return await res.json();
     });
 
     if (result) {

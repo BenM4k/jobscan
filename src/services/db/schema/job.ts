@@ -92,6 +92,7 @@ export const job = pgTable(
     ),
     index("job_simhash_idx").on(t.simhash),
     index("job_description_tsv_idx").using("gin", t.descriptionTsv),
+    index("job_posted_at_idx").on(t.postedAt.desc().nullsLast(), t.createdAt.desc()),
   ]
 );
 
@@ -129,5 +130,6 @@ export const jobSourceRef = pgTable(
   },
   (t) => [
     uniqueIndex("job_source_ref_unique_idx").on(t.source, t.externalId),
+    index("job_source_ref_job_id_idx").on(t.jobId),
   ]
 );

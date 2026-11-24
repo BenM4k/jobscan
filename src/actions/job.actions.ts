@@ -463,6 +463,16 @@ export async function generateTailoredCoverLetterAction(
   };
 }
 
+const fetchMoreJobsSchema = z.object({
+  statusFilter: z.string().min(1).max(50).optional(),
+  sourceFilter: z.string().min(1).max(50).optional(),
+  offset: z.number().int().min(0).default(0),
+  limit: z.number().int().min(1).max(100).default(20),
+  startDate: z.string().max(64).optional(),
+  endDate: z.string().max(64).optional(),
+  queryFilter: z.string().max(200).optional(),
+});
+
 export async function fetchMoreJobsAction(
   statusFilter?: JobStatus,
   sourceFilter?: string,
@@ -479,16 +489,32 @@ export async function fetchMoreJobsAction(
       error: sessionResult.ok ? "Unauthorized" : sessionResult.error.message,
     };
 
-  const dalListResult = await (
-    await import("@/dal/jobs.dal")
-  ).listJobs(
+  const parsed = fetchMoreJobsSchema.safeParse({
     statusFilter,
     sourceFilter,
-    limit,
     offset,
+    limit,
     startDate,
     endDate,
     queryFilter,
+  });
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: parsed.error.issues[0]?.message || "Invalid pagination or filter arguments",
+    };
+  }
+
+  const dalListResult = await (
+    await import("@/dal/jobs.dal")
+  ).listJobs(
+    parsed.data.statusFilter,
+    parsed.data.sourceFilter,
+    parsed.data.limit,
+    parsed.data.offset,
+    parsed.data.startDate,
+    parsed.data.endDate,
+    parsed.data.queryFilter,
     sessionResult.value.user.id,
   );
   if (!dalListResult.ok) {

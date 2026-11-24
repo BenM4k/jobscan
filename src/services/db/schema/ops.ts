@@ -44,6 +44,7 @@ export const aiCallLog = pgTable(
   },
   (t) => [
     index("ai_call_log_user_feature_idx").on(t.userId, t.feature),
+    index("ai_call_log_user_created_idx").on(t.userId, t.createdAt),
   ]
 );
 
@@ -73,6 +74,7 @@ export const featureFlagAssignment = pgTable(
       t.featureFlagId,
       t.userId
     ),
+    index("feature_flag_assignment_user_idx").on(t.userId),
   ]
 );
 

@@ -115,20 +115,36 @@ export async function invalidateFeatureFlagCache(
         await client.srem(`flag:${flagKey}:users`, userId).catch(() => {});
       }
     } else {
-      // Global flag-change flow: invalidate anonymous entry and all cached user evaluations
+      // Global flag-change flow: invalidate anonymous entry and scan all tracked users before deleting the tracking set
       const anonKey = getFeatureFlagCacheKey(flagKey, null);
-      const keysToDel: string[] = [anonKey];
+      await cacheDel(anonKey);
+      const usersSetKey = `flag:${flagKey}:users`;
       const client = getRedisClient();
       if (client) {
-        const users = await client.smembers(`flag:${flagKey}:users`).catch(() => []);
-        if (Array.isArray(users) && users.length > 0) {
-          for (const u of users) {
-            keysToDel.push(getFeatureFlagCacheKey(flagKey, u));
+        let cursor = "0";
+        let scanComplete = false;
+        while (true) {
+          const [nextCursor, members] = await client.sscan(
+            usersSetKey,
+            cursor,
+            { count: 200 }
+          );
+          if (Array.isArray(members) && members.length > 0) {
+            await cacheDel(
+              ...members.map((u) => getFeatureFlagCacheKey(flagKey, String(u)))
+            );
           }
+          const normalizedCursor = String(nextCursor ?? "0");
+          if (!nextCursor || normalizedCursor === "0") {
+            scanComplete = true;
+            break;
+          }
+          cursor = normalizedCursor;
         }
-        keysToDel.push(`flag:${flagKey}:users`);
+        if (scanComplete) {
+          await cacheDel(usersSetKey);
+        }
       }
-      await cacheDel(...keysToDel);
     }
   } catch (err) {
     console.warn(`[Flags] Failed to invalidate cache for flag "${flagKey}":`, err);

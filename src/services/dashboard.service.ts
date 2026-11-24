@@ -1,3 +1,4 @@
+import "server-only";
 import * as jobsDal from "@/dal/jobs.dal";
 import { JobSelect } from "@/dal/jobs.dal";
 import { JobStatus } from "@/services/db/schema";
@@ -84,34 +85,39 @@ export async function getDashboardFeedData(
   const jobs = dalListResult.ok ? dalListResult.value : [];
   const totalJobs = countResult.ok ? countResult.value : jobs.length;
 
-  // If pipeline is completely empty on initial dashboard load (no filters applied),
-  // dispatch background job fetch via Inngest without blocking the request path.
-  // Uses in-memory cooldown and durable Inngest event ID to prevent concurrent duplicate workflows.
-  const dedupeKey = userId || "global-empty-feed";
-  if (
-    jobs.length === 0 &&
-    !statusFilter &&
-    !sourceFilter &&
-    !startDate &&
-    !endDate &&
-    !queryFilter &&
-    shouldDispatchEmptyFeedFetch(dedupeKey)
-  ) {
-    const bucket = Math.floor(Date.now() / EMPTY_FEED_FETCH_COOLDOWN_MS);
-    inngest
-      .send({
-        name: "job.fetch.requested",
-        id: `empty-feed-${dedupeKey}-${bucket}`,
-        data: { source: "all", userId },
-      })
-      .catch((err) => {
-        console.warn("[Dashboard] Non-blocking Inngest job fetch trigger failed:", err);
-      });
-  }
-
   return {
     jobs,
     totalJobs,
   };
+}
+
+/**
+ * Dispatches a non-blocking Inngest job fetch when an unfiltered feed is empty.
+ * Kept outside `"use cache"` boundaries so cached data fetchers remain side-effect-free.
+ */
+export function dispatchEmptyFeedFetchIfNeeded(opts: {
+  jobsCount: number;
+  hasFilters: boolean;
+  userId?: string;
+}): void {
+  const { jobsCount, hasFilters, userId } = opts;
+  if (jobsCount !== 0 || hasFilters) return;
+
+  const dedupeKey = userId || "global-empty-feed";
+  if (!shouldDispatchEmptyFeedFetch(dedupeKey)) return;
+
+  const bucket = Math.floor(Date.now() / EMPTY_FEED_FETCH_COOLDOWN_MS);
+  inngest
+    .send({
+      name: "job.fetch.requested",
+      id: `empty-feed-${dedupeKey}-${bucket}`,
+      data: { source: "all", userId },
+    })
+    .catch((err) => {
+      console.warn(
+        "[Dashboard] Non-blocking Inngest job fetch trigger failed:",
+        err
+      );
+    });
 }
 

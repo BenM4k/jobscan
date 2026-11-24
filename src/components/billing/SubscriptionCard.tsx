@@ -1,17 +1,17 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { sanitizeExternalUrl } from "@/lib/safe-url";
-import { Button } from "@/components/ui/button";
-import { SubscriptionPlanSelect, SubscriptionSelect } from "@/dal/billing.dal";
+import { SubscriptionActionArea } from "@/components/billing/SubscriptionActionArea";
+import { useBillingStatusPolling } from "@/hooks/useBillingStatusPolling";
+import type { SubscriptionPlanSelect, SubscriptionSelect } from "@/dal/billing.dal";
 import {
   initiateSubscriptionAction,
-  checkPurchaseStatusAction,
   cancelSubscriptionAction,
 } from "@/actions/billing.actions";
 import { toast } from "sonner";
-import { Crown, Check, Loader2, Phone, Sparkles } from "lucide-react";
+import { Crown, Check } from "lucide-react";
 
 interface SubscriptionSectionProps {
   plan?: SubscriptionPlanSelect | null;
@@ -44,48 +44,28 @@ export function SubscriptionSection({
     subscription?.status === "canceled" &&
     new Date(subscription.currentPeriodEnd) > new Date();
 
-  // Polling for subscription confirmation with unmount cleanup and timeout cap
-  useEffect(() => {
-    if (!pollingRef || subStatus !== "pending") return;
-
-    let cancelled = false;
-    let attempts = 0;
-    const MAX_POLL_ATTEMPTS = 60;
-
-    const interval = setInterval(async () => {
-      if (cancelled) return;
-      attempts += 1;
-      if (attempts > MAX_POLL_ATTEMPTS) {
-        clearInterval(interval);
-        setSubStatus("idle");
-        setPollingRef(null);
-        toast.error("Payment confirmation timed out. Refresh billing to check status.");
-        return;
-      }
-
-      const res = await checkPurchaseStatusAction(pollingRef);
-      if (cancelled) return;
-      if (res.success && res.data) {
-        if (res.data.status === "confirmed") {
-          setSubStatus("confirmed");
-          setPollingRef(null);
-          toast.success(t("subActivated"));
-          idempotencyKeyRef.current = crypto.randomUUID();
-          onSubscriptionUpdated?.(res.data.subscription);
-        } else if (res.data.status === "failed") {
-          setSubStatus("failed");
-          setPollingRef(null);
-          toast.error(t("subFailed"));
-          idempotencyKeyRef.current = crypto.randomUUID();
-        }
-      }
-    }, 2000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [pollingRef, subStatus, onSubscriptionUpdated, t]);
+  useBillingStatusPolling({
+    pollingRef,
+    enabled: subStatus === "pending",
+    onConfirmed: (data) => {
+      setSubStatus("confirmed");
+      setPollingRef(null);
+      toast.success(t("subActivated"));
+      idempotencyKeyRef.current = crypto.randomUUID();
+      onSubscriptionUpdated?.(data.subscription);
+    },
+    onFailed: () => {
+      setSubStatus("failed");
+      setPollingRef(null);
+      toast.error(t("subFailed"));
+      idempotencyKeyRef.current = crypto.randomUUID();
+    },
+    onTimedOut: () => {
+      setSubStatus("idle");
+      setPollingRef(null);
+      toast.error(t("paymentTimedOut"));
+    },
+  });
 
   const handleSubscribe = async () => {
     const planId = plan?.id || "pro";
@@ -197,85 +177,31 @@ export function SubscriptionSection({
         </div>
       </div>
 
-      {/* Feature List with increased spacing */}
+      {/* Feature List */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 pt-2">
-        <div className="flex items-start gap-3 text-xs sm:text-sm text-foreground/90">
-          <div className="size-4.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
-            <Check className="size-3" />
+        {(["proFeature1", "proFeature2", "proFeature3"] as const).map((key) => (
+          <div key={key} className="flex items-start gap-3 text-xs sm:text-sm text-foreground/90">
+            <div className="size-4.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+              <Check className="size-3" />
+            </div>
+            <span>{t(key)}</span>
           </div>
-          <span>{t("proFeature1")}</span>
-        </div>
-        <div className="flex items-start gap-3 text-xs sm:text-sm text-foreground/90">
-          <div className="size-4.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
-            <Check className="size-3" />
-          </div>
-          <span>{t("proFeature2")}</span>
-        </div>
-        <div className="flex items-start gap-3 text-xs sm:text-sm text-foreground/90">
-          <div className="size-4.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
-            <Check className="size-3" />
-          </div>
-          <span>{t("proFeature3")}</span>
-        </div>
+        ))}
       </div>
 
-      {/* Action Area */}
-      {isActive ? (
-        <div className="pt-4 border-t border-border/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs sm:text-sm">
-          <span className="text-muted-foreground">
-            {t("subscriptionActive", { date: formattedEnd })}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleCancel}
-            disabled={isCanceling}
-            className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 text-xs w-fit"
-          >
-            {isCanceling ? t("canceling") : t("cancelSubscription")}
-          </Button>
-        </div>
-      ) : isCanceled ? (
-        <div className="pt-4 border-t border-border/60 text-xs sm:text-sm text-amber-600 dark:text-amber-400">
-          {t("subscriptionCanceled", { date: formattedEnd })}
-        </div>
-      ) : subStatus === "pending" ? (
-        <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center gap-3 text-xs sm:text-sm max-w-xl">
-          <Loader2 className="size-4.5 animate-spin shrink-0" />
-          <span>{t("processingPayment")}</span>
-        </div>
-      ) : (
-        <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5 max-w-xl">
-          <div className="relative flex-1">
-            <Phone className="size-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="tel"
-              placeholder={t("phoneNumberPlaceholder")}
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleSubscribe();
-                }
-              }}
-              className="w-full pl-10 pr-3.5 h-10 rounded-lg border border-input bg-transparent text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
-            />
-          </div>
-          <Button
-            onClick={handleSubscribe}
-            disabled={isInitiating || !phoneNumber.trim()}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold h-10 px-6 rounded-lg shrink-0 shadow-xs transition-colors"
-          >
-            {isInitiating ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Sparkles className="size-4" />
-            )}
-            <span>{t("subscribePro", { price: priceMonthly })}</span>
-          </Button>
-        </div>
-      )}
+      <SubscriptionActionArea
+        isActive={isActive}
+        isCanceled={isCanceled}
+        formattedEnd={formattedEnd}
+        subStatus={subStatus}
+        phoneNumber={phoneNumber}
+        onPhoneNumberChange={setPhoneNumber}
+        isInitiating={isInitiating}
+        isCanceling={isCanceling}
+        priceMonthly={priceMonthly}
+        onSubscribe={handleSubscribe}
+        onCancel={handleCancel}
+      />
     </section>
   );
 }

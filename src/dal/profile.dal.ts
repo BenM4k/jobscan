@@ -1,93 +1,67 @@
 import "server-only";
-import { db } from "@/services/db";
-import { profile } from "@/services/db/schema/legacy";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
-import { eq, sql } from "drizzle-orm";
 import * as resumeDal from "./resume.dal";
 
 import type { EducationItem, ExperienceItem } from "@/lib/ai";
-
-export type ProfileInsert = typeof profile.$inferInsert;
-export type ProfileSelect = typeof profile.$inferSelect;
 import { parseResumeContent } from "@/lib/resume-format";
+
+export interface ProfileSelect {
+  id: string;
+  userId: string;
+  resumeText: string;
+  rawText: string | null;
+  summary: string | null;
+  skills: string[];
+  education: EducationItem[];
+  experience: ExperienceItem[];
+  aiProvider: string;
+  updatedAt: Date;
+}
+
+export type ProfileInsert = Partial<Omit<ProfileSelect, "id" | "userId">> & {
+  userId: string;
+  resumeText: string;
+};
 
 export async function getProfile(
   userId: string
 ): Promise<Result<ProfileSelect | null, AppError>> {
   try {
-    // 1. Check canonical master_resume table (source of truth per AGENTS.md)
     const activeRes = await resumeDal.getActiveMasterResume(userId);
     if (!activeRes.ok) {
       return err(activeRes.error);
     }
 
     const activeResume = activeRes.value;
-
-    // 2. Safe check on legacy profile table (in case it exists and has structured data)
-    let legacyProfile: ProfileSelect | null = null;
-    try {
-      const [existing] = await db
-        .select()
-        .from(profile)
-        .where(eq(profile.userId, userId))
-        .limit(1);
-      legacyProfile = existing || null;
-    } catch {
-      // Legacy table dropped in migration 0010; safely proceed with canonical master_resume
-    }
-
     const activeContent = activeResume?.content?.trim() || "";
-    const legacyContent = legacyProfile?.resumeText?.trim() || "";
 
-    // If neither table has any resume text, user has no active resume
-    if (!activeContent && !legacyContent) {
+    if (!activeResume || !activeContent) {
       return ok(null);
     }
 
-    // Prefer canonical master_resume content if available
-    const chosenResumeText = activeContent || legacyContent;
-
-    // Retrieve skills: prefer canonical resume_skill rows, fallback to legacy profile skills, then markdown
     let skills: string[] = [];
-    if (activeResume) {
-      const skillsRes = await resumeDal.getResumeSkills(activeResume.id);
-      if (skillsRes.ok && skillsRes.value && skillsRes.value.length > 0) {
-        skills = skillsRes.value;
-      }
-    }
-    if (skills.length === 0 && legacyProfile?.skills && legacyProfile.skills.length > 0) {
-      skills = legacyProfile.skills;
+    const skillsRes = await resumeDal.getResumeSkills(activeResume.id);
+    if (skillsRes.ok && skillsRes.value && skillsRes.value.length > 0) {
+      skills = skillsRes.value;
     }
 
-    // Parse structured markdown sections from resume content
-    const parsed = parseResumeContent(chosenResumeText);
-
+    const parsed = parseResumeContent(activeContent);
     if (skills.length === 0 && parsed.skills.length > 0) {
       skills = parsed.skills;
     }
 
-    const summary = legacyProfile?.summary || parsed.summary || null;
-    const education =
-      legacyProfile?.education && legacyProfile.education.length > 0
-        ? legacyProfile.education
-        : parsed.education;
-    const experience =
-      legacyProfile?.experience && legacyProfile.experience.length > 0
-        ? legacyProfile.experience
-        : parsed.experience;
-
     const synthesizedProfile: ProfileSelect = {
-      id: activeResume?.id || legacyProfile?.id || userId,
-      userId: activeResume?.userId || legacyProfile?.userId || userId,
-      resumeText: chosenResumeText,
-      rawText: legacyProfile?.rawText || activeResume?.content || chosenResumeText,
-      summary,
+      id: activeResume.id,
+      userId: activeResume.userId,
+      resumeText: activeContent,
+      rawText: activeResume.content,
+      summary: parsed.summary || null,
       skills,
-      education: education as EducationItem[],
-      experience: experience as ExperienceItem[],
-      aiProvider: legacyProfile?.aiProvider || "gemini",
-      updatedAt: activeResume?.updatedAt || legacyProfile?.updatedAt || new Date(),
+      education: parsed.education,
+      experience: parsed.experience,
+      aiProvider: "gemini",
+      updatedAt: activeResume.updatedAt,
     };
 
     return ok(synthesizedProfile);
@@ -101,7 +75,6 @@ export async function upsertProfile(
   data: Partial<Omit<ProfileInsert, "id" | "userId">> & { resumeText: string }
 ): Promise<Result<ProfileSelect, AppError>> {
   try {
-    // 1. Always update or create the canonical master_resume first
     const activeRes = await resumeDal.getActiveMasterResume(userId);
     if (!activeRes.ok) {
       return err(activeRes.error);
@@ -136,41 +109,7 @@ export async function upsertProfile(
       savedResume = createRes.value;
     }
 
-    // 2. Best-effort mirror to legacy profile table if it exists in current environment
-    let legacyUpserted: ProfileSelect | null = null;
-    try {
-      const [upserted] = await db
-        .insert(profile)
-        .values({
-          userId,
-          resumeText: data.resumeText,
-          rawText: data.rawText,
-          summary: data.summary,
-          skills: data.skills ?? [],
-          education: data.education ?? [],
-          experience: data.experience ?? [],
-          aiProvider: data.aiProvider ?? "gemini",
-        })
-        .onConflictDoUpdate({
-          target: profile.userId,
-          set: {
-            resumeText: data.resumeText,
-            rawText: data.rawText !== undefined ? data.rawText : sql`${profile.rawText}`,
-            summary: data.summary !== undefined ? data.summary : sql`${profile.summary}`,
-            skills: data.skills !== undefined ? data.skills : sql`${profile.skills}`,
-            education: data.education !== undefined ? data.education : sql`${profile.education}`,
-            experience: data.experience !== undefined ? data.experience : sql`${profile.experience}`,
-            aiProvider: data.aiProvider !== undefined ? data.aiProvider : sql`${profile.aiProvider}`,
-            updatedAt: new Date(),
-          },
-        })
-        .returning();
-      legacyUpserted = upserted || null;
-    } catch {
-      // Legacy table dropped in migration 0010; ignore safely
-    }
-
-    const finalProfile: ProfileSelect = legacyUpserted || {
+    const finalProfile: ProfileSelect = {
       id: savedResume.id,
       userId,
       resumeText: data.resumeText,

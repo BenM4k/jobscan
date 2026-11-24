@@ -1,18 +1,21 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useId, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
-interface PasswordInputProps
-  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "type"> {
+interface PasswordInputProps extends Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  "type"
+> {
   label?: string;
   error?: string;
   containerClassName?: string;
 }
 
 export function PasswordInput({
+  id,
   label,
   error,
   className,
@@ -20,24 +23,30 @@ export function PasswordInput({
   disabled,
   ...props
 }: PasswordInputProps) {
+  const generatedId = useId();
+  const inputId = id ?? generatedId;
   const [showPassword, setShowPassword] = useState(false);
   const t = useTranslations("auth");
 
   return (
     <div className={cn("space-y-1", containerClassName)}>
       {label && (
-        <label className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider">
+        <label
+          htmlFor={inputId}
+          className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider"
+        >
           {label}
         </label>
       )}
       <div className="relative flex items-center">
         <input
+          id={inputId}
           type={showPassword ? "text" : "password"}
           disabled={disabled}
           className={cn(
             "w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-800 dark:text-slate-200 text-base sm:text-xs font-medium rounded-xl py-3 pl-3 pr-10 focus:ring-2 focus:ring-blue-500 focus:outline-none transition disabled:opacity-50",
             error && "border-rose-500 focus:ring-rose-500",
-            className
+            className,
           )}
           {...props}
         />
@@ -56,7 +65,9 @@ export function PasswordInput({
           )}
         </button>
       </div>
-      {error && <p className="text-[11px] font-semibold text-rose-500">{error}</p>}
+      {error && (
+        <p className="text-[11px] font-semibold text-rose-500">{error}</p>
+      )}
     </div>
   );
 }

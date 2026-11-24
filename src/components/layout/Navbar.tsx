@@ -8,8 +8,8 @@ import { NavbarMobile } from "@/components/layout/NavbarMobile";
 import { NavbarUserDropdown } from "@/components/layout/NavbarUserDropdown";
 import { NavbarTelemetry } from "@/components/layout/NavbarTelemetry";
 import { CreditBalanceIndicator } from "@/components/billing/CreditBalanceIndicator";
-import { getCreditBalance } from "@/dal/billing.dal";
-import { cacheTag } from "next/cache";
+import { cacheTag, cacheLife } from "next/cache";
+import { getUserCreditBalance } from "@/services/billing/billing.service";
 import { NAVBAR_TAG, BILLING_TAG } from "@/lib/cache-tags";
 
 interface NavbarProps {
@@ -29,6 +29,7 @@ export async function Navbar({
   locale = "en",
 }: NavbarProps) {
   "use cache";
+  cacheLife("minutes");
   cacheTag(NAVBAR_TAG);
   if (userId) {
     cacheTag(BILLING_TAG);
@@ -36,7 +37,7 @@ export async function Navbar({
 
   const t = await getTranslations({ locale, namespace: "nav" });
 
-  const balanceRes = userId ? await getCreditBalance(userId) : null;
+  const balanceRes = userId ? await getUserCreditBalance(userId) : null;
   const creditBalance = balanceRes?.ok ? balanceRes.value : 0;
 
   const navLinks: NavLinkItem[] = [

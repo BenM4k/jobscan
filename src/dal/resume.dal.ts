@@ -9,7 +9,7 @@ import {
 } from "@/services/db/schema";
 import { ok, err, Result } from "@/lib/result";
 import { AppError } from "@/lib/errors";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { normalizeSkillName } from "@/lib/skills";
 import { parseResumeContent } from "@/lib/resume-format";
 
@@ -255,25 +255,26 @@ export async function syncResumeSkills(
       );
       if (cleanNames.length === 0) return ok(undefined);
 
-      for (const name of cleanNames) {
-        const [sk] = await tx
-          .insert(skill)
-          .values({ name })
-          .onConflictDoUpdate({
-            target: skill.name,
-            set: { name },
-          })
-          .returning();
+      await tx
+        .insert(skill)
+        .values(cleanNames.map((name) => ({ name })))
+        .onConflictDoNothing({ target: skill.name });
 
-        if (sk) {
-          await tx
-            .insert(resumeSkill)
-            .values({
+      const skillRows = await tx
+        .select({ id: skill.id })
+        .from(skill)
+        .where(inArray(skill.name, cleanNames));
+
+      if (skillRows.length > 0) {
+        await tx
+          .insert(resumeSkill)
+          .values(
+            skillRows.map((sk) => ({
               resumeId,
               skillId: sk.id,
-            })
-            .onConflictDoNothing();
-        }
+            }))
+          )
+          .onConflictDoNothing();
       }
       return ok(undefined);
     });

@@ -70,9 +70,7 @@ export function ProfileViewMode({
         resumeLanguage={resumeLanguage}
         resumeSource={resumeSource}
         onEditClick={onEditClick}
-        onReformatClick={onEditClick}
         onDeleteClick={onDeleteClick}
-        isReformatting={false}
       />
 
       <ProfileSidebar

@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { AdminUserListItem } from "@/dal/admin.dal";
-import { AdminUserRow } from "./AdminUserRow";
+import { AdminUserRow, type AdminUserDialogType } from "./AdminUserRow";
+import { GrantCreditsDialog } from "./GrantCreditsDialog";
+import { GiftSubscriptionDialog } from "./GiftSubscriptionDialog";
+import { BanUserDialog } from "./BanUserDialog";
 import { Button } from "@/components/ui/button";
 import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -27,6 +30,12 @@ export function AdminUsersTable({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchTerm, setSearchTerm] = useState(currentSearch);
+  const dialogSeqRef = useRef(0);
+  const [activeDialog, setActiveDialog] = useState<{
+    id: number;
+    type: AdminUserDialogType;
+    user: AdminUserListItem;
+  } | null>(null);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,7 +115,19 @@ export function AdminUsersTable({
                 </td>
               </tr>
             ) : (
-              users.map((u) => <AdminUserRow key={u.id} user={u} />)
+              users.map((u) => (
+                <AdminUserRow
+                  key={u.id}
+                  user={u}
+                  onOpenDialog={(type, targetUser) =>
+                    setActiveDialog({
+                      id: ++dialogSeqRef.current,
+                      type,
+                      user: targetUser,
+                    })
+                  }
+                />
+              ))
             )}
           </tbody>
         </table>
@@ -143,6 +164,40 @@ export function AdminUsersTable({
           </Button>
         </div>
       </div>
+
+      {activeDialog?.type === "credits" && (
+        <GrantCreditsDialog
+          key={activeDialog.id}
+          user={activeDialog.user}
+          isOpen
+          onClose={() => {
+            const id = activeDialog.id;
+            setActiveDialog((cur) => (cur?.id === id ? null : cur));
+          }}
+        />
+      )}
+      {activeDialog?.type === "gift" && (
+        <GiftSubscriptionDialog
+          key={activeDialog.id}
+          user={activeDialog.user}
+          isOpen
+          onClose={() => {
+            const id = activeDialog.id;
+            setActiveDialog((cur) => (cur?.id === id ? null : cur));
+          }}
+        />
+      )}
+      {activeDialog?.type === "ban" && (
+        <BanUserDialog
+          key={activeDialog.id}
+          user={activeDialog.user}
+          isOpen
+          onClose={() => {
+            const id = activeDialog.id;
+            setActiveDialog((cur) => (cur?.id === id ? null : cur));
+          }}
+        />
+      )}
     </div>
   );
 }

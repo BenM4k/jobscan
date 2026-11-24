@@ -1,6 +1,6 @@
 "use cache";
 
-import { cacheTag } from "next/cache";
+import { cacheTag, cacheLife } from "next/cache";
 import {
   DASHBOARD_FEED_TAG,
   PROFILE_TAG,
@@ -26,17 +26,17 @@ export async function getCachedDashboardFeed(opts: {
   offset: number;
   userId?: string;
 }) {
+  cacheLife("minutes");
   cacheTag(DASHBOARD_FEED_TAG);
 
-  const { getDashboardFeedData } = await import(
-    "@/services/dashboard.service"
-  );
+  const { getDashboardFeedData } = await import("@/services/dashboard.service");
   return getDashboardFeedData(opts);
 }
 
 // ── Single Job Detail ────────────────────────────────────────────────────────
 
 export async function getCachedJobById(jobId: string, userId: string) {
+  cacheLife("minutes");
   cacheTag(jobTag(jobId));
 
   const jobsDal = await import("@/dal/jobs.dal");
@@ -46,6 +46,7 @@ export async function getCachedJobById(jobId: string, userId: string) {
 // ── Profile / Active Master Resume ───────────────────────────────────────────
 
 export async function getCachedActiveResume(userId: string) {
+  cacheLife("minutes");
   cacheTag(PROFILE_TAG);
 
   const resumeDal = await import("@/dal/resume.dal");
@@ -53,6 +54,7 @@ export async function getCachedActiveResume(userId: string) {
 }
 
 export async function getCachedResumeSkills(resumeId: string) {
+  cacheLife("minutes");
   cacheTag(PROFILE_TAG);
 
   const resumeDal = await import("@/dal/resume.dal");
@@ -62,13 +64,18 @@ export async function getCachedResumeSkills(resumeId: string) {
 // ── Resume Personas List ─────────────────────────────────────────────────────
 
 export async function getCachedMasterResumes(userId: string) {
+  cacheLife("minutes");
   cacheTag(RESUMES_TAG);
 
   const resumeDal = await import("@/dal/resume.dal");
   return resumeDal.getMasterResumes(userId);
 }
 
-export async function getCachedMasterResumeById(resumeId: string, userId: string) {
+export async function getCachedMasterResumeById(
+  resumeId: string,
+  userId: string,
+) {
+  cacheLife("minutes");
   cacheTag(resumeTag(resumeId));
 
   const resumeDal = await import("@/dal/resume.dal");
@@ -78,48 +85,18 @@ export async function getCachedMasterResumeById(resumeId: string, userId: string
 // ── Billing ──────────────────────────────────────────────────────────────────
 
 export async function getCachedBillingData(userId: string) {
+  cacheLife("minutes");
   cacheTag(BILLING_TAG);
 
-  const billingDal = await import("@/dal/billing.dal");
-  const [balanceRes, subRes, initialPacksRes, initialPlansRes, ledgerRes] =
-    await Promise.all([
-      billingDal.getCreditBalance(userId),
-      billingDal.getUserSubscription(userId),
-      billingDal.getCreditPacks(true),
-      billingDal.getSubscriptionPlans(true),
-      billingDal.getCreditLedger(userId, 50),
-    ]);
-
-  let packs = initialPacksRes.ok ? initialPacksRes.value : [];
-  let plans = initialPlansRes.ok ? initialPlansRes.value : [];
-
-  if (packs.length === 0 || plans.length === 0) {
-    const { seedBillingDefaultsIfEmpty } = await import("@/dal/billing-seed.dal");
-    await seedBillingDefaultsIfEmpty();
-    const [refetchedPacks, refetchedPlans] = await Promise.all([
-      billingDal.getCreditPacks(true),
-      billingDal.getSubscriptionPlans(true),
-    ]);
-    if (refetchedPacks.ok && refetchedPacks.value.length > 0) {
-      packs = refetchedPacks.value;
-    }
-    if (refetchedPlans.ok && refetchedPlans.value.length > 0) {
-      plans = refetchedPlans.value;
-    }
-  }
-
-  return {
-    balance: balanceRes.ok ? balanceRes.value : 0,
-    subscription: subRes.ok ? subRes.value : null,
-    packs,
-    plans,
-    ledger: ledgerRes.ok ? ledgerRes.value : [],
-  };
+  const { readBillingSnapshot } =
+    await import("@/services/billing/billing.service");
+  return readBillingSnapshot(userId);
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────────
 
 export async function getCachedUserFlags(userId: string) {
+  cacheLife("minutes");
   cacheTag(SETTINGS_TAG);
 
   const { getUserFeatureFlags } = await import("@/services/flags");
@@ -127,6 +104,7 @@ export async function getCachedUserFlags(userId: string) {
 }
 
 export async function getCachedUserPreferences(userId: string) {
+  cacheLife("minutes");
   cacheTag(SETTINGS_TAG);
 
   const growthDal = await import("@/dal/growth.dal");
@@ -134,6 +112,7 @@ export async function getCachedUserPreferences(userId: string) {
 }
 
 export async function getCachedAiUsage(userId: string) {
+  cacheLife("minutes");
   cacheTag(SETTINGS_TAG);
 
   const { getUserAiUsage } = await import("@/services/ai/usage.service");
@@ -143,11 +122,10 @@ export async function getCachedAiUsage(userId: string) {
 // ── Admin Overview ───────────────────────────────────────────────────────────
 
 export async function getCachedAdminOverview() {
+  cacheLife("minutes");
   cacheTag(ADMIN_OVERVIEW_TAG);
 
-  const { getAdminOverview } = await import(
-    "@/services/admin/admin.service"
-  );
+  const { getAdminOverview } = await import("@/services/admin/admin.service");
   return getAdminOverview();
 }
 
@@ -159,6 +137,7 @@ export async function getCachedAdminUsers(opts: {
   search?: string;
   role?: string;
 }) {
+  cacheLife("minutes");
   cacheTag(ADMIN_USERS_TAG);
 
   const { getAdminUsers } = await import("@/services/admin/admin.service");
