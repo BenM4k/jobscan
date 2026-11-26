@@ -11,9 +11,11 @@ export const aiExtractedJobSchema = z.object({
   location: z
     .string()
     .describe("City, region, or country of the role, or empty string if not found."),
+  // Gemini rejects empty-string enum members in response_schema, so use an explicit
+  // "unspecified" sentinel; normalizeExtractedJobFields maps it back to "".
   workplaceType: z
-    .enum(["", "remote", "hybrid", "on-site"])
-    .describe("Workplace arrangement if stated, otherwise empty string."),
+    .enum(["unspecified", "remote", "hybrid", "on-site"])
+    .describe("Workplace arrangement if stated, otherwise 'unspecified'."),
   rawSalaryText: z
     .string()
     .describe("Salary, compensation, or stipend text as stated, or empty string."),
@@ -100,7 +102,9 @@ export function detectSmartPasteType(raw: string): SmartPasteKind {
 
 /** Normalizes and clamps extracted job fields to safe form boundaries. */
 export function normalizeExtractedJobFields(
-  input: Partial<ExtractedJobFields>
+  input: Partial<Omit<ExtractedJobFields, "workplaceType">> & {
+    workplaceType?: string;
+  }
 ): ExtractedJobFields {
   return {
     title: (input.title ?? "").trim().slice(0, 250),
